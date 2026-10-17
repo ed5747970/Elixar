@@ -171,19 +171,18 @@ namespace CDriveCleaner
             Process.Start(new ProcessStartInfo(newExe, "--apply-update \"" + Install.Current + "\" " + Process.GetCurrentProcess().Id) { UseShellExecute = false });
         }
 
+        // The new version puts itself into Program Files (only administrators can change it) and starts from there.
+        // It never writes over, or starts, a copy in a folder other programs can change (like Downloads): a link or a swapped
+        // file there could turn an administrator's write or start into someone else's. An older copy left in Downloads hands
+        // over to the newer protected copy when it starts.
         public static int Apply(string target, int pid)
         {
             try { var p = Process.GetProcessById(pid); p.WaitForExit(60000); } catch { }
-            string me = Install.Current;
-            var targets = new List<string> { target };
-            if (Install.IsInstalled && !string.Equals(Path.GetFullPath(target), Path.GetFullPath(Install.Exe), StringComparison.OrdinalIgnoreCase)) targets.Add(Install.Exe);
-            foreach (var t in targets)
-                for (int i = 0; i < 20; i++)
-                {
-                    try { File.Copy(me, t, true); break; } catch { Thread.Sleep(500); }
-                }
-            try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = false }); } catch { }
-            return 0;
+            string err = "not tried";
+            for (int i = 0; i < 20 && err != null; i++) { err = Install.Ensure(); if (err != null) Thread.Sleep(500); }
+            if (err == null) { try { Process.Start(new ProcessStartInfo(Install.Exe) { UseShellExecute = false }); } catch { } return 0; }
+            System.Windows.Forms.MessageBox.Show("The update could not be installed: " + err, "Elixar");
+            return 1;
         }
     }
 }

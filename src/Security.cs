@@ -182,7 +182,18 @@ namespace CDriveCleaner
                 {
                     var di = new DirectoryInfo(dir);
                     if ((di.Attributes & FileAttributes.ReparsePoint) != 0) return false;   // never lock through a link
-                    if (!IsLocked(dir)) di.SetAccessControl(AdminOnly(usersRead));
+                    if (!IsLocked(dir))
+                    {
+                        if (OnlyAdminsMadeAnything(dir)) di.SetAccessControl(AdminOnly(usersRead));
+                        else
+                        {
+                            // someone else made it or put things in it: links or files planted inside can't be trusted,
+                            // so it is set aside and a fresh folder is made
+                            string aside = dir.TrimEnd('\\') + ".untrusted-" + DateTime.Now.ToString("yyyyMMddHHmmss");
+                            try { Directory.Move(dir, aside); } catch { return false; }
+                            Directory.CreateDirectory(dir, AdminOnly(usersRead));
+                        }
+                    }
                 }
                 return IsLocked(dir);
             }
@@ -214,6 +225,22 @@ namespace CDriveCleaner
                 {
                     var attrs = File.GetAttributes(path);
                     if ((attrs & FileAttributes.ReparsePoint) != 0) return false;
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // the folder and everything in it were made by administrators (or Windows), and nothing inside is a link
+        public static bool OnlyAdminsMadeAnything(string dir)
+        {
+            if (!OwnedByAdmins(dir)) return false;
+            try
+            {
+                foreach (var e in Directory.EnumerateFileSystemEntries(dir, "*", SearchOption.TopDirectoryOnly))
+                {
+                    if ((File.GetAttributes(e) & FileAttributes.ReparsePoint) != 0 || !OwnedByAdmins(e)) return false;
+                    if (Directory.Exists(e) && !OnlyAdminsMadeAnything(e)) return false;
                 }
                 return true;
             }
@@ -317,7 +344,27 @@ namespace CDriveCleaner
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool SetFileInformationByHandle(SafeFileHandle h, int cls, ref FILE_DISPOSITION_INFO info, uint size);
 
-        static string Long(string p) { return p.StartsWith(@"\\?\") ? p : p.StartsWith(@"\\") ? @"\\?\UNC\" + p.Substring(2) : @"\\?\" + p; }
+        internal static string Long(string p) { return p.StartsWith(@"\\?\") ? p : p.StartsWith(@"\\") ? @"\\?\UNC\" + p.Substring(2) : @"\\?\" + p; }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern uint GetLongPathNameW(string shortPath, StringBuilder buf, uint size);
+
+        // the full name of an existing path with short (8.3) names spelled out, without following links
+        public static string LongName(string path)
+        {
+            string full = Path.GetFullPath(path);
+            var sb = new StringBuilder(1024);
+            uint n = GetLongPathNameW(Long(full), sb, (uint)sb.Capacity);
+            if (n > sb.Capacity) { sb = new StringBuilder((int)n + 1); n = GetLongPathNameW(Long(full), sb, (uint)sb.Capacity); }
+            return n == 0 ? null : Short(sb.ToString());
+        }
+
+        // no link (junction or symbolic link) anywhere in the folder's path: it really is where its name says
+        public static bool NoLinks(string dir)
+        {
+            if (!Win.IsWindows) return true;
+            try { return Same(RealPath(dir), LongName(dir)); } catch { return false; }
+        }
 
         static string Short(string p)
         {
@@ -333,7 +380,7 @@ namespace CDriveCleaner
                 return h.IsInvalid ? null : Final(h);
         }
 
-        static string Final(SafeFileHandle h)
+        internal static string Final(SafeFileHandle h)
         {
             var sb = new StringBuilder(1024);
             uint n = GetFinalPathNameByHandleW(h, sb, (uint)sb.Capacity, 0);
@@ -341,7 +388,7 @@ namespace CDriveCleaner
             return n == 0 ? null : Short(sb.ToString());
         }
 
-        static bool Same(string a, string b) { return a != null && b != null && string.Equals(a.TrimEnd('\\'), b.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase); }
+        internal static bool Same(string a, string b) { return a != null && b != null && string.Equals(a.TrimEnd('\\'), b.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase); }
 
         // the file is really where its name says (no link in the way)
         public static bool RealPathMatches(string path)
@@ -350,6 +397,7 @@ namespace CDriveCleaner
             try
             {
                 string full = Path.GetFullPath(path);
+                if (!NoLinks(Path.GetDirectoryName(full))) return false;
                 string parent = RealPath(Path.GetDirectoryName(full));
                 using (var h = CreateFileW(Long(full), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | 4, IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero))
                     return !h.IsInvalid && parent != null && Same(Final(h), parent.TrimEnd('\\') + "\\" + Path.GetFileName(full));
@@ -366,6 +414,7 @@ namespace CDriveCleaner
             if (Protect.IsProtected(full)) return false;
             string parent = Path.GetDirectoryName(full.TrimEnd('\\'));
             if (parent == null) return false;
+            if (!NoLinks(parent)) { Blocked++; return false; }   // a link somewhere above it could lead into Windows' folders
             string realParent = RealPath(parent);
             if (realParent == null) return false;
             string expected = realParent.TrimEnd('\\') + "\\" + Path.GetFileName(full.TrimEnd('\\'));
@@ -479,22 +528,24 @@ namespace CDriveCleaner
                 if (!ready && Sys.IsAdmin())
                 {
                     ready = true;
-                    try
-                    {
-                        Locked.Lock(d, true);
-                        // bring over files from the folder Elixar used to keep them in
-                        foreach (var n in new[] { "last-scan.txt", "auto-clean-history.txt", "cleaner-log.txt" })
-                        {
-                            string oldF = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, n), newF = Path.Combine(d, n);
-                            if (File.Exists(oldF) && !File.Exists(newF)) File.Copy(oldF, newF);
-                        }
-                    }
-                    catch { }
+                    try { Locked.Lock(d, true); } catch { }
                 }
                 return d;
             }
         }
         public static string FileIn(string name) { return Path.Combine(Data, name); }
+
+        // a scratch folder only administrators can open, for files an administrator writes and then uses
+        // (the user's Temp folder can be changed by any program between the write and the use)
+        public static string Work
+        {
+            get
+            {
+                if (!Win.IsWindows || !Sys.IsAdmin()) return Path.GetTempPath();
+                string w = Path.Combine(Data, "work");
+                return Locked.Lock(w, false) ? w : null;
+            }
+        }
     }
 
     // ============================ the protected copy in Program Files ============================
@@ -519,30 +570,43 @@ namespace CDriveCleaner
 
         public static bool Matches
         {
-            get { try { return IsInstalled && Trust.Sha256(Exe) == Trust.Sha256(Current); } catch { return false; } }
+            get { try { return IsInstalled && Trust.Sha256(Exe) == SelfImage.Sha256(); } catch { return false; } }
         }
 
-        // copies this Elixar.exe into Program Files (only administrators can change files there); returns an error or null
+        // copies this Elixar.exe into Program Files (only administrators can change files there); returns an error or null.
+        // The copy is made from the file Elixar has held open since it started, after checking that it is the running program,
+        // and it carries no "downloaded from the internet" mark, so Windows doesn't show its SmartScreen box for it again.
         public static string Ensure()
         {
             try
             {
-                if (RunningInstalled) return Locked.IsLocked(Exe) ? null : "The Program Files copy is not protected.";
+                if (RunningInstalled) { if (Win.IsWindows && Sys.IsAdmin()) SafeFile.RemoveDownloadMark(Exe); return Locked.IsLocked(Exe) ? null : "The Program Files copy is not protected."; }
                 if (!Sys.IsAdmin()) return "Administrator rights are needed.";
+                if (!SelfImage.Verified) return "The Elixar.exe file on disk is not the program that is running (it was changed or replaced), so it was not installed. Download Elixar again.";
                 Directory.CreateDirectory(Dir);
                 if (!Locked.IsLocked(Dir)) Locked.Lock(Dir);
                 if (!Locked.IsLocked(Dir)) return "Could not protect " + Dir + ".";
                 if (!Matches)
                 {
                     string tmp = Exe + ".new";
-                    File.Copy(Current, tmp, true);
-                    if (Trust.Sha256(tmp) != Trust.Sha256(Current)) { File.Delete(tmp); return "The copy did not match."; }
+                    if (File.Exists(tmp)) File.Delete(tmp);
+                    File.WriteAllBytes(tmp, SelfImage.Bytes());
+                    if (Trust.Sha256(tmp) != SelfImage.Sha256()) { File.Delete(tmp); return "The copy did not match."; }
                     if (File.Exists(Exe)) { try { File.Delete(Exe); } catch { File.Move(Exe, Exe + ".old-" + DateTime.Now.Ticks); } }
                     File.Move(tmp, Exe);
                 }
+                SafeFile.RemoveDownloadMark(Exe);
                 return Matches && Locked.IsLocked(Exe) ? null : "The copy in Program Files could not be checked.";
             }
             catch (Exception e) { return e.Message; }
+        }
+
+        // starts Elixar again: the protected copy when there is one (never a file in a folder other programs can change)
+        public static void Relaunch(string args)
+        {
+            string exe = Current;
+            if (Win.IsWindows && Sys.IsAdmin() && Ensure() == null && IsInstalled) exe = Exe;
+            Process.Start(new ProcessStartInfo(exe, args ?? "") { UseShellExecute = false });
         }
 
         // a schedule is safe only when it starts the protected copy

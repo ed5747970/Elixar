@@ -146,7 +146,10 @@ namespace CDriveCleaner
             {
                 long before = 0;
                 try { before = new FileInfo(d).Length; } catch { }
-                string script = Path.Combine(Path.GetTempPath(), "elixar-compact-" + Guid.NewGuid().ToString("N") + ".txt");
+                // diskpart runs as administrator: its script must be in a folder no other program can change
+                string work = Paths.Work;
+                if (work == null) { log("  Skipped " + d + ": could not prepare a protected folder for diskpart."); continue; }
+                string script = Path.Combine(work, "elixar-compact-" + Guid.NewGuid().ToString("N") + ".txt");
                 File.WriteAllText(script, DiskpartScript(d));
                 int code = Run("diskpart.exe", "/s \"" + script + "\"", 60 * 60 * 1000, out o);
                 try { File.Delete(script); } catch { }
@@ -265,6 +268,8 @@ namespace CDriveCleaner
         {
             try
             {
+                // as administrator: only when no link leads it somewhere else (like Windows' own folders)
+                if (Protect.IsProtected(path) || !SafeDelete.RealPathMatches(path)) return false;
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
                 return true;
             }

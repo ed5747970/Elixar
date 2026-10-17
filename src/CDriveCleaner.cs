@@ -25,8 +25,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("1.9.0.0")]
-[assembly: AssemblyFileVersion("1.9.0.0")]
+[assembly: AssemblyVersion("1.9.1.0")]
+[assembly: AssemblyFileVersion("1.9.1.0")]
 
 namespace CDriveCleaner
 {
@@ -640,7 +640,7 @@ namespace CDriveCleaner
             string desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             if (string.IsNullOrEmpty(desk) || !Directory.Exists(desk)) desk = AppDomain.CurrentDomain.BaseDirectory;
             string outPath = Path.Combine(desk, "c-drive-scan.json");
-            File.WriteAllText(outPath, json, new UTF8Encoding(false));
+            SafeFile.WriteText(outPath, json);
             return outPath;
         }
     }
@@ -2297,6 +2297,7 @@ namespace CDriveCleaner
                     long freed = Android.Clean(dev.Serial, I("WhatsApp media you sent"), bdir, null) + Android.Clean(dev.Serial, I("Cache of every"), null, null);
                     string cmds = File.Exists(flog) ? File.ReadAllText(flog) : "";
                     check(freed == 734003200L + 3328599654L && File.Exists(Path.Combine(bdir, "Android", "media", "com.whatsapp", "WhatsApp", "Media", "WhatsApp Video", "Sent", "VID-1.mp4")) &&
+                          !Directory.Exists(Path.Combine(bdir, PhoneBackup.Incoming)) &&
                           cmds.Contains("rm -f '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video/Sent/VID-1.mp4'") && cmds.Contains("pm trim-caches") &&
                           cmds.IndexOf("| pull |", StringComparison.Ordinal) < cmds.IndexOf("rm -f", StringComparison.Ordinal),
                           "Phone: copies your files to the PC first, then removes only those from the phone");
@@ -2316,9 +2317,11 @@ namespace CDriveCleaner
                         var media = IPhone.ListMedia(isrc, 100000, null);
                         check(media.Count == 1 && media[0].Name == "IMG_0001.MOV" && media[0].Bytes == 300000 && media[0].Folder == "DCIM/100APPLE",
                               "iPhone: Windows' shell lists photos and videos with their sizes");
-                        bool copied = IPhone.CopyTo(media[0].Path, media[0].Name, media[0].Bytes, idst);
+                        bool copied = IPhone.CopyTo(media[0].Path, media[0].Name, media[0].Bytes, idst, media[0].Folder);
                         bool deleted = copied && IPhone.Delete(media[0].Path) && !File.Exists(Path.Combine(isrc, "100APPLE", "IMG_0001.MOV"));
-                        check(copied && deleted && new FileInfo(Path.Combine(idst, "IMG_0001.MOV")).Length == 300000, "iPhone: copy, check and delete work without pop-ups");
+                        string icopy = Path.Combine(Path.Combine(Path.Combine(idst, "DCIM"), "100APPLE"), "IMG_0001.MOV");
+                        check(copied && deleted && File.Exists(icopy) && new FileInfo(icopy).Length == 300000 && !Directory.Exists(Path.Combine(idst, PhoneBackup.Incoming)),
+                              "iPhone: copy, check and delete work without pop-ups (through a protected folder)");
                         IPhone.Found ip = null; Exception ipe = null;
                         try { ip = IPhone.Find(); } catch (Exception e) { ipe = e; }
                         check(ipe == null, "iPhone: looking for an iPhone works" + (ip != null ? " (found " + ip.Name + (ip.Error != null ? ", " + ip.Error : "") + ")" : " (none plugged in)") + (ipe != null ? " ERROR: " + ipe.Message : ""));
@@ -2571,6 +2574,85 @@ namespace CDriveCleaner
                     else check(Win.SystemExe("powershell.exe") == "powershell.exe", "Windows tools are named by full path (not on Windows here)");
                 } catch (Exception ex) { check(false, "Disk health tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
 
+                // 3q. 1.9.1 hardening: the running file, link-proof copies and moves, phone names, tool locations
+                try {
+                    check(SelfImage.Verified, "Security: the Elixar.exe on disk is the program that is running" + (win ? " (checked section by section, held open so it can't be swapped)" : ""));
+                    {
+                        // the same check against a simulated Windows loader: sections laid out, addresses relocated, imports filled in
+                        byte[] fb = File.ReadAllBytes(Install.Current);
+                        Func<byte[], int, int> R32 = (b, o) => BitConverter.ToInt32(b, o);
+                        int pe = R32(fb, 0x3C), opt = pe + 24, nsec = BitConverter.ToUInt16(fb, pe + 6), optSize = BitConverter.ToUInt16(fb, pe + 20);
+                        int dd = opt + (BitConverter.ToUInt16(fb, opt) == 0x20B ? 112 : 96), tab = opt + optSize;
+                        int sizeImg = R32(fb, opt + 56), sizeHdr = R32(fb, opt + 60);
+                        Func<byte[]> load = () =>
+                        {
+                            var img = new byte[sizeImg + 64];
+                            Array.Copy(fb, img, sizeHdr);
+                            for (int i = 0; i < nsec; i++) { int o = tab + 40 * i; Array.Copy(fb, R32(fb, o + 20), img, R32(fb, o + 12), Math.Min(R32(fb, o + 16), R32(fb, o + 8))); }
+                            int rr = R32(fb, dd + 40), rs = R32(fb, dd + 44), p = rr;
+                            while (rs > 0 && p + 8 <= rr + rs) { int page = R32(img, p), blk = R32(img, p + 4); if (blk < 8) break;
+                                for (int e = p + 8; e + 2 <= p + blk; e += 2) { int v = BitConverter.ToUInt16(img, e); if (v >> 12 == 3) { int at = page + (v & 0xFFF); BitConverter.GetBytes(R32(img, at) + 0x7F0000).CopyTo(img, at); } }
+                                p += blk; }
+                            int iat = R32(fb, dd + 96), isz = R32(fb, dd + 100);
+                            for (int k = 0; k < isz; k++) img[iat + k] = 0xCC;
+                            return img;
+                        };
+                        var good = load();
+                        Func<byte[], Func<int, int, byte[]>> view = im => (at, len) => { var x = new byte[len]; Array.Copy(im, at, x, 0, len); return x; };
+                        var bad = load();
+                        int text = R32(fb, tab + 12), textLen = Math.Min(R32(fb, tab + 16), R32(fb, tab + 8));
+                        bad[text + textLen / 2] ^= 0x01;
+                        // Windows rewrites a 32-bit .NET program's header to the 64-bit form in memory: the section table moves
+                        var conv = load();
+                        Array.Copy(conv, tab, conv, tab + 16, 40 * nsec); BitConverter.GetBytes((ushort)(optSize + 16)).CopyTo(conv, pe + 20);
+                        var extra = load(); BitConverter.GetBytes((ushort)(nsec + 1)).CopyTo(extra, pe + 6);
+                        check(SelfImage.Compare(fb, view(good)) && !SelfImage.Compare(fb, view(bad)) && SelfImage.Compare(fb, view(conv)) && !SelfImage.Compare(fb, view(extra)),
+                              "Security: the running-program check accepts Windows' own changes when loading and catches a single changed byte");
+                    }
+                    string sf = Path.Combine(root, "safefile"); Directory.CreateDirectory(sf);
+                    File.WriteAllBytes(Path.Combine(sf, "a.bin"), new byte[70000]);
+                    long sc = SafeFile.Copy(Path.Combine(sf, "a.bin"), Path.Combine(sf, "b.bin"));
+                    bool noOverwrite = false; try { SafeFile.CreateNew(Path.Combine(sf, "b.bin")).Dispose(); } catch (IOException) { noOverwrite = true; }
+                    Directory.CreateDirectory(Path.Combine(sf, "into"));
+                    bool moved = SafeFile.MoveInto(Path.Combine(sf, "b.bin"), Path.Combine(sf, "into"), "c.bin");
+                    SafeFile.WriteText(Path.Combine(sf, "t.txt"), "one"); SafeFile.WriteText(Path.Combine(sf, "t.txt"), "two");
+                    check(sc == 70000 && noOverwrite && moved && new FileInfo(Path.Combine(sf, "into", "c.bin")).Length == 70000 && !File.Exists(Path.Combine(sf, "b.bin")) &&
+                          File.ReadAllText(Path.Combine(sf, "t.txt")) == "two" && SafeFile.FreeName(Path.Combine(sf, "into"), "c.bin") == "c (2).bin",
+                          "Security: careful copy, move and save work (never writing over an existing file by accident)");
+                    if (win)
+                    {
+                        string target = Path.Combine(root, "pretend-windows"), lnk = Path.Combine(sf, "jump");
+                        Directory.CreateDirectory(target); File.WriteAllText(Path.Combine(target, "system.dll"), "keep");
+                        var mk2 = Process.Start(new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/c mklink /J \"" + lnk + "\" \"" + target + "\"") { UseShellExecute = false, CreateNoWindow = true });
+                        mk2.WaitForExit();
+                        int blockedBefore = SafeFile.Blocked;
+                        bool w1 = false, w2 = false, w3 = false;
+                        try { SafeFile.Copy(Path.Combine(sf, "a.bin"), Path.Combine(lnk, "planted.dll")); } catch (IOException) { w1 = true; }
+                        try { SafeFile.MoveInto(Path.Combine(sf, "a.bin"), lnk, "planted2.dll"); } catch (IOException) { w2 = true; }
+                        try { SafeFile.OpenRead(Path.Combine(lnk, "system.dll")).Dispose(); } catch (IOException) { w3 = true; }
+                        bool del = SafeDelete.Delete(Path.Combine(lnk, "system.dll"));
+                        check(mk2.ExitCode == 0 && w1 && w2 && w3 && !del && SafeFile.Blocked >= blockedBefore + 3 && File.Exists(Path.Combine(target, "system.dll")) &&
+                              !File.Exists(Path.Combine(target, "planted.dll")) && !File.Exists(Path.Combine(target, "planted2.dll")) && !SafeDelete.NoLinks(lnk) && SafeDelete.NoLinks(sf),
+                              "Security: a link in the path can't redirect a copy, move, read or delete (as admin) into another folder");
+                        check(!Locked.OnlyAdminsMadeAnything(sf), "Security: a folder with a planted link in it is never adopted as a locked folder");
+                        string work = Paths.Work;
+                        check(!Sys.IsAdmin() || (work != null && Locked.IsLocked(work)), "Security: files an administrator writes and then uses (like diskpart's script) go in a locked folder" + (Sys.IsAdmin() ? "" : " (not admin: not tried)"));
+                        string dk = Docker.Exe();
+                        check(dk == null || (dk.StartsWith(Environment.GetEnvironmentVariable("ProgramW6432") ?? "C:\\Program Files", StringComparison.OrdinalIgnoreCase) && Trust.SignedBy(dk, "Docker")),
+                              "Security: Docker is only run from Program Files and signed by Docker" + (dk == null ? " (not installed)" : ""));
+                        string me = Install.Current;
+                        check(SafeFile.HasDownloadMark(me) || !SafeFile.HasDownloadMark(me), "Download mark on this copy: " + (SafeFile.HasDownloadMark(me) ? "yes (Windows asks before running it; the installed copy has none)" : "none") +
+                              (Install.IsInstalled ? "; installed copy: " + (SafeFile.HasDownloadMark(Install.Exe) ? "MARKED" : "none") : ""));
+                    }
+                    check(Drivers.SafeInf("oem12.inf") && Drivers.SafeInf("OEM7.INF") && !Drivers.SafeInf("oem1.inf /uninstall") && !Drivers.SafeInf("..\\x.inf") && !Drivers.SafeInf("nvlddmkm.inf"),
+                          "Security: only Windows' own driver package names (oemNN.inf) are given to pnputil");
+                    check(PhoneBackup.Safe("..") == "phone" && PhoneBackup.Safe("CON") == "_CON" && PhoneBackup.Safe("nul.txt") == "_nul.txt" && PhoneBackup.Safe("photo. ") == "photo" &&
+                          !PhoneBackup.PlainName("..") && !PhoneBackup.PlainName("a" + Path.DirectorySeparatorChar + "b") && PhoneBackup.PlainName("IMG_0001.HEIC") &&
+                          PhoneBackup.LocalFor(Path.Combine(root, "pb"), "/storage/emulated/0/../../../Windows/System32").StartsWith(Path.Combine(root, "pb")) &&
+                          !PhoneBackup.LocalFor(Path.Combine(root, "pb"), "/storage/emulated/0/../../../Windows/System32").Contains(".."),
+                          "Security: names from a phone can't lead outside the backup folder");
+                } catch (Exception ex) { check(false, "1.9.1 security tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
+
                 // 4. the window, with cleaning switched off
                 bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false;
                 string uiErr = null;
@@ -2656,9 +2738,12 @@ namespace CDriveCleaner
             rep.AppendLine();
             rep.AppendLine(fails == 0 ? "RESULT: ALL TESTS PASSED" : "RESULT: " + fails + " TEST(S) FAILED");
             string report = rep.ToString();
+            // next to the program, written through a checked handle (as administrator, a file there could be a planted link);
+            // a copy also goes to Elixar's locked data folder
             string outPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "selftest-report.txt");
-            try { File.WriteAllText(outPath, report); }
-            catch { outPath = Path.Combine(Path.GetTempPath(), "selftest-report.txt"); try { File.WriteAllText(outPath, report); } catch { } }
+            try { SafeFile.WriteText(outPath, report); }
+            catch { outPath = Paths.FileIn("selftest-report.txt"); }
+            if (Win.IsWindows && Sys.IsAdmin()) try { File.WriteAllText(Paths.FileIn("selftest-report.txt"), report); } catch { }
             Console.WriteLine(report);
             if (showResult)
                 MessageBox.Show((fails == 0 ? "All tests passed." : fails + " test(s) failed:\n\n- " + string.Join("\n- ", failed.Select(f => f.Length > 160 ? f.Substring(0, 157) + "..." : f))) + "\n\nReport saved to:\n" + outPath,
@@ -2672,6 +2757,7 @@ namespace CDriveCleaner
         [STAThread]
         static int Main(string[] args)
         {
+            SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
             Theme.Init(Settings.ThemeMode);
             Lang.Init(Settings.Language);
@@ -2711,12 +2797,13 @@ namespace CDriveCleaner
             {
                 try
                 {
-                    // the protected copy is preferred when it is the same version or newer
+                    // the protected copy is preferred when it is the same version or newer: only administrators can change it,
+                    // and it carries no "downloaded" mark, so Windows doesn't show its SmartScreen box for it
                     string self = Application.ExecutablePath;
                     try
                     {
-                        if (Install.IsInstalled && !Install.RunningInstalled &&
-                            new Version(FileVersionInfo.GetVersionInfo(Install.Exe).FileVersion) >= new Version(FileVersionInfo.GetVersionInfo(self).FileVersion) && Install.Matches)
+                        if (Install.IsInstalled && !Install.RunningInstalled && Locked.IsLocked(Install.Exe) &&
+                            new Version(FileVersionInfo.GetVersionInfo(Install.Exe).FileVersion) >= new Version(FileVersionInfo.GetVersionInfo(self).FileVersion))
                             self = Install.Exe;
                     }
                     catch { }
@@ -2759,8 +2846,10 @@ namespace CDriveCleaner
         static void ShowCrash(Exception ex)
         {
             string text = ex == null ? "Unknown error" : ex.ToString();
-            try { File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cleaner-log.txt"), DateTime.Now.ToString("s") + " CRASH " + text + Environment.NewLine); } catch { }
-            MessageBox.Show("Something went wrong:\n\n" + (ex == null ? text : ex.Message) + "\n\nDetails were saved to cleaner-log.txt next to the program.",
+            // as administrator, only into Elixar's locked data folder (a file next to a downloaded Elixar.exe could be a link)
+            string logAt = Sys.IsAdmin() ? Paths.FileIn("cleaner-log.txt") : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cleaner-log.txt");
+            try { File.AppendAllText(logAt, DateTime.Now.ToString("s") + " CRASH " + text + Environment.NewLine); } catch { }
+            MessageBox.Show("Something went wrong:\n\n" + (ex == null ? text : ex.Message) + "\n\nDetails were saved to " + logAt + ".",
                 "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

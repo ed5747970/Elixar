@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.9.0</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.9.1</p></div>
 </div></header>
 <main class="wrap">
 
@@ -212,7 +212,20 @@
   <tr><td>A fake &ldquo;powershell.exe&rdquo; planted next to a downloaded Elixar.exe runs as admin</td><td>Since 1.9, Windows tools are always started from the Windows folder by their full path</td></tr>
   <tr><td>Swapped Android tools or uninstall commands run as admin</td><td>Google's signature is checked before the Android tools run; your account's uninstallers run without admin rights</td></tr>
 </table>
-<p>To check your copy, click &ldquo;Verify this copy&rdquo; in the footer: it shows Elixar's SHA-256 fingerprint to compare with SHA256.txt, and the state of the protected copy and the Undo folder. Elixar is not an antivirus, and Windows still shows the &ldquo;Windows protected your PC&rdquo; box because Elixar has no paid code-signing certificate.</p>
+<p>To check your copy, click &ldquo;Verify this copy&rdquo; in the footer: it shows Elixar's SHA-256 fingerprint to compare with SHA256.txt, and the state of the protected copy and the Undo folder. Elixar is not an antivirus.</p>
+<h3>The blue &ldquo;Windows protected your PC&rdquo; box</h3>
+<p>Windows shows it for downloaded programs that aren't signed with a paid certificate. Click More info &rsaquo; Run anyway once, then open the <strong>Settings</strong> tab and click <strong>Install Elixar on this PC</strong>. From then on, start Elixar from the Start menu: the installed copy in Program Files carries no &ldquo;downloaded&rdquo; mark, so the blue box doesn't come back, and signed updates go straight into it. Windows still asks for administrator rights (the usual Yes/No prompt) each time.</p>
+<h3>What 1.9.1 added</h3>
+<table>
+  <tr><th>Risk</th><th>Protection</th></tr>
+  <tr><td>Elixar.exe in Downloads is renamed and a different file put in its place while it runs, so the fake gets installed</td><td>Elixar holds its own file open from the first moment and checks, section by section, that it is the program that is running before installing it</td></tr>
+  <tr><td>Restarting or updating starts a swapped file in Downloads as admin</td><td>Restarts and updates always go through the protected copy in Program Files</td></tr>
+  <tr><td>A fake docker.exe in a folder on PATH runs as admin</td><td>Docker is only run from Program Files, and only if Docker signed it</td></tr>
+  <tr><td>A link swapped into a folder while Elixar copies, moves or deletes (Move off C:, Undo, Duplicates, phone copies)</td><td>Every file is opened by handle and checked for where it really is, including every folder above it</td></tr>
+  <tr><td>A script or download in Temp is changed between writing and using it (diskpart, Android tools)</td><td>These go in a folder only administrators can open</td></tr>
+  <tr><td>Phone file names like &ldquo;..&rdquo; or device names</td><td>Made safe, and phone copies arrive through a locked folder first</td></tr>
+  <tr><td>A folder made in advance by another program is adopted as Elixar's data folder</td><td>It is set aside and a fresh locked folder is made</td></tr>
+</table>
 
 <h2 id="files">Files and folders</h2>
 <table>
@@ -228,7 +241,7 @@
 <h2 id="trouble">Troubleshooting</h2>
 <table>
   <tr><th>You see</th><th>Do this</th></tr>
-  <tr><td>&ldquo;Windows protected your PC&rdquo;</td><td>Click More info &rsaquo; Run anyway; check SHA256.txt if unsure</td></tr>
+  <tr><td>&ldquo;Windows protected your PC&rdquo;</td><td>Click More info &rsaquo; Run anyway once (check SHA256.txt if unsure), then install Elixar from the Settings tab and use the Start menu entry</td></tr>
   <tr><td>A self-test check failed</td><td>Send selftest-report.txt (in the Elixar folder) for a fix</td></tr>
   <tr><td>Driver list empty in the self-test</td><td>Normal without admin rights; Windows lists drivers only to administrators</td></tr>
   <tr><td>Automation says &ldquo;Not protected&rdquo;</td><td>Open Automation and click Save</td></tr>
@@ -239,6 +252,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-17</td><td>1.9.1</td><td>No more SmartScreen box once installed; 7 security fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>1.9.0</td><td>Disk health (read only, with daily alerts); Settings tab to switch English/Hebrew and light/dark; Windows tools always started by full path</td></tr>
   <tr><td>2026-10-17</td><td>1.8.0</td><td>Windows.old, hibernation file, Free space for me, Move off C:, 6 more caches, Hebrew, dark mode, space trend, folder map, installer, signed updates, GitHub build and test</td></tr>
   <tr><td>2026-10-17</td><td>1.7.3</td><td>This user guide built in: footer link &ldquo;User guide&rdquo; or F1, with &ldquo;Save a copy&rdquo;</td></tr>

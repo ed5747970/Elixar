@@ -204,8 +204,9 @@ namespace CDriveCleaner
             r.Switched = true;
             foreach (var f in copied)
             {
-                try { File.SetAttributes(f, FileAttributes.Normal); File.Delete(f); }
-                catch { r.LeftBehind++; }
+                bool gone = false;
+                try { gone = Win.IsWindows ? SafeDelete.Delete(f) : Del(f); } catch { }
+                if (!gone) r.LeftBehind++;
             }
             RemoveEmptyDirs(from);
             if (r.LeftBehind > 0) r.Problems.Add(r.LeftBehind + " files were in use and stay in " + from + "; delete them later.");
@@ -216,7 +217,7 @@ namespace CDriveCleaner
         {
             DirectoryInfo di;
             try { di = new DirectoryInfo(src); if ((di.Attributes & FileAttributes.ReparsePoint) != 0) return; } catch { return; }
-            Directory.CreateDirectory(dst);
+            try { SafeFile.MakeDir(dst); } catch (Exception e) { r.Failed++; r.Problems.Add(dst + ": " + e.Message); return; }
             FileInfo[] files; DirectoryInfo[] dirs;
             try { files = di.GetFiles(); dirs = di.GetDirectories(); } catch (Exception e) { r.Failed++; r.Problems.Add(src + ": " + e.Message); return; }
             foreach (var f in files)
@@ -224,7 +225,11 @@ namespace CDriveCleaner
                 string target = Path.Combine(dst, f.Name);
                 try
                 {
-                    if (!(File.Exists(target) && new FileInfo(target).Length == f.Length)) File.Copy(f.FullName, target, true);
+                    if (!(File.Exists(target) && new FileInfo(target).Length == f.Length))
+                    {
+                        if (File.Exists(target)) Fs.Delete(target);
+                        SafeFile.Copy(f.FullName, target);   // read and written through checked handles: a link can't redirect it
+                    }
                     if (new FileInfo(target).Length != f.Length) throw new IOException("copy is a different size");
                     copied.Add(f.FullName); r.Copied++; r.Bytes += f.Length;
                 }
@@ -233,12 +238,14 @@ namespace CDriveCleaner
             foreach (var d in dirs) CopyTree(d.FullName, Path.Combine(dst, d.Name), r, copied, log);
         }
 
+        static bool Del(string f) { File.SetAttributes(f, FileAttributes.Normal); File.Delete(f); return true; }
+
         static void RemoveEmptyDirs(string dir)
         {
             try
             {
                 foreach (var d in Directory.GetDirectories(dir)) RemoveEmptyDirs(d);
-                if (Directory.GetFileSystemEntries(dir).Length == 0 && !Protect.IsProtected(dir)) Directory.Delete(dir, false);
+                if (Directory.GetFileSystemEntries(dir).Length == 0 && !Protect.IsProtected(dir)) { if (Win.IsWindows) SafeDelete.Delete(dir); else Directory.Delete(dir, false); }
             }
             catch { }
         }
@@ -309,13 +316,15 @@ namespace CDriveCleaner
     // ============================ Docker ============================
     public static class Docker
     {
+        // Only Docker Desktop's own copy in Program Files, signed by Docker. A docker.exe found through PATH could sit in a
+        // folder any program can write to (for example one in your user folder), and Elixar would run it as administrator.
         public static string Exe()
         {
-            foreach (var p in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
-                try { string f = Path.Combine(p.Trim().Trim('"'), "docker.exe"); if (p.Trim().Length > 0 && File.Exists(f)) return f; } catch { }
             string pf = Environment.GetEnvironmentVariable("ProgramW6432") ?? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             string std = Path.Combine(pf ?? "", @"Docker\Docker\resources\bin\docker.exe");
-            return File.Exists(std) ? std : null;
+            if (!File.Exists(std)) return null;
+            if (Win.IsWindows && !Trust.SignedBy(std, "Docker")) return null;
+            return std;
         }
 
         // "Total reclaimed space: 1.2GB" -> bytes

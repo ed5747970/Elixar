@@ -62,7 +62,7 @@ namespace CDriveCleaner
             var btnInstall = MakeButton(Setup.IsRegistered() ? "Repair the installation" : "Install Elixar on this PC");
             var btnUpdate = MakeButton("Check for updates");
             pcButtons.Controls.Add(btnInstall); pcButtons.Controls.Add(btnUpdate);
-            var pcInfo = Note("Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change.");
+            var pcInfo = Note("Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it.");
             pcInfo.Margin = new Padding(S(2), S(6), 0, 0);
 
             t.Controls.Add(Title("Settings"), 0, 0);
@@ -110,8 +110,8 @@ namespace CDriveCleaner
             Settings.ThemeMode = ChosenTheme;
             UpdateApplySettings();
             if (testMode) return;
-            // starts this same copy again (it already runs as administrator), then closes this window
-            try { Process.Start(new ProcessStartInfo(Application.ExecutablePath) { UseShellExecute = false }); Close(); } catch { }
+            // starts Elixar again (the protected copy in Program Files when possible), then closes this window
+            try { Install.Relaunch(null); Close(); } catch { }
         }
 
         // a little Elixar window in the chosen colours

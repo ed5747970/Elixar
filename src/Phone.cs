@@ -92,8 +92,10 @@ namespace CDriveCleaner
         // Downloads Google's platform-tools (about 7 MB), keeps them only if every file is signed by Google
         public static string Download(Action<string> log)
         {
-            string zip = Path.Combine(Path.GetTempPath(), "elixar-platform-tools-" + Guid.NewGuid().ToString("N") + ".zip");
-            string tmp = Path.Combine(Path.GetTempPath(), "elixar-platform-tools-" + Guid.NewGuid().ToString("N"));
+            string work = Paths.Work;   // as administrator: a folder no other program can change while the files are checked
+            if (work == null) return "Could not prepare a protected folder for the download.";
+            string zip = Path.Combine(work, "elixar-platform-tools-" + Guid.NewGuid().ToString("N") + ".zip");
+            string tmp = Path.Combine(work, "elixar-platform-tools-" + Guid.NewGuid().ToString("N"));
             try
             {
                 ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
@@ -410,8 +412,8 @@ namespace CDriveCleaner
             {
                 if (backupRoot != null)
                 {
-                    string dir = PhoneBackup.LocalFor(backupRoot, f.Folder), o;
-                    if (!PullOne(serial, f, dir, out o)) { if (log != null) log("  kept " + f.Name + " (copy to PC failed: " + o.Trim() + ")"); continue; }
+                    string o;
+                    if (!PullOne(serial, f, backupRoot, out o)) { if (log != null) log("  kept " + f.Name + " (copy to PC failed: " + o.Trim() + ")"); continue; }
                 }
                 gone.Add(f.Path); freed += f.Bytes;
             }
@@ -419,14 +421,26 @@ namespace CDriveCleaner
             return freed;
         }
 
-        // copies one file and checks the copy has the same size
-        public static bool PullOne(string serial, PhoneFile f, string localDir, out string output)
+        // Copies one file into root (keeping the phone's folders) and checks the copy has the same size.
+        // adb runs as administrator, so it writes into a folder only administrators can change; the checked file is then
+        // moved into your folder by handle (a link can't send it anywhere else).
+        public static bool PullOne(string serial, PhoneFile f, string root, out string output)
         {
-            Directory.CreateDirectory(localDir);
-            if (!Adb.Pull(serial, f.Path, localDir, out output)) return false;
-            string local = Path.Combine(localDir, f.Name);
-            if (Adb.Prefix.Length > 0) return File.Exists(local);        // fake adb writes stand-in files
-            return File.Exists(local) && new FileInfo(local).Length == f.Bytes;
+            output = "";
+            if (!PhoneBackup.PlainName(f.Name)) { output = "its name can't be used on Windows"; return false; }
+            string box = PhoneBackup.Box(root);
+            if (box == null) { output = "could not prepare a protected folder in " + root; return false; }
+            try
+            {
+                if (!Adb.Pull(serial, f.Path, box, out output)) return false;
+                string got = Path.Combine(box, f.Name);
+                if (!File.Exists(got)) return false;
+                if (Adb.Prefix.Length == 0 && new FileInfo(got).Length != f.Bytes) return false;   // the fake adb writes stand-in files
+                PhoneBackup.Deliver(got, PhoneBackup.LocalFor(root, f.Folder), f.Name);
+                return true;
+            }
+            catch (Exception e) { output = (output + " " + e.Message).Trim(); return false; }
+            finally { PhoneBackup.Unbox(root, box); }
         }
 
         public static void RemoveFiles(string serial, List<string> paths)
@@ -739,18 +753,28 @@ namespace CDriveCleaner
         }
 
         // copies one file (phone path or normal path) into a PC folder; true when the copy is there at full size
-        public static bool CopyTo(string itemPath, string name, long bytes, string localDir)
+        // copies one file into root (keeping the iPhone's folders), the same careful way as for Android
+        public static bool CopyTo(string itemPath, string name, long bytes, string root, string folder)
         {
-            Directory.CreateDirectory(localDir);
-            string target = Path.Combine(localDir, name);
-            bool ok = Sta(() =>
+            if (!PhoneBackup.PlainName(name)) return false;
+            string box = PhoneBackup.Box(root);
+            if (box == null) return false;
+            try
             {
-                var op = NewOp();
-                op.CopyItem(Item(itemPath), Item(localDir), null, IntPtr.Zero);
-                op.PerformOperations();
-                return !op.GetAnyOperationsAborted();
-            });
-            return ok && File.Exists(target) && (bytes <= 0 || new FileInfo(target).Length == bytes);
+                string target = Path.Combine(box, name);
+                bool ok = Sta(() =>
+                {
+                    var op = NewOp();
+                    op.CopyItem(Item(itemPath), Item(box), null, IntPtr.Zero);
+                    op.PerformOperations();
+                    return !op.GetAnyOperationsAborted();
+                });
+                if (!ok || !File.Exists(target) || (bytes > 0 && new FileInfo(target).Length != bytes)) return false;
+                PhoneBackup.Deliver(target, PhoneBackup.LocalFor(root, folder), name);
+                return true;
+            }
+            catch { return false; }
+            finally { PhoneBackup.Unbox(root, box); }
         }
 
         public static bool Delete(string itemPath)
@@ -794,10 +818,25 @@ namespace CDriveCleaner
             return Path.Combine(pics, "Phone backup");
         }
 
+        static readonly string[] Reserved = { "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                                              "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9" };
+
+        // a name from the phone made safe as one Windows folder or file name: no slashes, no "." or "..", no device names
         public static string Safe(string s)
         {
+            s = s ?? "";
             foreach (var c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '_');
-            return s.Trim().Length == 0 ? "phone" : s.Trim();
+            s = s.Trim().TrimEnd('.', ' ');
+            if (s.Length == 0 || s.Trim('.').Length == 0) return "phone";
+            string stem = s.Split('.')[0].ToUpperInvariant();
+            if (Reserved.Contains(stem)) s = "_" + s;
+            return s;
+        }
+
+        // a phone file name that can be used as it is on Windows
+        public static bool PlainName(string name)
+        {
+            return !string.IsNullOrEmpty(name) && Safe(name) == name;
         }
 
         // phone folder -> PC folder under the backup root, keeping the phone's layout
@@ -805,8 +844,43 @@ namespace CDriveCleaner
         {
             string rel = phoneFolder.StartsWith(Android.Sd) ? phoneFolder.Substring(Android.Sd.Length) : phoneFolder;
             string dir = root;
-            foreach (var part in rel.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)) dir = Path.Combine(dir, Safe(part));
+            foreach (var part in rel.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)) dir = Path.Combine(dir, Safe(part));
             return dir;
+        }
+
+        public const string Incoming = ".elixar-incoming";
+
+        // a fresh folder for one file, inside a folder in root that only administrators can change
+        public static string Box(string root)
+        {
+            try
+            {
+                SafeFile.MakeDir(root);
+                string st = Path.Combine(root, Incoming);
+                if (!Locked.Lock(st)) return null;
+                try { File.SetAttributes(st, File.GetAttributes(st) | FileAttributes.Hidden); } catch { }
+                string box = Path.Combine(st, Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(box);
+                return box;
+            }
+            catch { return null; }
+        }
+
+        public static void Unbox(string root, string box)
+        {
+            try { Fs.Delete(box); } catch { }
+            try { string st = Path.Combine(root, Incoming); if (Directory.Exists(st) && Directory.GetFileSystemEntries(st).Length == 0) Fs.Delete(st); } catch { }
+        }
+
+        // moves a checked copy into your folder; a file with the same name and size already there counts as copied
+        public static string Deliver(string staged, string dir, string name)
+        {
+            SafeFile.MakeDir(dir);
+            string same = Path.Combine(dir, Safe(name));
+            if (File.Exists(same) && new FileInfo(same).Length == new FileInfo(staged).Length) { Fs.Delete(staged); return same; }
+            string n = SafeFile.FreeName(dir, Safe(name));
+            SafeFile.MoveInto(staged, dir, n);
+            return Path.Combine(dir, n);
         }
     }
 

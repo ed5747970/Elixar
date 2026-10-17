@@ -183,12 +183,14 @@ namespace CDriveCleaner
                 if (!SafeDelete.RealPathMatches(src)) { if (log != null) log("  Skipped " + src + ": a link was in the way"); return 0; }
                 try
                 {
-                    if (SameVolume(src, dst)) File.Move(src, dst);
+                    // by handle: the file and the folder it goes into are checked for where they really are
+                    if (SameVolume(src, dst)) SafeFile.MoveInto(src, Path.GetDirectoryName(dst), Path.GetFileName(dst));
                     else
                     {
-                        File.Copy(src, dst, false);
-                        try { File.SetAttributes(src, FileAttributes.Normal); File.Delete(src); }
-                        catch { try { File.Delete(dst); } catch { } return 0; }   // in use: leave it, drop the copy
+                        SafeFile.Copy(src, dst);
+                        bool gone = false;
+                        try { if (Win.IsWindows) gone = SafeDelete.Delete(src); else { File.SetAttributes(src, FileAttributes.Normal); File.Delete(src); gone = true; } } catch { }
+                        if (!gone) { Fs.Delete(dst); return 0; }   // in use: leave it, drop the copy
                     }
                     return len;
                 }
@@ -200,7 +202,7 @@ namespace CDriveCleaner
             Directory.CreateDirectory(dst);
             try { foreach (var f in di.GetFiles()) total += MoveTree(f.FullName, Path.Combine(dst, f.Name), log); } catch { }
             try { foreach (var d in di.GetDirectories()) total += MoveTree(d.FullName, Path.Combine(dst, d.Name), log); } catch { }
-            try { if (Directory.GetFileSystemEntries(src).Length == 0) { di.Attributes = FileAttributes.Directory; Directory.Delete(src, false); } } catch { }
+            try { if (Directory.GetFileSystemEntries(src).Length == 0) { di.Attributes = FileAttributes.Directory; if (Win.IsWindows) SafeDelete.Delete(src); else Directory.Delete(src, false); } } catch { }
             return total;
         }
 

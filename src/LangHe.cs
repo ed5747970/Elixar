@@ -446,6 +446,7 @@ namespace CDriveCleaner
             d["Apply and restart Elixar"] = "החלה והפעלה מחדש של Elixar";
             d["Choose the language and how Elixar looks. To apply a change, Elixar restarts for a moment; nothing else changes."] = "בחרו את השפה ואת המראה של Elixar. כדי להחיל שינוי, Elixar מופעל מחדש לרגע; שום דבר אחר לא משתנה.";
             d["Wait until Elixar finishes, then apply the change."] = "המתינו ש-Elixar יסיים, ואז החילו את השינוי.";
+            d["Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it."] = "ההתקנה מוסיפה את Elixar לתפריט התחל ולרשימת האפליקציות המותקנות של Windows (עם הסרה), בתיקייה שרק מנהלים יכולים לשנות. אחר כך הפעילו את Elixar מתפריט התחל: Windows כבר לא יציג עבורו את החלון הכחול \"Windows protected your PC\".";
             // texts with numbers in them
             Pat(@"Clean (\d+) \((.+)\)", m => "ניקוי " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")");
             Pat(@"Remove (\d+) \((.+)\)\.\.\.", m => "הסרה של " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")...");

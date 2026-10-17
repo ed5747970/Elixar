@@ -93,6 +93,8 @@ namespace CDriveCleaner
             return list;
         }
 
+        public static bool SafeInf(string inf) { return Regex.IsMatch(inf ?? "", @"^oem\d{1,6}\.inf$", RegexOptions.IgnoreCase); }
+
         static readonly Regex ArchRe = new Regex(@"\.inf_(amd64|x86|arm64|arm|ia64)_", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         public static string ArchOf(string original)
@@ -257,6 +259,8 @@ namespace CDriveCleaner
             int removed = 0;
             foreach (var d in pkgs)
             {
+                // only Windows' own "oemNN.inf" names go on pnputil's command line
+                if (!SafeInf(d.Inf)) { log("  Skipped " + d.Inf + ": not a driver package name Elixar expects."); continue; }
                 string backup = Path.Combine(b.Dir, d.Inf);
                 Directory.CreateDirectory(backup);
                 string outp;

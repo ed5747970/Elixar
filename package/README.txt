@@ -1,7 +1,14 @@
-ELIXAR  (version 1.9.0)
+ELIXAR  (version 1.9.1)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.9.1
+- The blue "Windows protected your PC" box: click More info > Run anyway once,
+  then Settings > "Install Elixar on this PC" and start Elixar from the Start
+  menu. The installed copy has no "downloaded" mark, so the box stops.
+- Security: 7 fixes against other programs tricking Elixar's administrator
+  rights (swapped files, links, fake tools, Temp files). See the user guide.
 
 NEW IN 1.9
 - Disk health (Tools, and a button on the Dashboard): reads your drives' own
@@ -38,6 +45,7 @@ FIRST: RUN THE SAFE SELF-TEST
 1. Unzip this folder anywhere (for example to your Desktop).
 2. Double-click "Run self-test (safe).bat".
    If Windows says "Windows protected your PC": click More info > Run anyway.
+   (Install Elixar from its Settings tab afterwards and the box stops.)
    - It only creates and deletes files inside its own test folder in Temp.
    - Your real cleanup items are only measured; nothing of yours is deleted.
    - The program window opens with cleaning switched off, measures, and closes.

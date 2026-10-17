@@ -39,7 +39,7 @@ namespace CDriveCleaner
 
         public static void SaveCopy(string path)
         {
-            File.WriteAllText(path, Html(), new UTF8Encoding(true));
+            SafeFile.WriteText(path, "\uFEFF" + Html());
         }
     }
 }

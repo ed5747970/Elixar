@@ -61,6 +61,13 @@ namespace CDriveCleaner
             sb.AppendLine("SHA-256:     " + hash);
             sb.AppendLine("Signature:   " + (signed ? "valid, signed by " + Trust.Signer(exe) : "not signed (Elixar is a personal project)"));
             sb.AppendLine("             Compare it with SHA256.txt from your download. If they differ, delete this copy.");
+            if (Win.IsWindows)
+            {
+                sb.AppendLine("Running program: " + (SelfImage.Verified ? "the same as this file, which is held open so nothing can replace it."
+                                                                        : "WARNING: different from this file. It may have been replaced; download Elixar again."));
+                sb.AppendLine("Download mark: " + (SafeFile.HasDownloadMark(exe) ? "yes - Windows shows its SmartScreen box for this copy. Use the installed copy from the Start menu instead."
+                                                                                : "none - Windows doesn't show its SmartScreen box for this copy."));
+            }
             sb.AppendLine();
             if (Win.IsWindows)
             {
@@ -78,6 +85,9 @@ namespace CDriveCleaner
                 sb.AppendLine("   - never follows links planted in folders it cleans");
                 sb.AppendLine("   - runs Android tools only after checking Google's signature");
                 sb.AppendLine("   - runs uninstallers for your account without admin rights");
+                sb.AppendLine("   - starts Windows tools only from the Windows folder, and Docker only from Program Files");
+                sb.AppendLine("   - copies, moves and saves files only after checking where they really are");
+                sb.AppendLine("   - restarts and updates only through the protected copy");
             }
             return sb.ToString();
         }

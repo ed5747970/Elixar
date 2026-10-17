@@ -526,10 +526,9 @@ namespace CDriveCleaner
                 foreach (var f in sel)
                 {
                     UI(() => lblPhBig.Text = (move ? "Moving " : "Copying ") + f.Name + " (" + (ok + 1) + " of " + sel.Count + ")...");
-                    string dir = dev != null ? PhoneBackup.LocalFor(root, f.Folder) : Path.Combine(root, f.Folder.Replace('/', '\\'));
                     bool copied; string o = "";
-                    if (dev != null) copied = Android.PullOne(dev.Serial, f, dir, out o);
-                    else copied = IPhone.CopyTo(f.Path, f.Name, f.Bytes, dir);
+                    if (dev != null) copied = Android.PullOne(dev.Serial, f, root, out o);
+                    else copied = IPhone.CopyTo(f.Path, f.Name, f.Bytes, root, f.Folder);
                     if (!copied) { Log("Phone: could not copy " + f.Name + " " + o.Trim()); continue; }
                     ok++; bytes += f.Bytes;
                     if (move)
