@@ -210,7 +210,7 @@ namespace CDriveCleaner
                 using (var d = new FolderBrowserDialog { Description = "Where should copies from the phone go?", SelectedPath = PhoneDestRoot() })
                     if (d.ShowDialog(this) == DialogResult.OK) { phDest = d.SelectedPath; UpdatePhBig(); }
             };
-            btnOpen.Click += (o, e) => { try { Directory.CreateDirectory(PhoneDestRoot()); Process.Start("explorer.exe", "\"" + PhoneDestRoot() + "\""); } catch { } };
+            btnOpen.Click += (o, e) => { try { Directory.CreateDirectory(PhoneDestRoot()); Process.Start(Win.SystemExe("explorer.exe"), "\"" + PhoneDestRoot() + "\""); } catch { } };
             UpdatePhBig();
         }
 

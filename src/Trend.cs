@@ -283,7 +283,7 @@ namespace CDriveCleaner
             map.MouseMove += (o, e) => { var n = Hit(e.Location); string t = n == null ? "" : n.Name + "  " + Fs.Fmt(n.Bytes); if (tip.GetToolTip(map) != t) tip.SetToolTip(map, t); };
             Controls.Add(map); Controls.Add(status); Controls.Add(top);
             up.Click += (o, e) => { var p = Directory.GetParent(current); if (p != null) Go(p.FullName); };
-            open.Click += (o, e) => { try { Process.Start("explorer.exe", "\"" + current + "\""); } catch { } };
+            open.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "\"" + current + "\""); } catch { } };
             KeyPreview = true;
             KeyDown += (o, e) => { if (e.KeyCode == Keys.Back) { var p = Directory.GetParent(current); if (p != null) Go(p.FullName); } };
             Shown += (o, e) => Go(start);

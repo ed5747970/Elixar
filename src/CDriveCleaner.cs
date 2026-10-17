@@ -25,8 +25,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("1.8.0.0")]
-[assembly: AssemblyFileVersion("1.8.0.0")]
+[assembly: AssemblyVersion("1.9.0.0")]
+[assembly: AssemblyFileVersion("1.9.0.0")]
 
 namespace CDriveCleaner
 {
@@ -198,7 +198,7 @@ namespace CDriveCleaner
 
         public static string Run(string exe, string args, int timeoutMs)
         {
-            var psi = new ProcessStartInfo(exe, args)
+            var psi = new ProcessStartInfo(Win.SystemExe(exe), args)
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -1147,12 +1147,14 @@ namespace CDriveCleaner
             BuildAutomation();
             BuildTools();
             BuildPhone();
+            BuildSettingsTab();
             tabs.TabPages.Add(pageDash);
             tabs.TabPages.Add(pageApps);
             tabs.TabPages.Add(pageClean);
             tabs.TabPages.Add(pageTools);
             tabs.TabPages.Add(pagePhone);
             tabs.TabPages.Add(pageAuto);
+            tabs.TabPages.Add(pageSettings);
             bool appsLoaded = false, autoLoaded = false;
             tabs.SelectedIndexChanged += (o, e) =>
             {
@@ -1186,15 +1188,7 @@ namespace CDriveCleaner
             lnkVerify.LinkClicked += (o, e) => { using (var f = new IntegrityForm(s)) { f.Shown += (o2, e2) => { Theme.Apply(f); Lang.Apply(f); }; f.ShowDialog(this); } };
             var lnkSettings = footLink("Settings");
             footRow.Controls.Add(footText("   \u00b7   ")); footRow.Controls.Add(lnkSettings);
-            lnkSettings.LinkClicked += (o, e) =>
-            {
-                using (var sf = new SettingsForm(s) { CheckUpdates = () => CheckForUpdates(true) })
-                    if (sf.ShowDialog(this) == DialogResult.OK && sf.NeedsRestart &&
-                        Lang.Box(this, "Restart Elixar now to use the new settings?", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes && !testMode)
-                    {
-                        try { Process.Start(new ProcessStartInfo(Application.ExecutablePath) { UseShellExecute = false }); Close(); } catch { }
-                    }
-            };
+            lnkSettings.LinkClicked += (o, e) => ShowSettings();
             Lang.Menu(guideMenu);
             lnkUpdate = footLink("Update available");
             lnkUpdate.LinkColor = Color.FromArgb(0, 125, 70); lnkUpdate.Visible = false;
@@ -1242,6 +1236,7 @@ namespace CDriveCleaner
                     RefreshDashboard();
                     LoadAppIndex();
                     CheckForUpdates(false);
+                    CheckDisksQuietly();
                     if (!testMode) Task.Factory.StartNew(() => Quarantine.PurgeOld(Log));
                 });
             };
@@ -1284,7 +1279,7 @@ namespace CDriveCleaner
                         string e3 = t2.IsFaulted ? t2.Exception.GetBaseException().Message : t2.Result.Item2;
                         Log("Update: " + e3);
                         if (Lang.Box(this, e3 + "\n\nOpen the download page?", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes && Updates.ReleasesPage.Length > 0)
-                            try { Process.Start("explorer.exe", Updates.ReleasesPage); } catch { }
+                            try { Process.Start(Win.SystemExe("explorer.exe"), Updates.ReleasesPage); } catch { }
                         return;
                     }
                     Log("Installing the update and restarting...");
@@ -1312,7 +1307,7 @@ namespace CDriveCleaner
                     Log("Saved the user guide to " + d.FileName);
                     if (Lang.Box(this, "Saved:\n" + d.FileName + "\n\nOpen it now? (It works offline, and your browser can print it or save it as PDF.)", "Elixar",
                             MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes && Win.IsWindows)
-                        Process.Start("explorer.exe", "\"" + d.FileName + "\"");
+                        Process.Start(Win.SystemExe("explorer.exe"), "\"" + d.FileName + "\"");
                 }
                 catch (Exception ex) { Lang.Box(this, "Could not save it: " + ex.Message, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             }
@@ -1461,8 +1456,10 @@ namespace CDriveCleaner
             head.Controls.Add(btnDashApps, 4, 0);
             var btnTrend = MakeButton("Space trend");
             var btnMap = MakeButton("Folder map");
-            head.ColumnCount = 7; head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            head.Controls.Add(btnTrend, 5, 0); head.Controls.Add(btnMap, 6, 0);
+            btnDashDisk = MakeButton("Disk health");
+            head.ColumnCount = 8; head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            head.Controls.Add(btnTrend, 5, 0); head.Controls.Add(btnMap, 6, 0); head.Controls.Add(btnDashDisk, 7, 0);
+            btnDashDisk.Click += (o, e) => ShowDiskHealth();
             btnTrend.Click += (o, e) => { using (var tf = new TrendForm(s, SpaceHistory.Read())) { tf.Shown += (o2, e2) => { Theme.Apply(tf); Lang.Apply(tf); }; tf.ShowDialog(this); } };
             btnMap.Click += (o, e) => { var mf = new TreemapForm(Win.IsWindows ? @"C:\" : "/", s); mf.Shown += (o2, e2) => { Theme.Apply(mf); Lang.Apply(mf); }; mf.Show(this); };
             btnDashApps.Click += (o, e) => ShowStoreTab();
@@ -1588,7 +1585,7 @@ namespace CDriveCleaner
                 if (dashList.SelectedItems.Count == 0) return;
                 var d = (DashLoc)dashList.SelectedItems[0].Tag;
                 if (Directory.Exists(d.Path)) OpenDrill(d.Path);
-                else if (File.Exists(d.Path)) { try { Process.Start("explorer.exe", "/select,\"" + d.Path + "\""); } catch { } }
+                else if (File.Exists(d.Path)) { try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + d.Path + "\""); } catch { } }
             };
             btnToCleaner.Click += (o, e) => tabs.SelectedTab = pageClean;
             btnFindFiles.Click += (o, e) => FindLargestFiles();
@@ -1606,7 +1603,7 @@ namespace CDriveCleaner
         {
             if (filesList.SelectedItems.Count == 0) return;
             string path = (string)filesList.SelectedItems[0].Tag;
-            try { Process.Start("explorer.exe", "/select,\"" + path + "\""); }
+            try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + path + "\""); }
             catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
         }
 
@@ -2373,7 +2370,7 @@ namespace CDriveCleaner
                         Directory.CreateDirectory(victim); Directory.CreateDirectory(clean);
                         File.WriteAllText(Path.Combine(victim, "important.txt"), "keep");
                         File.WriteAllText(Path.Combine(clean, "junk.tmp"), "junk");
-                        var mk = Process.Start(new ProcessStartInfo("cmd.exe", "/c mklink /J \"" + Path.Combine(clean, "link") + "\" \"" + victim + "\"") { UseShellExecute = false, CreateNoWindow = true });
+                        var mk = Process.Start(new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/c mklink /J \"" + Path.Combine(clean, "link") + "\" \"" + victim + "\"") { UseShellExecute = false, CreateNoWindow = true });
                         mk.WaitForExit();
                         Fs.ClearIn(clean);
                         check(mk.ExitCode == 0 && File.Exists(Path.Combine(victim, "important.txt")) && Directory.GetFileSystemEntries(clean).Length == 0,
@@ -2523,17 +2520,68 @@ namespace CDriveCleaner
                     check(!Updates.Configured || Updates.Repo.Contains("/"), "Updates: " + (Updates.Configured ? "signed updates from github.com/" + Updates.Repo : "local build, updates switch on in the GitHub build"));
                 } catch (Exception ex) { check(false, "Update and installer tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
 
+                // 3p. disk health (read only) and Windows tools started by full path
+                try {
+                    string canned = "ADMIN\tTrue\n" +
+                        "DISK\t0\tSamsung SSD 980 1TB\tSSD\tNVMe\tHealthy\tOK\t1000204886016\t4\t38\t61\t0\t0\t0\t0\t5210\tFalse\tC\n" +
+                        "DISK\t1\tWDC WD20EZRZ\t3\t11\t1\t2\t2000398934016\t\t57\t60\t120\t3\t0\t0\t31000\t\tD,E\n" +
+                        "DISK\t2\tOld Crucial\t4\t11\t2\tPredictive Failure\t256060514304\t100\t40\t48\t9\t0\t0\t0\t40000\tTrue\t\n" +
+                        "DISK\t3\tUSB Stick\tUnspecified\tUSB\tHealthy\tOK\t32010928128\t\t255\t\t\t\t\t\t\t\tF\n" +
+                        "garbage line\nEND\n";
+                    var dr = DiskHealth.Parse(canned);
+                    var d0 = dr.Disks.First(d => d.Id == "0"); var d1 = dr.Disks.First(d => d.Id == "1"); var d2 = dr.Disks.First(d => d.Id == "2"); var d3 = dr.Disks.First(d => d.Id == "3");
+                    check(dr.Complete && dr.Admin && dr.Disks.Count == 4 && dr.Disks[0].Id == "0" && d0.Kind == "NVMe SSD" && d0.LifeLeft == 96 && d0.Temp == 38 && d0.HoldsC &&
+                          d0.Level == HealthLevel.Healthy && d0.PredictFailure == false && DiskHealth.Hours(d0.Hours) == "217 days" && DiskHealth.Errors(d0) == "none",
+                          "Disk health: reads a healthy NVMe drive (96% life left, 38 °C, no errors)");
+                    check(d1.Kind == "SATA hard disk" && d1.Health == "Warning" && d1.Level == HealthLevel.Warning && d1.Temp == 57 && d1.Reasons.Any(r => r.Contains("running hot")) &&
+                          d1.Uncorrected == 3 && d1.Reasons.Any(r => r.Contains("could not be fixed")) && d1.Letters == "D,E",
+                          "Disk health: a warm hard disk with errors it could not fix needs attention");
+                    check(d2.Level == HealthLevel.Failing && d2.Reasons.Count >= 4 && d2.Advice.StartsWith("Back up now") && dr.Worst == HealthLevel.Failing &&
+                          dr.Summary.Contains("back up your files now"), "Disk health: a drive that predicts its own failure says: back up now");
+                    check(d3.Kind == "USB drive" && d3.Temp == -1 && d3.Level == HealthLevel.Healthy && d3.Notes.Any(n => n.Contains("USB")),
+                          "Disk health: odd readings from USB drives are ignored, not reported as a problem");
+                    var none = DiskHealth.Parse("ADMIN\tFalse\nDISK\t5\t\t\t\t5\t\t\t\t\t\t\t\t\t\t\t\t\nEND");
+                    check(none.Disks[0].Level == HealthLevel.Unknown && none.Disks[0].Name == "Disk 5" && none.Disks[0].Notes.Any(n => n.Contains("administrator")) &&
+                          DiskHealth.Parse("").Summary == "Windows did not report any drives.", "Disk health: a drive that shares nothing is shown as unknown, never as healthy");
+                    var today = new DateTime(2026, 10, 17);
+                    check(!DiskHealth.ShouldAlert(HealthLevel.Healthy, "", today) && DiskHealth.ShouldAlert(HealthLevel.Warning, "", today) &&
+                          !DiskHealth.ShouldAlert(HealthLevel.Warning, DiskHealth.Stamp(HealthLevel.Warning, today.AddDays(-3)), today) &&
+                          DiskHealth.ShouldAlert(HealthLevel.Warning, DiskHealth.Stamp(HealthLevel.Warning, today.AddDays(-7)), today) &&
+                          DiskHealth.ShouldAlert(HealthLevel.Failing, DiskHealth.Stamp(HealthLevel.Warning, today), today) &&
+                          DiskHealth.ShouldAlert(HealthLevel.Failing, DiskHealth.Stamp(HealthLevel.Failing, today.AddDays(-1)), today) &&
+                          !DiskHealth.ShouldAlert(HealthLevel.Failing, DiskHealth.Stamp(HealthLevel.Failing, today), today),
+                          "Disk health alerts: a failing drive once a day, a warning once a week, at once when it gets worse");
+                    var cmds = DiskHealth.CommandsIn(DiskHealth.Script);
+                    check(DiskHealth.ScriptOnlyReads(DiskHealth.Script) && cmds.Contains("Get-PhysicalDisk") && cmds.Contains("Get-StorageReliabilityCounter") &&
+                          !DiskHealth.ScriptOnlyReads(DiskHealth.Script + "\nSet-PhysicalDisk -FriendlyName x") && !DiskHealth.ScriptOnlyReads(DiskHealth.Script + "\n'x' > c:\\x.txt") &&
+                          !DiskHealth.Script.ToLowerInvariant().Contains("serial"),
+                          "Disk health only reads: its fixed script uses " + string.Join(", ", cmds) + " and nothing that writes, downloads or reads serial numbers");
+                    if (win)
+                    {
+                        string wdir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                        var tools = new[] { "powershell.exe", "cmd.exe", "schtasks.exe", "explorer.exe", "dism.exe" }.Select(Win.SystemExe).ToList();
+                        check(tools.All(p => Path.IsPathRooted(p) && p.StartsWith(wdir, StringComparison.OrdinalIgnoreCase) && File.Exists(p)) &&
+                              Win.SystemExe(@"C:\x\y.exe") == @"C:\x\y.exe",
+                              "Windows tools start from the Windows folder only (" + tools[0] + "), never a same-named file next to Elixar");
+                        var real = DiskHealth.Read();
+                        check(real.Error == null && real.Disks.Count > 0,
+                              "Disk health on this PC: " + (real.Error ?? real.Summary + " " + string.Join("; ", real.Disks.Select(d => d.Label + " = " + DiskHealth.LevelText(d.Level) +
+                              (d.LifeLeft >= 0 ? ", " + d.LifeLeft + "% life left" : "") + (d.Temp > 0 ? ", " + d.Temp + " °C" : "")))));
+                    }
+                    else check(Win.SystemExe("powershell.exe") == "powershell.exe", "Windows tools are named by full path (not on Windows here)");
+                } catch (Exception ex) { check(false, "Disk health tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
+
                 // 4. the window, with cleaning switched off
-                bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false;
+                bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false;
                 string uiErr = null;
                 try
                 {
                     var form = new MainForm(true);
                     int scans = 0;
-                    bool changeOk = false, dashDone = false, appsDone = false, storeDone = false, undoDone = false, phoneDone = false, startDone = false, moveDone = false;
+                    bool changeOk = false, dashDone = false, appsDone = false, storeDone = false, undoDone = false, phoneDone = false, startDone = false, moveDone = false, diskDone = false;
                     Action maybeClose = () =>
                     {
-                        if (scans >= 2 && dashDone && appsDone && storeDone && undoDone && phoneDone && startDone && moveDone)
+                        if (scans >= 2 && dashDone && appsDone && storeDone && undoDone && phoneDone && startDone && moveDone && diskDone)
                         {
                             toolsOk = true;
                             storeOk = !win || form.StoreCount > 0;
@@ -2541,6 +2589,8 @@ namespace CDriveCleaner
                             appsOk = !win || form.AppsCount > 0;
                             uiOk = changeOk;
                             phoneOk = form.PhoneRows > 10;
+                            diskOk = !win || form.DiskRows > 0;
+                            settingsOk = form.SettingsTabReady;
                             form.Close();
                         }
                     };
@@ -2557,7 +2607,8 @@ namespace CDriveCleaner
                     form.UndoDone += () => { if (!phoneDone) form.ShowPhone(); };
                     form.PhoneDone += () => { phoneDone = true; if (!startDone) form.ShowStartup(); };
                     form.StartupDone += () => { startDone = true; if (!moveDone) form.ShowMove(); };
-                    form.MoveDone += () => { moveDone = true; maybeClose(); };
+                    form.MoveDone += () => { moveDone = true; form.ShowDiskHealth(); };
+                    form.DiskHealthDone += () => { diskDone = true; maybeClose(); };
                     form.StoreDone += () => form.ShowUndo();
                     form.Shown += (o, e) => { form.RefreshApps(); form.ShowStoreTab(); };
                     var timeout = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
@@ -2573,6 +2624,8 @@ namespace CDriveCleaner
                 check(storeOk, "Built-in and Store apps list opens and fills in");
                 check(toolsOk, "Tools tab opens and the Undo list loads");
                 check(phoneOk, "Phone tab finds the (simulated) phone and lists what to clean and its apps");
+                check(diskOk, "Disk health tab opens and lists the drives");
+                check(settingsOk, "Settings tab shows the saved language and theme, ready to switch");
                 Adb.Exe = null; Adb.Prefix = "";
 
                 // 5. drill-down window on the test folder

@@ -1,4 +1,4 @@
-// Settings (language, theme) and dark mode.
+// Saved settings (language, theme) and dark mode. The Settings tab is in SettingsTab.cs.
 
 using System;
 using System.Collections.Generic;
@@ -158,53 +158,6 @@ namespace CDriveCleaner
                 TextRenderer.DrawText(e.Graphics, page.Text, tc.Font, e.Bounds, sel ? Ink : Quiet, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 if (sel) using (var p = new Pen(Accent, 2)) e.Graphics.DrawLine(p, e.Bounds.Left + 4, e.Bounds.Bottom - 2, e.Bounds.Right - 4, e.Bounds.Bottom - 2);
             };
-        }
-    }
-
-    public class SettingsForm : Form
-    {
-        public bool NeedsRestart;
-        public Action CheckUpdates;
-        public SettingsForm(float scale)
-        {
-            Func<int, int> S = px => (int)Math.Round(px * scale);
-            Text = Lang.T("Settings"); Icon = Brand.Load(32); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
-            MinimizeBox = false; MaximizeBox = false; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Padding = new Padding(S(14)); Font = new Font("Segoe UI", 9.5f);
-            var t = new TableLayoutPanel { AutoSize = true, ColumnCount = 2 };
-            var lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(220) };
-            lang.Items.AddRange(new object[] { "English", "עברית (Hebrew)" });
-            lang.SelectedIndex = Settings.Language == "he" ? 1 : 0;
-            var theme = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(220) };
-            theme.Items.AddRange(new object[] { Lang.T("Follow Windows"), Lang.T("Light"), Lang.T("Dark") });
-            theme.SelectedIndex = Settings.ThemeMode == "light" ? 1 : Settings.ThemeMode == "dark" ? 2 : 0;
-            t.Controls.Add(new Label { AutoSize = true, Text = Lang.T("Language"), Margin = new Padding(0, S(7), S(12), S(6)) }, 0, 0); t.Controls.Add(lang, 1, 0);
-            t.Controls.Add(new Label { AutoSize = true, Text = Lang.T("Theme"), Margin = new Padding(0, S(7), S(12), S(6)) }, 0, 1); t.Controls.Add(theme, 1, 1);
-            var btnInstall = new Button { Text = Lang.T(Setup.IsRegistered() ? "Repair the installation" : "Install Elixar on this PC"), AutoSize = true };
-            var btnUpdate = new Button { Text = Lang.T("Check for updates"), AutoSize = true };
-            var info = new Label { AutoSize = true, MaximumSize = new Size(S(420), 0), ForeColor = Theme.Quiet, Margin = new Padding(0, S(6), 0, 0),
-                                   Text = Lang.T("Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change.") };
-            t.Controls.Add(new Label { AutoSize = true, Text = Lang.T("This PC"), Margin = new Padding(0, S(12), S(12), 0) }, 0, 2);
-            var tools = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, S(6), 0, 0) }; tools.Controls.Add(btnInstall); tools.Controls.Add(btnUpdate);
-            t.Controls.Add(tools, 1, 2); t.Controls.Add(info, 1, 3);
-            btnInstall.Click += (o, e) =>
-            {
-                string err = Setup.InstallHere(null);
-                Lang.Box(this, err == null ? "Elixar is installed: find it in the Start menu. It also appears in Windows' installed apps list." : "Could not install Elixar: " + err, "Elixar",
-                    MessageBoxButtons.OK, err == null ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
-            };
-            btnUpdate.Click += (o, e) => { if (CheckUpdates != null) CheckUpdates(); };
-            var ok = new Button { Text = Lang.T("Save"), AutoSize = true, DialogResult = DialogResult.OK };
-            var cancel = new Button { Text = Lang.T("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
-            var row = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, S(12), 0, 0) }; row.Controls.Add(ok); row.Controls.Add(cancel);
-            t.Controls.Add(row, 1, 4);
-            Controls.Add(t); AcceptButton = ok; CancelButton = cancel;
-            ok.Click += (o, e) =>
-            {
-                string l = lang.SelectedIndex == 1 ? "he" : "en", th = theme.SelectedIndex == 1 ? "light" : theme.SelectedIndex == 2 ? "dark" : "auto";
-                NeedsRestart = l != Settings.Language || th != Settings.ThemeMode;
-                Settings.Language = l; Settings.ThemeMode = th;
-            };
-            Shown += (o, e) => { Theme.Apply(this); Lang.Apply(this); };
         }
     }
 }

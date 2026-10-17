@@ -18,11 +18,7 @@ namespace CDriveCleaner
 
     public static class SystemSpace
     {
-        static string Exe(string name)
-        {
-            string dir = Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess ? "Sysnative" : "System32";
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), dir, name);
-        }
+        static string Exe(string name) { return Win.SystemExe(name); }
 
         public static int Run(string exe, string args, int timeoutMs, out string output)
         {

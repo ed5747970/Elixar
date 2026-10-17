@@ -83,7 +83,7 @@ namespace CDriveCleaner
         public static ProcessStartInfo UninstallCommand(string uninstallString)
         {
             // cmd /s /c "..." keeps every quote inside the original string
-            return new ProcessStartInfo("cmd.exe", "/s /c \"" + uninstallString + "\"") { UseShellExecute = false, CreateNoWindow = true };
+            return new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/s /c \"" + uninstallString + "\"") { UseShellExecute = false, CreateNoWindow = true };
         }
 
         // A location is only measured when it is a real app folder on C:, never a drive root or a shared system folder.
@@ -322,7 +322,7 @@ namespace CDriveCleaner
         {
             var a = SelectedApp();
             if (a == null || a.Location.Length == 0) return;
-            try { Process.Start("explorer.exe", "\"" + a.Location + "\""); }
+            try { Process.Start(Win.SystemExe("explorer.exe"), "\"" + a.Location + "\""); }
             catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
         }
 

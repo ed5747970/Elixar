@@ -147,7 +147,7 @@ namespace CDriveCleaner
                     Measure = () => -1, Clean = log => IPhone.Sta(() => { try { System.Windows.Forms.Clipboard.Clear(); } catch { } return 0; }) },
                 new CleanItem { Name = "DNS cache", Tier = Tier.Review, Privacy = true, Where = "Windows network cache",
                     Info = "The list of websites this PC looked up recently. Windows fills it again as you browse.",
-                    Measure = () => -1, Clean = log => { try { var p = Process.Start(new ProcessStartInfo("ipconfig.exe", "/flushdns") { UseShellExecute = false, CreateNoWindow = true }); p.WaitForExit(30000); } catch { } } },
+                    Measure = () => -1, Clean = log => { try { var p = Process.Start(new ProcessStartInfo(Win.SystemExe("ipconfig.exe"), "/flushdns") { UseShellExecute = false, CreateNoWindow = true }); p.WaitForExit(30000); } catch { } } },
             };
         }
     }

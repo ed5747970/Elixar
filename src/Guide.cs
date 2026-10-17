@@ -33,7 +33,7 @@ namespace CDriveCleaner
         public static void Open()
         {
             string p = WriteTemp();
-            if (Win.IsWindows) Process.Start("explorer.exe", "\"" + p + "\"");
+            if (Win.IsWindows) Process.Start(Win.SystemExe("explorer.exe"), "\"" + p + "\"");
             else Process.Start(p);
         }
 

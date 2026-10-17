@@ -1,4 +1,4 @@
-// Tools tab: Drivers, System space, Duplicates, Undo.
+// Tools tab: Disk health, Drivers, Startup, System space, Move off C:, Duplicates, Undo.
 
 using System;
 using System.Collections.Generic;
@@ -41,21 +41,23 @@ namespace CDriveCleaner
         {
             pageTools = new TabPage("Tools") { BackColor = Color.FromArgb(246, 248, 251) };
             toolsTabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(S(12), S(4)) };
+            pageDisk = new TabPage("Disk health") { BackColor = pageTools.BackColor };
             pageDrivers = new TabPage("Drivers") { BackColor = pageTools.BackColor };
             pageStartup = new TabPage("Startup") { BackColor = pageTools.BackColor };
             pageSys = new TabPage("System space") { BackColor = pageTools.BackColor };
             pageMove = new TabPage("Move off C:") { BackColor = pageTools.BackColor };
             pageDups = new TabPage("Duplicates") { BackColor = pageTools.BackColor };
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
-            toolsTabs.TabPages.AddRange(new[] { pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageUndo });
+            toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageUndo });
             pageTools.Controls.Add(toolsTabs);
-            BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildUndo();
+            BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();
         }
 
         void OnToolsTab()
         {
-            if (toolsTabs.SelectedTab == pageDrivers && !drvLoaded) ScanDrivers();
+            if (toolsTabs.SelectedTab == pageDisk && !diskLoaded) RefreshDiskHealth();
+            else if (toolsTabs.SelectedTab == pageDrivers && !drvLoaded) ScanDrivers();
             else if (toolsTabs.SelectedTab == pageStartup && !startLoaded) RefreshStartup();
             else if (toolsTabs.SelectedTab == pageMove && !moveLoaded) RefreshMove();
             else if (toolsTabs.SelectedTab == pageUndo) RefreshUndo();
@@ -366,7 +368,7 @@ namespace CDriveCleaner
             dupList = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
             dupList.Columns.Add("File", S(560)); dupList.Columns.Add("Size", S(85), HorizontalAlignment.Right); dupList.Columns.Add("Modified", S(95)); dupList.Columns.Add("", S(140));
             dupList.ItemChecked += (o, e) => UpdateDupButton();
-            dupList.DoubleClick += (o, e) => { if (dupList.SelectedItems.Count > 0) try { Process.Start("explorer.exe", "/select,\"" + ((FileInfo)dupList.SelectedItems[0].Tag).FullName + "\""); } catch { } };
+            dupList.DoubleClick += (o, e) => { if (dupList.SelectedItems.Count > 0) try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + ((FileInfo)dupList.SelectedItems[0].Tag).FullName + "\""); } catch { } };
 
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, S(6), 0, 0) };
             btnDupFind = MakeButton("Find duplicates"); btnDupFind.Font = new Font("Segoe UI Semibold", 9f);
@@ -488,7 +490,7 @@ namespace CDriveCleaner
             pageUndo.Controls.Add(t);
             undoList.SelectedIndexChanged += (o, e) => UpdateUndoButtons();
             btnUndoRefresh.Click += (o, e) => RefreshUndo();
-            btnUndoOpen.Click += (o, e) => { var b = SelectedUndo(); if (b != null) try { Process.Start("explorer.exe", "\"" + b.Dir + "\""); } catch { } };
+            btnUndoOpen.Click += (o, e) => { var b = SelectedUndo(); if (b != null) try { Process.Start(Win.SystemExe("explorer.exe"), "\"" + b.Dir + "\""); } catch { } };
             btnUndoRestore.Click += (o, e) =>
             {
                 var b = SelectedUndo(); if (b == null || testMode) return;

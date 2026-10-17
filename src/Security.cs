@@ -19,6 +19,19 @@ namespace CDriveCleaner
     public static class Win
     {
         public static bool IsWindows { get { return Environment.OSVersion.Platform == PlatformID.Win32NT; } }
+
+        // The full path of a Windows tool. Starting "powershell.exe" by name makes Windows look in Elixar's own folder
+        // and the current folder first, so a same-named file planted next to a downloaded Elixar.exe would run with
+        // administrator rights. Elixar always names the copy in the Windows folder instead.
+        public static string SystemExe(string name)
+        {
+            if (!IsWindows || string.IsNullOrEmpty(name) || name.IndexOfAny(new[] { '\\', '/', ':' }) >= 0) return name;
+            string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            if (name.Equals("explorer.exe", StringComparison.OrdinalIgnoreCase)) return System.IO.Path.Combine(win, name);
+            string sys = System.IO.Path.Combine(win, Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess ? "Sysnative" : "System32");
+            if (name.Equals("powershell.exe", StringComparison.OrdinalIgnoreCase)) return System.IO.Path.Combine(System.IO.Path.Combine(sys, @"WindowsPowerShell\v1.0"), name);
+            return System.IO.Path.Combine(sys, name);
+        }
     }
 
     // ============================ file fingerprints and digital signatures ============================

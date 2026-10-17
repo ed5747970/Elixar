@@ -130,7 +130,7 @@ namespace CDriveCleaner
             output = "";
             try
             {
-                var psi = new ProcessStartInfo("schtasks.exe", args)
+                var psi = new ProcessStartInfo(Win.SystemExe("schtasks.exe"), args)
                 {
                     UseShellExecute = false, CreateNoWindow = true,
                     RedirectStandardOutput = true, RedirectStandardError = true
@@ -182,6 +182,7 @@ namespace CDriveCleaner
         {
             long total = Sys.Total(), free = Sys.Free();
             SpaceHistory.Record(free, total);   // one reading a day for the space trend
+            CheckDisks();
             if (!ShouldWarn(free, total, percent))
             {
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");
@@ -192,6 +193,24 @@ namespace CDriveCleaner
                 "Only " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / total) + "%). Click to open Elixar.",
                 ToolTipIcon.Warning, true);
             return 0;
+        }
+
+        // read only; runs with the same rights as the space check
+        static void CheckDisks()
+        {
+            try
+            {
+                var r = DiskHealth.Read();
+                if (r.Error != null) { Log("Disk health: " + r.Error); return; }
+                Log("Disk health: " + r.Summary);
+                var w = r.Worst;
+                if (!DiskHealth.ShouldAlert(w, Settings.Get("DiskAlert", ""), DateTime.Today)) return;
+                Settings.Set("DiskAlert", DiskHealth.Stamp(w, DateTime.Today));
+                var d = r.Disks.First(x => x.Level == w);
+                Notify(w == HealthLevel.Failing ? "A drive may fail soon: back up now" : "A drive needs attention",
+                       d.Label + ": " + (d.Reasons.Count > 0 ? d.Reasons[0] : DiskHealth.LevelText(w)) + " Click to open Elixar.", w == HealthLevel.Failing ? ToolTipIcon.Error : ToolTipIcon.Warning, true);
+            }
+            catch (Exception e) { Log("Disk health check failed: " + e.Message); }
         }
 
         public static List<CleanItem> AutoItems()

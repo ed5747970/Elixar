@@ -168,8 +168,8 @@ namespace CDriveCleaner
                 var sel = list.SelectedItems.Count > 0 ? (DrillEntry)list.SelectedItems[0].Tag : null;
                 try
                 {
-                    if (sel != null && !sel.IsGroup) Process.Start("explorer.exe", "/select,\"" + sel.Path + "\"");
-                    else Process.Start("explorer.exe", "\"" + current + "\"");
+                    if (sel != null && !sel.IsGroup) Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + sel.Path + "\"");
+                    else Process.Start(Win.SystemExe("explorer.exe"), "\"" + current + "\"");
                 }
                 catch { }
             };

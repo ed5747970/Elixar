@@ -1,7 +1,17 @@
-ELIXAR  (version 1.8.0)
+ELIXAR  (version 1.9.0)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.9
+- Disk health (Tools, and a button on the Dashboard): reads your drives' own
+  health, wear, temperature and error data and warns before a drive fails.
+  Read only: nothing is written to the drives, nothing is downloaded or sent.
+  The daily low-space check also warns you if a drive's health gets worse.
+- Settings tab: switch between English and Hebrew, and light, dark or
+  "follow Windows", then click "Apply and restart Elixar".
+- Security: Windows tools (PowerShell, cmd, schtasks...) are always started
+  from the Windows folder by full path, never a same-named file next to Elixar.
 
 NEW IN 1.8
 - Free space for me (Cleaner): type how many GB you want back; Elixar ticks the safest items.

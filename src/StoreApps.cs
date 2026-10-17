@@ -169,7 +169,7 @@ namespace CDriveCleaner
 
         public static string RunPs(string script, int timeoutMs)
         {
-            var psi = new ProcessStartInfo("powershell.exe",
+            var psi = new ProcessStartInfo(Win.SystemExe("powershell.exe"),
                 "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script)))
             {
                 UseShellExecute = false, CreateNoWindow = true,

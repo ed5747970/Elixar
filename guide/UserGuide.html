@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.8.0</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.9.0</p></div>
 </div></header>
 <main class="wrap">
 
@@ -101,6 +101,7 @@
   <li><strong>Folder drill-down:</strong> double-click a folder row or click &ldquo;Explore C:\&rdquo; to see what is inside, biggest first. Backspace goes up. This also explains &ldquo;Other used&rdquo;.</li>
   <li><strong>F5 or Refresh</strong> measures again; it also refreshes after every clean.</li>
   <li><strong>Space trend:</strong> free space over time and a forecast like &ldquo;C: loses 5 GB a month, full around October 2027&rdquo;. Elixar records one reading a day (each scan and the daily low-space check), so the chart fills in over a few days.</li>
+  <li><strong>Disk health:</strong> the button turns orange (&ldquo;Disk health: check&rdquo;) or red (&ldquo;back up now!&rdquo;) when a drive needs attention. Click it to see why.</li>
   <li><strong>Folder map:</strong> boxes sized by the space they use and coloured by level (red critical, orange caution, blue review, green safe). Click a folder to go inside; Backspace goes back.</li>
 </ul>
 
@@ -133,7 +134,17 @@
 <p>Nothing is ticked for you, a restore point is made first, and removed apps can be reinstalled from the Microsoft Store. You can also reach removal from other tabs: &ldquo;Remove apps...&rdquo; on the Dashboard and Cleaner, right-click in Largest files, and &ldquo;Uninstall &lt;app&gt;...&rdquo; in the folder drill-down.</p>
 
 <h2 id="tools">Tools</h2>
-<p>The Tools tab has six inner tabs for deeper jobs.</p>
+<p>The Tools tab has seven inner tabs for deeper jobs.</p>
+<h3>Disk health</h3>
+<p>Reads the health, wear and error counters your drives keep about themselves (the same data Windows uses) and tells you, in plain words, before a drive fails. It only reads: nothing is written to any drive, nothing is downloaded, nothing is sent anywhere, and serial numbers are not read.</p>
+<table>
+  <tr><th>Result</th><th>When</th><th>What to do</th></tr>
+  <tr><td class="safe">Healthy</td><td>Windows says the drive is fine and nothing below applies</td><td>Nothing</td></tr>
+  <tr><td class="caution">Needs attention</td><td>Windows reports a warning; under 20% of an SSD's rated write life left; errors the drive couldn't fix; running hot (55 &deg;C for a hard disk, 70 &deg;C for an SSD)</td><td>Keep a recent backup and check again in a few days (or let a hot PC cool down)</td></tr>
+  <tr><td style="color:var(--danger);font-weight:600">May fail soon</td><td>Windows says unhealthy; the drive's own S.M.A.R.T. check predicts failure; its rated write life is used up</td><td>Back up your files today, then replace the drive</td></tr>
+  <tr><td>Unknown</td><td>The drive shares nothing (common for USB drives)</td><td>Never shown as healthy when Elixar can't tell</td></tr>
+</table>
+<p>Wear, temperature and error counts need administrator rights, which Elixar normally has. The daily low-space check also checks the drives and shows a notification: every day while a drive may fail soon, once a week while it needs attention.</p>
 <h3>Drivers</h3>
 <p>Shows this PC's hardware (CPU, graphics, motherboard, disks, network) and finds drivers it doesn't need.</p>
 <table>
@@ -177,13 +188,13 @@
 <h2 id="automation">Automation</h2>
 <p>Two schedules run through Windows Task Scheduler even when Elixar is closed; click Save to turn them on or off.</p>
 <ul>
-  <li><strong>Low-space alert:</strong> a Windows notification when C: drops under the limit you choose (default 15%), checked daily and a few minutes after you sign in.</li>
+  <li><strong>Low-space alert:</strong> a Windows notification when C: drops under the limit you choose (default 15%), checked daily and a few minutes after you sign in. The same check warns you when a drive's health gets worse.</li>
   <li><strong>Weekly auto-clean:</strong> cleans only the 11 default Safe items on the day and time you choose. Never Caution items, the Recycle Bin, browser caches, privacy items or DISM. Open apps are skipped, never closed, and a notification shows what was freed.</li>
 </ul>
 <div class="note">Schedules start the protected copy in C:\Program Files\Elixar. After updating Elixar, open Automation and click Save once so they use the new version.</div>
 
 <h2 id="settings">Settings and updates</h2>
-<p>Click <strong>Settings</strong> in the footer.</p>
+<p>Open the <strong>Settings</strong> tab (or click Settings in the footer). Pick a language and a theme, then click <strong>Apply and restart Elixar</strong>: Elixar restarts for a moment in the new look. The small picture next to the theme choices shows what it will look like.</p>
 <ul>
   <li><strong>Language:</strong> English or Hebrew (the window is laid out right to left). Some live status lines stay in English.</li>
   <li><strong>Theme:</strong> follow Windows, light or dark.</li>
@@ -198,6 +209,7 @@
   <tr><td>A virus swaps Elixar.exe and the weekly schedule runs it as admin</td><td>Schedules run a copy in Program Files, which only admins can change</td></tr>
   <tr><td>A fake backup planted in Undo gets restored as admin</td><td>The Undo folder is locked to admins; anything else in it is ignored; Restore never writes into Windows' folders</td></tr>
   <tr><td>A link planted in Temp redirects deletion into Windows</td><td>Each file is checked for its real location while held open, then deleted; System32, drive roots and your main folders are never deleted</td></tr>
+  <tr><td>A fake &ldquo;powershell.exe&rdquo; planted next to a downloaded Elixar.exe runs as admin</td><td>Since 1.9, Windows tools are always started from the Windows folder by their full path</td></tr>
   <tr><td>Swapped Android tools or uninstall commands run as admin</td><td>Google's signature is checked before the Android tools run; your account's uninstallers run without admin rights</td></tr>
 </table>
 <p>To check your copy, click &ldquo;Verify this copy&rdquo; in the footer: it shows Elixar's SHA-256 fingerprint to compare with SHA256.txt, and the state of the protected copy and the Undo folder. Elixar is not an antivirus, and Windows still shows the &ldquo;Windows protected your PC&rdquo; box because Elixar has no paid code-signing certificate.</p>
@@ -227,6 +239,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-17</td><td>1.9.0</td><td>Disk health (read only, with daily alerts); Settings tab to switch English/Hebrew and light/dark; Windows tools always started by full path</td></tr>
   <tr><td>2026-10-17</td><td>1.8.0</td><td>Windows.old, hibernation file, Free space for me, Move off C:, 6 more caches, Hebrew, dark mode, space trend, folder map, installer, signed updates, GitHub build and test</td></tr>
   <tr><td>2026-10-17</td><td>1.7.3</td><td>This user guide built in: footer link &ldquo;User guide&rdquo; or F1, with &ldquo;Save a copy&rdquo;</td></tr>
   <tr><td>2026-10-17</td><td>1.7.2</td><td>Hardware list in Tools &rsaquo; Drivers fixed; stronger signature self-test</td></tr>
