@@ -26,11 +26,14 @@ namespace CDriveCleaner
     public static class GoogleAuth
     {
         public const string Scope = "openid email https://www.googleapis.com/auth/gmail.send";
+        // only when you turn on Email cleaning, after Elixar asks you: see senders, dates and sizes, and move emails to Gmail's Trash
+        public const string ModifyScope = "https://www.googleapis.com/auth/gmail.modify";
         const string AuthUrl = "https://accounts.google.com/o/oauth2/v2/auth", TokenUrl = "https://oauth2.googleapis.com/token", RevokeUrl = "https://oauth2.googleapis.com/revoke";
         static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Elixar mail sign-in v1");
 
         public class Client { public string Id = "", Secret = ""; }
-        public class Account { public string Email = "", Refresh = "", ClientId = "", ClientSecret = ""; public DateTime Since; }
+        public class Account { public string Email = "", Refresh = "", ClientId = "", ClientSecret = "", Scopes = ""; public DateTime Since;
+                               public bool Mailbox { get { return (" " + Scopes + " ").Contains(" " + ModifyScope + " "); } } }
 
         public static string OverrideDir;   // self-test only
         public static string Dir
@@ -111,7 +114,7 @@ namespace CDriveCleaner
             string f = AccountFile;
             if (f == null) throw new IOException("Could not prepare Elixar's protected mail folder.");
             var json = new JavaScriptSerializer().Serialize(new Dictionary<string, string> {
-                { "email", a.Email }, { "refresh", a.Refresh }, { "cid", a.ClientId }, { "csec", a.ClientSecret }, { "since", a.Since.ToString("o", CultureInfo.InvariantCulture) } });
+                { "email", a.Email }, { "refresh", a.Refresh }, { "cid", a.ClientId }, { "csec", a.ClientSecret }, { "scopes", a.Scopes }, { "since", a.Since.ToString("o", CultureInfo.InvariantCulture) } });
             File.WriteAllBytes(f, Protect(Encoding.UTF8.GetBytes(json)));
         }
 
@@ -122,7 +125,7 @@ namespace CDriveCleaner
                 string f = AccountFile;
                 if (f == null || !File.Exists(f)) return null;
                 var o = Json(Encoding.UTF8.GetString(Unprotect(File.ReadAllBytes(f))));
-                var a = new Account { Email = Str(o, "email"), Refresh = Str(o, "refresh"), ClientId = Str(o, "cid"), ClientSecret = Str(o, "csec") };
+                var a = new Account { Email = Str(o, "email"), Refresh = Str(o, "refresh"), ClientId = Str(o, "cid"), ClientSecret = Str(o, "csec"), Scopes = Str(o, "scopes") };
                 DateTime.TryParse(Str(o, "since"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out a.Since);
                 return a.Email.Length > 0 && a.Refresh.Length > 0 ? a : null;
             }
@@ -130,6 +133,7 @@ namespace CDriveCleaner
         }
 
         public static string SignedInEmail { get { var a = Load(); return a == null ? null : a.Email; } }
+        public static bool MailboxAccess { get { var a = Load(); return a != null && a.Mailbox; } }
 
         // ---------- sign-in in the browser ----------
         public static string B64Url(byte[] b) { return Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_'); }
@@ -142,10 +146,12 @@ namespace CDriveCleaner
         static string Random(int bytes) { var b = new byte[bytes]; using (var r = RandomNumberGenerator.Create()) r.GetBytes(b); return B64Url(b); }
         public static string Challenge(string verifier) { using (var h = SHA256.Create()) return B64Url(h.ComputeHash(Encoding.ASCII.GetBytes(verifier))); }
 
-        public static string AuthorizeUrl(Client c, string redirect, string state, string challenge)
+        public static string AuthorizeUrl(Client c, string redirect, string state, string challenge) { return AuthorizeUrl(c, redirect, state, challenge, false); }
+
+        public static string AuthorizeUrl(Client c, string redirect, string state, string challenge, bool mailbox)
         {
             Func<string, string> E = Uri.EscapeDataString;
-            return AuthUrl + "?client_id=" + E(c.Id) + "&redirect_uri=" + E(redirect) + "&response_type=code&scope=" + E(Scope) +
+            return AuthUrl + "?client_id=" + E(c.Id) + "&redirect_uri=" + E(redirect) + "&response_type=code&scope=" + E(mailbox ? Scope + " " + ModifyScope : Scope) +
                    "&code_challenge=" + challenge + "&code_challenge_method=S256&state=" + state + "&access_type=offline&prompt=consent";
         }
 
@@ -204,7 +210,10 @@ namespace CDriveCleaner
         }
 
         // Opens Google's sign-in page in the browser and waits (up to 5 minutes) for the answer. Returns an error or null.
-        public static string SignIn(Action<string> status, CancellationToken cancel)
+        public static string SignIn(Action<string> status, CancellationToken cancel) { return SignIn(status, cancel, false); }
+
+        // mailbox: also ask for Email cleaning (only after the person agreed in Elixar's own question first)
+        public static string SignIn(Action<string> status, CancellationToken cancel, bool mailbox)
         {
             var c = LoadClient();
             if (c == null) return "Set up Google sign-in first (one time).";
@@ -214,7 +223,7 @@ namespace CDriveCleaner
             {
                 int port = ((IPEndPoint)listener.LocalEndpoint).Port;
                 string redirect = "http://127.0.0.1:" + port + "/", state = Random(24), verifier = Random(48);
-                string url = AuthorizeUrl(c, redirect, state, Challenge(verifier));
+                string url = AuthorizeUrl(c, redirect, state, Challenge(verifier), mailbox);
                 if (status != null) status("Waiting for you to sign in to Google in your browser...");
                 OpenBrowser(url);
                 string code = null, err = null;
@@ -248,10 +257,12 @@ namespace CDriveCleaner
                 string refresh = Str(tok, "refresh_token"), scope = Str(tok, "scope");
                 if (refresh.Length == 0) return "Google didn't give Elixar a sign-in key: " + (Str(tok, "error_description") + " " + Str(tok, "error")).Trim();
                 if (scope.IndexOf("gmail.send", StringComparison.Ordinal) < 0) return "Google sign-in worked, but the \"send email\" permission wasn't ticked. Sign in again and allow it.";
+                if (mailbox && (" " + scope + " ").IndexOf(" " + ModifyScope + " ", StringComparison.Ordinal) < 0)
+                    return "Google sign-in worked, but the permission to see and tidy your emails wasn't ticked, so Email cleaning stays off.";
                 bool verified;
                 string email = EmailFromIdToken(Str(tok, "id_token"), c.Id, out verified);
                 if (email == null || !verified) return "Google didn't confirm your email address.";
-                Save(new Account { Email = email, Refresh = refresh, ClientId = c.Id, ClientSecret = c.Secret, Since = DateTime.Now });
+                Save(new Account { Email = email, Refresh = refresh, ClientId = c.Id, ClientSecret = c.Secret, Since = DateTime.Now, Scopes = scope });
                 MailStatus.Reset();
                 cachedToken = Str(tok, "access_token"); cachedUntil = DateTime.Now.AddSeconds(Math.Max(60, ToInt(Str(tok, "expires_in"))) - 60);
                 return null;
@@ -290,9 +301,17 @@ namespace CDriveCleaner
         static string cachedToken; static DateTime cachedUntil;
         public static string LastError;
         public static void Forget() { cachedToken = null; }
+        public static void UseTestToken(string t) { cachedToken = t; cachedUntil = DateTime.Now.AddHours(1); }   // tests only
         public const string SignedOutText = "Google signed Elixar out (the sign-in was removed or expired). Sign in again in Settings.";
 
+        static readonly object tokenLock = new object();
+
         public static string AccessToken(out string error)
+        {
+            lock (tokenLock) return AccessTokenLocked(out error);   // Email cleaning asks from several threads at once
+        }
+
+        static string AccessTokenLocked(out string error)
         {
             error = null;
             if (cachedToken != null && DateTime.Now < cachedUntil) return cachedToken;

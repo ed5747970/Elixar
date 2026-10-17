@@ -1,7 +1,15 @@
-ELIXAR  (version 1.10.0)
+ELIXAR  (version 2.0.0)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.0
+- Email tab: finds old ads, social notifications, mailing lists, spam and
+  large old emails in your Gmail and moves the ones you pick to Gmail's Trash
+  (restorable for 30 days). Off until you allow it; Elixar asks you first.
+  Starred and Important emails are never touched, and Elixar only looks at
+  senders, dates and sizes, never at what your emails say.
+- Version numbers: 2.0 comes after 1.10, which came after 1.9.
 
 NEW IN 1.10
 - Email reports (Settings > Email reports): sign in with Google and get the

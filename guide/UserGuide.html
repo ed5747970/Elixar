@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.10.0</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.0.0</p></div>
 </div></header>
 <main class="wrap">
 
@@ -54,7 +54,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email reports</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email reports</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -219,6 +219,25 @@
   <tr><td>How do I stop it?</td><td>Untick the emails, or click Sign out (Google cancels the permission). Uninstalling Elixar also signs out.</td></tr>
 </table>
 
+<h2 id="emailclean">Email cleaning (Email tab)</h2>
+<p>Finds what you can clean in your Gmail and moves what you pick to Gmail's Trash. It is <strong>off until you allow it</strong>: sign in first (Settings &rsaquo; Email reports), then on the Email tab click &ldquo;Allow Elixar to check my Gmail&rdquo;. Elixar explains what it will and won't do and asks you; only then does Google ask for the permission.</p>
+<table>
+  <tr><th>Group</th><th>Gmail search</th><th>Level</th></tr>
+  <tr><td>Ads and offers older than a month</td><td>Promotions, older than 30 days</td><td class="safe">Safe (ticked)</td></tr>
+  <tr><td>Social network notifications older than a month</td><td>Social, older than 30 days</td><td class="safe">Safe (ticked)</td></tr>
+  <tr><td>Group and mailing-list emails older than 3 months</td><td>Forums, older than 90 days</td><td class="safe">Safe (ticked)</td></tr>
+  <tr><td>Spam</td><td>The Spam folder (Gmail empties it after 30 days anyway)</td><td class="safe">Safe (ticked)</td></tr>
+  <tr><td>Automatic updates older than 6 months</td><td>Updates (receipts, alerts), older than 180 days</td><td class="review">Your decision</td></tr>
+  <tr><td>Large emails older than a year</td><td>Over 10 MB, older than a year</td><td class="review">Your decision</td></tr>
+</table>
+<ul>
+  <li>Starred and Important emails, and chats, are never included.</li>
+  <li>Elixar reads only each email's sender, date and size, never what it says, and saves nothing about your emails. Click a row to see who sends the most and the exact search used.</li>
+  <li>&ldquo;Move to Gmail's Trash&rdquo; asks first. Gmail keeps the emails in its Trash for 30 days, so you can restore them. Elixar never deletes an email permanently: empty the Trash in Gmail to free the space now.</li>
+  <li>To turn it off, click &ldquo;Turn off Email cleaning&rdquo;: Elixar signs out so Google takes the permission back. Sign in again in Settings to keep email reports (send only).</li>
+  <li>One-time Google setup: in step 4, also tick <code>.../auth/gmail.modify</code>. Google shows its broadest wording for this permission (&ldquo;read, compose and send&rdquo;); Elixar uses it only as described here.</li>
+</ul>
+
 <h2 id="security">Security</h2>
 <p>Elixar runs as administrator, so since 1.7 it guards against a virus with normal rights tricking it into doing admin work.</p>
 <table>
@@ -269,6 +288,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-17</td><td>2.0.0</td><td>Email tab: clean old ads, social notifications, mailing lists, spam and large old emails in Gmail (asks first, Trash only); everything from 1.10</td></tr>
   <tr><td>2026-10-17</td><td>1.10.0</td><td>Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email; sign-in health with a reminder if Google signs Elixar out</td></tr>
   <tr><td>2026-10-17</td><td>1.9.1</td><td>No more SmartScreen box once installed; 7 security fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>1.9.0</td><td>Disk health (read only, with daily alerts); Settings tab to switch English/Hebrew and light/dark; Windows tools always started by full path</td></tr>

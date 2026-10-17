@@ -87,7 +87,8 @@ namespace CDriveCleaner
             mailCts = new CancellationTokenSource();
             var token = mailCts.Token;
             UpdateMailUi();
-            Task.Factory.StartNew(() => GoogleAuth.SignIn(st => UI(() => mailStatus.Text = Lang.T(st)), token), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            bool keepMailbox = GoogleAuth.MailboxAccess;   // signing in again keeps Email cleaning if it was on
+            Task.Factory.StartNew(() => GoogleAuth.SignIn(st => UI(() => mailStatus.Text = Lang.T(st)), token, keepMailbox), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 mailCts = null;
                 string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result;
@@ -152,7 +153,7 @@ namespace CDriveCleaner
                 "1. Open console.cloud.google.com and sign in. Create a project named Elixar.",
                 "2. APIs & Services > Library: find \"Gmail API\" and click Enable.",
                 "3. Google Auth Platform > Get started: app name Elixar, your email, Audience: External.",
-                "4. Data access > Add or remove scopes: tick \".../auth/gmail.send\" (send email on your behalf). Nothing else.",
+                "4. Data access > Add or remove scopes: tick \".../auth/gmail.send\" (send email). Only if you want Email cleaning, also \".../auth/gmail.modify\". Nothing else.",
                 "5. Audience > Publish app (In production). Otherwise Google signs Elixar out every 7 days.",
                 "6. Clients > Create client > Application type: Desktop app > Create > Download JSON.",
                 "7. Click the button below and choose that file.",

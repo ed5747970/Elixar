@@ -25,8 +25,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("1.10.0.0")]
-[assembly: AssemblyFileVersion("1.10.0.0")]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 
 namespace CDriveCleaner
 {
@@ -1148,11 +1148,13 @@ namespace CDriveCleaner
             BuildTools();
             BuildPhone();
             BuildSettingsTab();
+            BuildEmailClean();
             tabs.TabPages.Add(pageDash);
             tabs.TabPages.Add(pageApps);
             tabs.TabPages.Add(pageClean);
             tabs.TabPages.Add(pageTools);
             tabs.TabPages.Add(pagePhone);
+            tabs.TabPages.Add(pageEmail);
             tabs.TabPages.Add(pageAuto);
             tabs.TabPages.Add(pageSettings);
             bool appsLoaded = false, autoLoaded = false;
@@ -1160,6 +1162,7 @@ namespace CDriveCleaner
             {
                 if (tabs.SelectedTab == pageApps && !appsLoaded) { appsLoaded = true; if (appsTabs.SelectedTab == pageStore) RefreshStoreApps(); else RefreshApps(); }
                 if (tabs.SelectedTab == pageAuto && !autoLoaded) { autoLoaded = true; LoadAutomationState(); }
+                if (tabs.SelectedTab == pageEmail) UpdateEmailUi();
                 if (tabs.SelectedTab == pageTools) OnToolsTab();
                 if (tabs.SelectedTab == pagePhone) OnPhoneTab();
             };
@@ -2728,11 +2731,30 @@ namespace CDriveCleaner
                     check(TrendChart.IsPng(png) && png.Length < 120000 && TrendChart.Png(tpts.Take(1).ToList(), DateTime.Today, 56) == null && sm2.Images.Count == 1 &&
                           sm2.Html().Contains("src=\"cid:chart0@elixar\"") && mime2.Contains("multipart/related") && mime2.Contains("Content-ID: <chart0@elixar>") && mime2.Contains("Content-Type: image/png"),
                           "Email: the weekly summary carries a space-trend chart made on this PC (" + (png == null ? 0 : png.Length / 1024) + " KB, inside the email, no web link)");
+                    // Email cleaning: fixed searches, never Starred/Important, only with the extra permission, fails safely offline
+                    var cats = Gmail.Categories();
+                    string u1 = gc == null ? "" : GoogleAuth.AuthorizeUrl(gc, "http://127.0.0.1:1/", "s", "c", false), u2 = gc == null ? "" : GoogleAuth.AuthorizeUrl(gc, "http://127.0.0.1:1/", "s", "c", true);
+                    var acc = new GoogleAuth.Account { Scopes = "openid https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email" };
+                    var acc2 = new GoogleAuth.Account { Scopes = "https://www.googleapis.com/auth/gmail.send " + GoogleAuth.ModifyScope + " openid" };
+                    check(cats.Count == 6 && cats.Where(c => !c.SpamFolder).All(c => c.Query.Contains("-is:starred") && c.Query.Contains("-is:important")) &&
+                          cats.Where(c => c.Tier == Tier.Review).All(c => !c.DefaultOn) && !u1.Contains("gmail.modify") && u2.Contains("gmail.modify") && !u2.Contains("mail.google.com") &&
+                          !acc.Mailbox && acc2.Mailbox, "Email cleaning: only with its own extra permission; fixed searches that never include Starred or Important emails");
+                    check(Gmail.SenderName("\"Amazon.com\" <store-news@amazon.com>") == "Amazon.com" && Gmail.SenderName("noreply@linkedin.com") == "linkedin.com" &&
+                          Gmail.SenderName("<x@y.org>") == "y.org" && Gmail.SenderName("") == "(unknown)", "Email cleaning: shows who sends the most, by name");
+                    GoogleAuth.OverrideDir = mdir;
+                    GoogleAuth.Save(new GoogleAuth.Account { Email = "elisar@gmail.com", Refresh = "1//x", ClientId = "c.apps.googleusercontent.com", ClientSecret = "s", Since = DateTime.Now, Scopes = acc2.Scopes });
+                    GoogleAuth.Forget();
+                    var probe = Gmail.Categories()[0];
+                    if (!win) Gmail.Scan(probe, System.Threading.CancellationToken.None);   // no internet in the test machine: must fail politely
+                    bool polite = win || (probe.Error != null && probe.Count == 0 && probe.Ids.Count == 0);
+                    MailStatus.Reset();
+                    GoogleAuth.OverrideDir = null;
+                    check(polite, "Email cleaning: a failed check shows a message and touches nothing");
                     check(true, "Email: Google app " + (GoogleAuth.BuiltInClient != null ? "built into this copy (no setup needed)" : "not built in (local build): each PC sets it up once"));
                 } catch (Exception ex) { check(false, "Email tests stopped: " + ex.GetType().Name + ": " + ex.Message); GoogleAuth.OverrideDir = null; }
 
                 // 4. the window, with cleaning switched off
-                bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false;
+                bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false, emailOk = false;
                 string uiErr = null;
                 try
                 {
@@ -2751,6 +2773,7 @@ namespace CDriveCleaner
                             phoneOk = form.PhoneRows > 10;
                             diskOk = !win || form.DiskRows > 0;
                             settingsOk = form.SettingsTabReady;
+                            emailOk = form.EmailRows == 6;
                             form.Close();
                         }
                     };
@@ -2786,6 +2809,7 @@ namespace CDriveCleaner
                 check(phoneOk, "Phone tab finds the (simulated) phone and lists what to clean and its apps");
                 check(diskOk, "Disk health tab opens and lists the drives");
                 check(settingsOk, "Settings tab shows the saved language and theme, ready to switch");
+                check(emailOk, "Email tab lists what it can clean in Gmail (off until you allow it)");
                 Adb.Exe = null; Adb.Prefix = "";
 
                 // 5. drill-down window on the test folder

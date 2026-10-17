@@ -485,6 +485,44 @@ namespace CDriveCleaner
             d["Choose the file you downloaded from Google"] = "בחרו את הקובץ שהורדתם מ-Google";
             d["Done. Close this window and click \"Sign in with Google\"."] = "מוכן. סגרו את החלון ולחצו \"התחברות עם Google\".";
             d["No email sent yet."] = "עדיין לא נשלח מייל.";
+            d["Email"] = "מייל";
+            d["Finds old ads, social notifications, mailing lists, spam and large old emails in your Gmail, and moves the ones you pick to Gmail's Trash. Starred and Important emails are never touched, and Elixar only looks at senders, dates and sizes, never at what your emails say."] = "מוצא פרסומות ישנות, התראות מרשתות חברתיות, רשימות תפוצה, ספאם ומיילים גדולים וישנים ב-Gmail שלך, ומעביר את מה שבחרת לאשפה של Gmail. מיילים מסומנים בכוכב ומיילים חשובים לא נוגעים בהם, ו-Elixar מסתכל רק על שולח, תאריך וגודל, אף פעם לא על תוכן המיילים.";
+            d["Emails"] = "מיילים";
+            d["About"] = "בערך";
+            d["Most from"] = "בעיקר מ-";
+            d["Your decision"] = "ההחלטה שלך";
+            d["Allow Elixar to check my Gmail..."] = "לאפשר ל-Elixar לבדוק את ה-Gmail שלי...";
+            d["Scan my Gmail"] = "סריקת ה-Gmail שלי";
+            d["Move selected to Gmail's Trash..."] = "העברת הנבחרים לאשפה של Gmail...";
+            d["Turn off Email cleaning..."] = "כיבוי ניקוי המייל...";
+            d["Sign in first (Settings)"] = "קודם להתחבר (הגדרות)";
+            d["Moved emails stay in Gmail's Trash for 30 days, so you can restore them there. To free the space in your Google account right away, empty the Trash in Gmail."] = "מיילים שהועברו נשארים באשפה של Gmail במשך 30 יום, כך שאפשר לשחזר אותם משם. כדי לפנות את המקום בחשבון Google מיד, רוקנו את האשפה ב-Gmail.";
+            d["Not signed in. Sign in with Google in Settings > Email reports first."] = "לא מחובר. קודם התחברו עם Google בהגדרות > דוחות במייל.";
+            d["Ads and offers older than a month"] = "פרסומות ומבצעים מלפני יותר מחודש";
+            d["Social network notifications older than a month"] = "התראות מרשתות חברתיות מלפני יותר מחודש";
+            d["Group and mailing-list emails older than 3 months"] = "מיילים מקבוצות ורשימות תפוצה מלפני יותר מ-3 חודשים";
+            d["Spam"] = "ספאם";
+            d["Automatic updates older than 6 months"] = "עדכונים אוטומטיים מלפני יותר מחצי שנה";
+            d["Large emails (over 10 MB) older than a year"] = "מיילים גדולים (מעל 10 MB) מלפני יותר משנה";
+            d["Gmail's Promotions tab: shops, newsletters and deals you have already seen."] = "לשונית קידומי מכירות ב-Gmail: חנויות, ניוזלטרים ומבצעים שכבר ראית.";
+            d["Gmail's Social tab: likes, comments and friend requests from Facebook, LinkedIn, Instagram and others."] = "לשונית רשתות חברתיות ב-Gmail: לייקים, תגובות ובקשות חברות מפייסבוק, לינקדאין, אינסטגרם ועוד.";
+            d["Gmail's Forums tab: mailing lists and discussion groups."] = "לשונית פורומים ב-Gmail: רשימות תפוצה וקבוצות דיון.";
+            d["Gmail removes spam by itself after 30 days; moving it to the Trash just clears it sooner."] = "Gmail מוחק ספאם בעצמו אחרי 30 יום; העברה לאשפה רק מנקה אותו מוקדם יותר.";
+            d["Gmail's Updates tab: shipping notices, account alerts, statements and receipts. Check the senders first: you may want to keep receipts."] = "לשונית עדכונים ב-Gmail: הודעות משלוח, התראות חשבון, דפי חשבון וקבלות. בדקו קודם את השולחים: אולי תרצו לשמור קבלות.";
+            d["Emails with big attachments, often photos or videos. Your decision: save the attachments first if you need them."] = "מיילים עם קבצים מצורפים גדולים, לרוב תמונות או סרטונים. ההחלטה שלך: שמרו קודם את הקבצים אם צריך.";
+            d["Gmail search used:"] = "חיפוש Gmail שבו נעשה שימוש:";
+            d["Allow Elixar to check your Gmail?"] = "לאפשר ל-Elixar לבדוק את ה-Gmail שלך?";
+            d["To find emails you can clean, Elixar needs Google's permission to see your emails' senders, dates and sizes, and to move emails to Gmail's Trash."] = "כדי למצוא מיילים שאפשר לנקות, Elixar צריך הרשאה מ-Google לראות שולח, תאריך וגודל של המיילים, ולהעביר מיילים לאשפה של Gmail.";
+            d["Elixar looks only at senders, dates and sizes. It never opens what your emails say and saves nothing about them."] = "Elixar מסתכל רק על שולח, תאריך וגודל. הוא אף פעם לא פותח את תוכן המיילים ולא שומר עליהם כלום.";
+            d["Nothing leaves your PC: Elixar has no server."] = "שום דבר לא יוצא מהמחשב: ל-Elixar אין שרת.";
+            d["Emails are only moved to Gmail's Trash, only after you confirm, and can be restored there for 30 days."] = "מיילים רק מועברים לאשפה של Gmail, רק אחרי שאישרת, ואפשר לשחזר אותם משם במשך 30 יום.";
+            d["Starred and Important emails are never touched."] = "מיילים מסומנים בכוכב ומיילים חשובים לא נוגעים בהם אף פעם.";
+            d["You can turn it off any time on this tab."] = "אפשר לכבות את זה בכל רגע בלשונית הזו.";
+            d["Google's own screen will describe this permission in broader words than what Elixar does with it. Continue?"] = "המסך של Google יתאר את ההרשאה במילים רחבות יותר ממה ש-Elixar עושה איתה. להמשיך?";
+            d["Turn off Email cleaning?\n\nElixar signs out of Google so the permission to see your emails is taken back. To keep getting email reports, sign in again in Settings (that sign-in can only send)."] = "לכבות את ניקוי המייל?\n\nElixar יתנתק מ-Google כדי לבטל את ההרשאה לראות את המיילים. כדי להמשיך לקבל דוחות במייל, התחברו שוב בהגדרות (ההתחברות הזו יכולה רק לשלוח).";
+            d["Google sign-in worked, but the permission to see and tidy your emails wasn't ticked, so Email cleaning stays off."] = "ההתחברות ל-Google הצליחה, אבל ההרשאה לראות ולסדר את המיילים לא סומנה, ולכן ניקוי המייל נשאר כבוי.";
+            d["Could not check: "] = "לא הצלחתי לבדוק: ";
+            d["Some checks didn't finish: "] = "חלק מהבדיקות לא הסתיימו: ";
             // texts with numbers in them
             Pat(@"Clean (\d+) \((.+)\)", m => "ניקוי " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")");
             Pat(@"Remove (\d+) \((.+)\)\.\.\.", m => "הסרה של " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")...");
@@ -512,6 +550,13 @@ namespace CDriveCleaner
             Pat(@"Last email: (.+) - (.+) ✓", m => "המייל האחרון: " + m.Groups[1].Value + " - " + T(m.Groups[2].Value) + " ✓");
             Pat(@"The last email didn't go out \((.+)\): (.+)", m => "המייל האחרון לא נשלח (" + m.Groups[1].Value + "): " + T(m.Groups[2].Value));
             Pat(@"Google signed Elixar out on (.+)\. Emails have stopped: click ""Sign in again""\.", m => "Google ניתק את Elixar ב-" + m.Groups[1].Value + ". המיילים הפסיקו: לחצו \"התחברות מחדש\".");
+            Pat(@"Signed in as (.+)\. Email cleaning is off: Elixar can't see your emails until you allow it\.", m => "מחובר בתור " + m.Groups[1].Value + ". ניקוי המייל כבוי: Elixar לא יכול לראות את המיילים עד שתאפשרו.");
+            Pat(@"Email cleaning is on for (.+)\.", m => "ניקוי המייל פעיל עבור " + m.Groups[1].Value + ".");
+            Pat(@"Checking your Gmail \((\d+) of (\d+)\)\.\.\.", m => "בודק את ה-Gmail שלך (" + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ")...");
+            Pat(@"Found ([\d,]+) emails that are safe to clean \(about (.+)\)\. The ones ticked are ready to move to Gmail's Trash\.", m => "נמצאו " + m.Groups[1].Value + " מיילים שבטוח לנקות (בערך " + m.Groups[2].Value + "). המסומנים מוכנים להעברה לאשפה של Gmail.");
+            Pat(@"Move ([\d,]+) emails to Gmail's Trash\.\.\.", m => "העברת " + m.Groups[1].Value + " מיילים לאשפה של Gmail...");
+            Pat(@"Moving to Gmail's Trash: ([\d,]+) of ([\d,]+)\.\.\.", m => "מעביר לאשפה של Gmail: " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + "...");
+            Pat(@"Most from \(in a sample of (\d+) emails\):", m => "בעיקר מ- (מדגם של " + m.Groups[1].Value + " מיילים):");
             return d;
         }
     }
