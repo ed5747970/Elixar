@@ -1,0 +1,6 @@
+out/
+pkg/
+*.zip
+selftest-report.txt
+ELIXAR-SIGNING-KEY*
+*.pfx

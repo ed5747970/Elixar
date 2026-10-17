@@ -1,0 +1,331 @@
+// More space: Windows.old, the hibernation file, "Free X GB for me", moving personal folders and games off C:.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
+
+namespace CDriveCleaner
+{
+    // ============================ Windows.old and upgrade leftovers (Windows' own Disk Cleanup) ============================
+    public static class WindowsOld
+    {
+        public static readonly string[] Folders = { @"C:\Windows.old", @"C:\$Windows.~BT", @"C:\$Windows.~WS" };
+        // Disk Cleanup handlers that remove them the supported way
+        public static readonly string[] Handlers = { "Previous Installations", "Temporary Setup Files", "Windows Upgrade Log Files" };
+        const string VolumeCaches = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\";
+        public const int Slot = 4242;   // cleanmgr /sagerun:4242 uses only what Elixar ticks here
+        public static string FlagName { get { return "StateFlags" + Slot.ToString("0000", CultureInfo.InvariantCulture); } }
+
+        public static long Size() { return Folders.Sum(f => Fs.SizeOf(f)); }
+
+        public static void Clean(Action<string> log)
+        {
+            if (!Win.IsWindows) return;
+            var set = new List<string>();
+            try
+            {
+                using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                    foreach (var h in Handlers)
+                        using (var k = hklm.OpenSubKey(VolumeCaches + h, true))
+                            if (k != null) { k.SetValue(FlagName, 2, RegistryValueKind.DWord); set.Add(h); }
+                if (log != null) log("  Windows Disk Cleanup is removing the previous Windows installation (" + string.Join(", ", set) + "). This can take 10-30 minutes...");
+                string o = Sys.Run("cleanmgr.exe", "/sagerun:" + Slot, 2 * 60 * 60 * 1000);
+            }
+            finally
+            {
+                // leave Disk Cleanup exactly as it was
+                try
+                {
+                    using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                        foreach (var h in set)
+                            using (var k = hklm.OpenSubKey(VolumeCaches + h, true))
+                                if (k != null) k.DeleteValue(FlagName, false);
+                }
+                catch { }
+            }
+        }
+    }
+
+    // ============================ hibernation file ============================
+    public static class Hibernation
+    {
+        public static long FileSize()
+        {
+            try
+            {
+                var f = new DirectoryInfo(@"C:\").GetFiles("hiberfil.sys");   // read from the folder listing, the file itself is locked
+                return f.Length > 0 ? f[0].Length : 0;
+            }
+            catch { return 0; }
+        }
+
+        // "full", "reduced", "off" (or "" when unknown)
+        public static string State()
+        {
+            try
+            {
+                using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                using (var k = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Power"))
+                {
+                    if (k == null) return "";
+                    object en = k.GetValue("HibernateEnabled"), type = k.GetValue("HiberFileType");
+                    if (en is int && (int)en == 0) return "off";
+                    if (type is int) return (int)type == 1 ? "reduced" : "full";
+                    return FileSize() > 0 ? "on" : "off";
+                }
+            }
+            catch { return ""; }
+        }
+
+        public static string Describe(long size, string state)
+        {
+            switch (state)
+            {
+                case "off": return "Hibernation is off (no hiberfil.sys).";
+                case "reduced": return "Hibernation file: " + Fs.Fmt(size) + " (reduced: keeps Fast Startup, no Hibernate).";
+                case "full": return "Hibernation file: " + Fs.Fmt(size) + " (full: Hibernate and Fast Startup).";
+                default: return size > 0 ? "Hibernation file: " + Fs.Fmt(size) + "." : "No hibernation file.";
+            }
+        }
+
+        public static string Set(string mode)   // "reduced", "off", "full"
+        {
+            string args = mode == "off" ? "/hibernate off" : mode == "reduced" ? "/hibernate /type reduced" : "/hibernate on";
+            string o = Sys.Run("powercfg.exe", args, 60000);
+            if (mode == "full") o += Sys.Run("powercfg.exe", "/hibernate /type full", 60000);
+            return o.Trim().Length == 0 ? "Done." : o.Trim();
+        }
+    }
+
+    // ============================ "Free X GB for me" ============================
+    public static class Planner
+    {
+        public class Plan { public List<CleanItem> Items = new List<CleanItem>(); public long Bytes, Target, MaxPossible; public bool Reached { get { return Bytes >= Target; } } }
+
+        static int Rank(CleanItem i) { return i.Tier == Tier.Safe ? 0 : i.Tier == Tier.Review ? 1 : 2; }
+
+        // the safest items first (Safe, then Review, then Caution if allowed), biggest first within each, until the target is reached
+        public static Plan Pick(IEnumerable<CleanItem> items, long target, bool allowCaution, bool allowRecycleBin)
+        {
+            var pool = items.Where(i => !i.Privacy && !i.SizeUnknown && i.Size > 0 && (allowCaution || i.Tier != Tier.Caution) &&
+                                        (allowRecycleBin || !i.Name.StartsWith("Recycle Bin", StringComparison.OrdinalIgnoreCase)))
+                            .OrderBy(Rank).ThenByDescending(i => i.Size).ToList();
+            var plan = new Plan { Target = target, MaxPossible = pool.Sum(i => i.Size) };
+            foreach (var i in pool)
+            {
+                if (plan.Bytes >= target) break;
+                plan.Items.Add(i); plan.Bytes += i.Size;
+            }
+            // drop picks that are no longer needed, the riskiest and smallest first (a big one picked later can make them unnecessary)
+            foreach (var i in plan.Items.OrderByDescending(Rank).ThenBy(x => x.Size).ToList())
+                if (plan.Bytes - i.Size >= target) { plan.Items.Remove(i); plan.Bytes -= i.Size; }
+            return plan;
+        }
+    }
+
+    // ============================ moving personal folders and games off C: ============================
+    public class UserFolder
+    {
+        public string Name, Id;   // Id = Windows' KNOWNFOLDERID
+        public string Path = ""; public long Bytes = -1; public bool OneDrive;
+        public bool OnC { get { return Path.StartsWith(@"C:\", StringComparison.OrdinalIgnoreCase); } }
+    }
+
+    public class SteamGame { public string Name = "", Library = "", Folder = ""; public long Bytes; }
+
+    public static class Mover
+    {
+        public static readonly string[][] Known =
+        {
+            new[] { "Downloads", "374DE290-123F-4565-9164-39C4925E467B" },
+            new[] { "Documents", "FDD39AD0-238F-46AF-ADB4-6C85480369C7" },
+            new[] { "Pictures", "33E28130-4E1E-4676-835A-98395C3BC3BB" },
+            new[] { "Videos", "18989B1D-99B5-455B-841C-AB7C74E4DDFC" },
+            new[] { "Music", "4BD8D571-6D19-48D3-BE97-422220080E43" },
+            new[] { "Desktop", "B4BFCC3A-DB2C-424C-B029-7FE99A87C641" },
+        };
+
+        [DllImport("shell32.dll")] static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint flags, IntPtr token, out IntPtr path);
+        [DllImport("shell32.dll")] static extern int SHSetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint flags, IntPtr token, [MarshalAs(UnmanagedType.LPWStr)] string path);
+
+        public static string GetPath(string id)
+        {
+            IntPtr p;
+            if (SHGetKnownFolderPath(new Guid(id), 0, IntPtr.Zero, out p) != 0) return null;
+            try { return Marshal.PtrToStringUni(p); } finally { Marshal.FreeCoTaskMem(p); }
+        }
+
+        public static bool SetPath(string id, string path) { return SHSetKnownFolderPath(new Guid(id), 0, IntPtr.Zero, path) == 0; }
+
+        public static List<UserFolder> ReadFolders(bool measure)
+        {
+            var list = new List<UserFolder>();
+            if (!Win.IsWindows) return list;
+            foreach (var k in Known)
+            {
+                var f = new UserFolder { Name = k[0], Id = k[1], Path = GetPath(k[1]) ?? "" };
+                f.OneDrive = f.Path.IndexOf("\\OneDrive", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (measure) f.Bytes = Fs.SizeOf(f.Path);
+                list.Add(f);
+            }
+            return list;
+        }
+
+        // the usual new place: X:\Users\<you>\<Folder>
+        public static string TargetFor(string drive, string folderName)
+        {
+            string user = Environment.UserName;
+            return System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(drive, "Users"), user), folderName);
+        }
+
+        public static string HomeFor(string folderName)
+        {
+            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), folderName);
+        }
+
+        public class Result { public int Copied, Failed, LeftBehind; public long Bytes; public bool Switched; public List<string> Problems = new List<string>(); }
+
+        // 1. copy everything (nothing deleted yet)  2. check every copy  3. point Windows at the new place  4. delete the originals
+        public static Result Move(string from, string to, Func<string, bool> switchTo, Action<string> log)
+        {
+            var r = new Result();
+            if (!Directory.Exists(from)) { r.Problems.Add("Folder not found: " + from); return r; }
+            Directory.CreateDirectory(to);
+            var copied = new List<string>();
+            CopyTree(from, to, r, copied, log);
+            if (r.Failed > 0) { r.Problems.Insert(0, r.Failed + " files could not be copied; nothing was changed. Close programs using them and try again."); return r; }
+            if (switchTo != null && !switchTo(to)) { r.Problems.Add("Windows did not accept the new place; your files are still in " + from + " (a copy is in " + to + ")."); return r; }
+            r.Switched = true;
+            foreach (var f in copied)
+            {
+                try { File.SetAttributes(f, FileAttributes.Normal); File.Delete(f); }
+                catch { r.LeftBehind++; }
+            }
+            RemoveEmptyDirs(from);
+            if (r.LeftBehind > 0) r.Problems.Add(r.LeftBehind + " files were in use and stay in " + from + "; delete them later.");
+            return r;
+        }
+
+        static void CopyTree(string src, string dst, Result r, List<string> copied, Action<string> log)
+        {
+            DirectoryInfo di;
+            try { di = new DirectoryInfo(src); if ((di.Attributes & FileAttributes.ReparsePoint) != 0) return; } catch { return; }
+            Directory.CreateDirectory(dst);
+            FileInfo[] files; DirectoryInfo[] dirs;
+            try { files = di.GetFiles(); dirs = di.GetDirectories(); } catch (Exception e) { r.Failed++; r.Problems.Add(src + ": " + e.Message); return; }
+            foreach (var f in files)
+            {
+                string target = Path.Combine(dst, f.Name);
+                try
+                {
+                    if (!(File.Exists(target) && new FileInfo(target).Length == f.Length)) File.Copy(f.FullName, target, true);
+                    if (new FileInfo(target).Length != f.Length) throw new IOException("copy is a different size");
+                    copied.Add(f.FullName); r.Copied++; r.Bytes += f.Length;
+                }
+                catch (Exception e) { r.Failed++; if (r.Problems.Count < 20) r.Problems.Add(f.FullName + ": " + e.Message); }
+            }
+            foreach (var d in dirs) CopyTree(d.FullName, Path.Combine(dst, d.Name), r, copied, log);
+        }
+
+        static void RemoveEmptyDirs(string dir)
+        {
+            try
+            {
+                foreach (var d in Directory.GetDirectories(dir)) RemoveEmptyDirs(d);
+                if (Directory.GetFileSystemEntries(dir).Length == 0 && !Protect.IsProtected(dir)) Directory.Delete(dir, false);
+            }
+            catch { }
+        }
+
+        // ---- Steam games ----
+        static readonly Regex VdfPair = new Regex("\"(?<k>[^\"]+)\"\\s+\"(?<v>[^\"]*)\"", RegexOptions.Compiled);
+
+        public static List<string> SteamLibraries(string steamPath)
+        {
+            var libs = new List<string>();
+            if (string.IsNullOrEmpty(steamPath)) return libs;
+            libs.Add(steamPath);
+            try
+            {
+                string vdf = Path.Combine(Path.Combine(steamPath, "steamapps"), "libraryfolders.vdf");
+                if (File.Exists(vdf))
+                    foreach (Match m in VdfPair.Matches(File.ReadAllText(vdf)))
+                        if (m.Groups["k"].Value == "path") libs.Add(m.Groups["v"].Value.Replace("\\\\", "\\"));
+            }
+            catch { }
+            return libs.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        public static SteamGame ParseManifest(string acfText, string library)
+        {
+            string name = null, dir = null; long size = 0;
+            foreach (Match m in VdfPair.Matches(acfText ?? ""))
+            {
+                string k = m.Groups["k"].Value, v = m.Groups["v"].Value;
+                if (k == "name" && name == null) name = v;
+                else if (k == "installdir" && dir == null) dir = v;
+                else if (k == "SizeOnDisk" && size == 0) long.TryParse(v, out size);
+            }
+            if (name == null || dir == null) return null;
+            return new SteamGame { Name = name, Library = library, Folder = Path.Combine(Path.Combine(Path.Combine(library, "steamapps"), "common"), dir), Bytes = size };
+        }
+
+        public static List<SteamGame> SteamGamesOn(string drive, string steamPath)
+        {
+            var games = new List<SteamGame>();
+            foreach (var lib in SteamLibraries(steamPath).Where(l => l.StartsWith(drive, StringComparison.OrdinalIgnoreCase)))
+                try
+                {
+                    foreach (var acf in Directory.GetFiles(Path.Combine(lib, "steamapps"), "appmanifest_*.acf"))
+                    {
+                        var g = ParseManifest(File.ReadAllText(acf), lib);
+                        if (g != null) games.Add(g);
+                    }
+                }
+                catch { }
+            return games.OrderByDescending(g => g.Bytes).ToList();
+        }
+
+        // other fixed drives with room
+        public static List<DriveInfo> TargetDrives()
+        {
+            var list = new List<DriveInfo>();
+            try
+            {
+                foreach (var d in DriveInfo.GetDrives())
+                    try { if (d.DriveType == DriveType.Fixed && d.IsReady && !d.Name.StartsWith("C", StringComparison.OrdinalIgnoreCase) && d.DriveFormat == "NTFS") list.Add(d); } catch { }
+            }
+            catch { }
+            return list.OrderByDescending(d => d.AvailableFreeSpace).ToList();
+        }
+    }
+
+    // ============================ Docker ============================
+    public static class Docker
+    {
+        public static string Exe()
+        {
+            foreach (var p in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
+                try { string f = Path.Combine(p.Trim().Trim('"'), "docker.exe"); if (p.Trim().Length > 0 && File.Exists(f)) return f; } catch { }
+            string pf = Environment.GetEnvironmentVariable("ProgramW6432") ?? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            string std = Path.Combine(pf ?? "", @"Docker\Docker\resources\bin\docker.exe");
+            return File.Exists(std) ? std : null;
+        }
+
+        // "Total reclaimed space: 1.2GB" -> bytes
+        public static long ParseReclaimed(string output)
+        {
+            var m = Regex.Match(output ?? "", @"Total reclaimed space:\s*([\d.]+)\s*([kKMG]?B)");
+            if (!m.Success) return 0;
+            double v; if (!double.TryParse(m.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out v)) return 0;
+            switch (m.Groups[2].Value.ToUpperInvariant()) { case "KB": v *= 1e3; break; case "MB": v *= 1e6; break; case "GB": v *= 1e9; break; }
+            return (long)v;
+        }
+    }
+}

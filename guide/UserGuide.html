@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elixar User Guide</title>
+<style>
+  :root { --ink:#1d1a2e; --quiet:#5b5872; --brand:#2e265c; --accent:#5b4cc4; --line:#dcd8ea; --tint:#f4f2fa; --bg:#ffffff;
+          --safe:#007d46; --review:#285ac8; --caution:#be6900; --danger:#c7362f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#ece9f7; --quiet:#a9a5c0; --brand:#c9c0ff; --accent:#9d90ff; --line:#3a3655; --tint:#221f35; --bg:#16141f;
+            --safe:#4cc58a; --review:#7ea6ff; --caution:#f0a64a; --danger:#ff7b72; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  header { background:linear-gradient(90deg,#2a1f5c,#1f3f5a); color:#fff; padding:28px 16px; }
+  header .wrap { display:flex; align-items:center; gap:16px; }
+  header h1 { margin:0; font-size:28px; font-weight:600; }
+  header p { margin:2px 0 0; opacity:.85; }
+  .wrap { max-width:880px; margin:0 auto; padding:0 16px; }
+  main { padding:8px 0 48px; }
+  h2 { font-size:22px; color:var(--brand); margin:40px 0 8px; padding-top:8px; border-top:1px solid var(--line); }
+  h3 { font-size:17px; margin:22px 0 6px; }
+  p, li { max-width:760px; }
+  table { border-collapse:collapse; width:100%; margin:12px 0 16px; font-size:15px; }
+  th, td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid var(--line); }
+  th { background:var(--tint); font-weight:600; }
+  code { background:var(--tint); padding:1px 5px; border-radius:4px; font-size:14px; }
+  nav.toc { background:var(--tint); border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:20px 0; }
+  nav.toc ol { margin:6px 0 0; padding-left:20px; columns:2; }
+  nav.toc a { color:var(--accent); text-decoration:none; }
+  .lead { font-size:18px; }
+  .safe { color:var(--safe); font-weight:600; } .review { color:var(--review); font-weight:600; }
+  .caution { color:var(--caution); font-weight:600; } .privacy { color:var(--accent); font-weight:600; }
+  .note { border-left:4px solid var(--accent); background:var(--tint); padding:10px 14px; border-radius:0 8px 8px 0; margin:14px 0; }
+  .glance svg { width:100%; height:auto; }
+  .glance .box { fill:none; stroke:var(--line); stroke-width:1.5; } .glance .frame { fill:var(--tint); stroke:var(--line); stroke-width:1.5; }
+  .glance .name { fill:var(--ink); font-weight:600; font-size:13px; } .glance .line { fill:var(--quiet); font-size:11.5px; }
+  .glance .title { fill:var(--ink); font-weight:600; font-size:15px; }
+  footer { color:var(--quiet); font-size:14px; border-top:1px solid var(--line); padding:18px 0 32px; }
+  @media (max-width:640px) { nav.toc ol { columns:1; } table { font-size:14px; } }
+  @media print { header { background:none; color:#000; padding:0; } nav.toc { display:none; } h2 { break-after:avoid; } table, .note { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.8.0</p></div>
+</div></header>
+<main class="wrap">
+
+<p class="lead">Elixar frees space on drive C: safely. It shows what fills the drive, from Critical to Safe, and removes only what you choose.</p>
+
+<nav class="toc"><strong>Contents</strong>
+<ol>
+  <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
+  <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
+</ol></nav>
+
+<h2 id="glance">At a glance</h2>
+<div class="glance">
+<svg viewBox="0 0 760 292" role="img" aria-label="Six tabs: see what fills C:, then clean it safely">
+  <text class="title" x="24" y="32">Six tabs: see what fills C:, then clean it safely</text>
+  <rect class="frame" x="24" y="52" width="712" height="216" rx="8"/>
+  <text class="name" x="40" y="76">Elixar, tabs from left to right</text>
+  <rect class="box" x="40" y="92" width="216" height="72" rx="8"/><text class="name" x="52" y="116">Dashboard</text><text class="line" x="52" y="134">What fills C:, Critical to Safe</text><text class="line" x="52" y="150">Biggest files and folders</text>
+  <rect class="box" x="272" y="92" width="216" height="72" rx="8"/><text class="name" x="284" y="116">Apps</text><text class="line" x="284" y="134">Uninstall unused programs</text><text class="line" x="284" y="150">Remove Copilot, Xbox and more</text>
+  <rect class="box" x="504" y="92" width="216" height="72" rx="8"/><text class="name" x="516" y="116">Cleaner</text><text class="line" x="516" y="134">37 items in 4 groups:</text><text class="line" x="516" y="150">Safe, Review, Caution, Privacy</text>
+  <rect class="box" x="40" y="180" width="216" height="72" rx="8"/><text class="name" x="52" y="204">Tools</text><text class="line" x="52" y="222">Drivers, Startup, System space</text><text class="line" x="52" y="238">Duplicates and Undo</text>
+  <rect class="box" x="272" y="180" width="216" height="72" rx="8"/><text class="name" x="284" y="204">Phone</text><text class="line" x="284" y="222">Android: clean over USB</text><text class="line" x="284" y="238">iPhone: move photos and videos</text>
+  <rect class="box" x="504" y="180" width="216" height="72" rx="8"/><text class="name" x="516" y="204">Automation</text><text class="line" x="516" y="222">Low-space alert</text><text class="line" x="516" y="238">Weekly clean of Safe items</text>
+</svg></div>
+<p>Start on the Dashboard to see what fills C:, then clean in the Cleaner; the other tabs handle apps, deeper tools, your phone and schedules. Press <strong>F1</strong> in Elixar any time to open this guide.</p>
+
+<h2 id="start">Getting started</h2>
+<p>Unzip Elixar.zip anywhere (for example your Desktop). Elixar needs only Windows 10 or 11; nothing else to install.</p>
+<ol>
+  <li><strong>Check the download (optional).</strong> Open a Command Prompt in the folder and run <code>certutil -hashfile Elixar.exe SHA256</code>. The result must match SHA256.txt.</li>
+  <li><strong>Run the safe self-test.</strong> Double-click &ldquo;Run self-test (safe).bat&rdquo;. It works only in its own Temp folder, measures your real items without deleting anything, opens the window with cleaning switched off, and saves selftest-report.txt. If Windows shows &ldquo;Windows protected your PC&rdquo;, click More info &rsaquo; Run anyway.</li>
+  <li><strong>Open Elixar.</strong> Double-click Elixar.exe and click Yes on the Windows prompt (it needs administrator rights to clean Windows folders).</li>
+  <li><strong>Clean.</strong> Start on the Dashboard to see what fills C:, then go to the Cleaner tab, click a row to read what it removes, tick what you want and click &ldquo;Clean selected&rdquo;. Nothing is deleted before you confirm, and a restore point is made first.</li>
+</ol>
+
+<h2 id="dashboard">Dashboard</h2>
+<p>The Dashboard opens first and shows what fills C:, grouped from Critical to Safe. It never deletes anything.</p>
+<ul>
+  <li><strong>Drive bar:</strong> C: split into Critical, Caution, Review, Safe, other used and free space.</li>
+  <li><strong>Four cards:</strong> how many GB sit in each level and what to do about it.</li>
+</ul>
+<table>
+  <tr><th>Level</th><th>Meaning</th><th>What to do</th></tr>
+  <tr><td class="danger" style="color:var(--danger);font-weight:600">Critical</td><td>Windows, Program Files, the page file</td><td>Never delete by hand; uninstall apps in the Apps tab</td></tr>
+  <tr><td class="caution">Caution</td><td>Leftovers such as Windows upgrade media</td><td>Read the note first; kept in Undo for 7 days</td></tr>
+  <tr><td class="review">Review</td><td>Your files, Downloads, the Recycle Bin</td><td>Your decision</td></tr>
+  <tr><td class="safe">Safe</td><td>Caches and temp files</td><td>Rebuilt automatically; clean any time</td></tr>
+</table>
+<ul>
+  <li><strong>Everything on C:</strong> every known location, biggest first, with its share of used space. A folder inside another listed folder is never counted twice.</li>
+  <li><strong>Find largest files:</strong> scans the whole drive (2 to 5 minutes, read-only) and lists files over 50 MB from Critical to Safe. Double-click a file to show it in its folder; right-click &rsaquo; Uninstall when it belongs to an app.</li>
+  <li><strong>Folder drill-down:</strong> double-click a folder row or click &ldquo;Explore C:\&rdquo; to see what is inside, biggest first. Backspace goes up. This also explains &ldquo;Other used&rdquo;.</li>
+  <li><strong>F5 or Refresh</strong> measures again; it also refreshes after every clean.</li>
+  <li><strong>Space trend:</strong> free space over time and a forecast like &ldquo;C: loses 5 GB a month, full around October 2027&rdquo;. Elixar records one reading a day (each scan and the daily low-space check), so the chart fills in over a few days.</li>
+  <li><strong>Folder map:</strong> boxes sized by the space they use and coloured by level (red critical, orange caution, blue review, green safe). Click a folder to go inside; Backspace goes back.</li>
+</ul>
+
+<h2 id="cleaner">Cleaner</h2>
+<p>The Cleaner lists 43 items in four groups; tick what you want and click &ldquo;Clean selected&rdquo;. Click any row to read exactly what it removes. <strong>Free space for me...</strong> asks how many GB you want back and ticks the safest items that reach it (Caution items and the Recycle Bin only if you allow them; privacy items never).</p>
+<table>
+  <tr><th>Group</th><th>Ticked for you?</th><th>Examples</th></tr>
+  <tr><td class="safe">Safe</td><td>Yes (11 items)</td><td>Temp files, Windows Update downloads, Delivery Optimization, DirectX and NVIDIA shader caches, thumbnail cache, error reports, crash dumps, Chrome and Edge cache, Stremio cache; not ticked: Discord, Teams, Telegram, WhatsApp, Zoom, Epic, EA, Steam, other browsers, VS Code</td></tr>
+  <tr><td class="review">Review</td><td>No</td><td>Recycle Bin, Spotify cache, NuGet packages, Docker unused data</td></tr>
+  <tr><td class="caution">Caution</td><td>Never</td><td>Previous Windows installation (Windows.old, often 15-30 GB, removed with Windows&rsquo; own Disk Cleanup), Windows upgrade media (<code>$GetCurrent</code>), recovery update leftovers (<code>$WinREAgent</code>), old Adobe Reader updates, NVIDIA app update downloads; moved to Undo for 7 days</td></tr>
+  <tr><td class="privacy">Privacy</td><td>Never</td><td>Browsing history and cookies (Chrome, Edge, Brave), Firefox cookies, recent files and jump lists, typed history, clipboard, DNS cache</td></tr>
+</table>
+<ul>
+  <li><strong>Open apps:</strong> if an app whose cache is ticked is open, Elixar asks before closing it.</li>
+  <li><strong>Restore point:</strong> made before cleaning unless you untick it.</li>
+  <li><strong>Rescan (F5):</strong> measures again. The Change column shows how much each item grew (orange) or shrank (green) since the last scan.</li>
+  <li><strong>Privacy items</strong> never touch saved passwords, bookmarks or logins, and are never part of the weekly clean.</li>
+</ul>
+
+<h2 id="apps">Apps</h2>
+<p>Uninstalling apps you don't use is the safe way to shrink the Critical part of C:.</p>
+<p><strong>Programs:</strong> every installed program with its size on disk and when it was last used (from Windows' own records). Orange means no use found in 90 days. Click a column to sort. &ldquo;Uninstall...&rdquo; runs the app's own uninstaller, the same one Windows uses; apps installed for your account only are uninstalled with your normal rights, not as administrator.</p>
+<h3>Built-in and Store apps</h3>
+<table>
+  <tr><th>Label</th><th>Meaning</th><th>Examples</th></tr>
+  <tr><td class="safe">Optional</td><td>Safe to remove</td><td>Copilot, News, Weather, Tips, Solitaire, Clipchamp, Candy Crush</td></tr>
+  <tr><td class="review">Your decision</td><td>Removable; the note says what you lose</td><td>Xbox app (Game Pass), Game Bar (Win+G recording), Xbox sign-in</td></tr>
+  <tr><td style="color:var(--quiet);font-weight:600">Keep (locked)</td><td>Can never be ticked</td><td>Microsoft Store, Windows Security, codecs, language packs, driver panels</td></tr>
+</table>
+<p>Nothing is ticked for you, a restore point is made first, and removed apps can be reinstalled from the Microsoft Store. You can also reach removal from other tabs: &ldquo;Remove apps...&rdquo; on the Dashboard and Cleaner, right-click in Largest files, and &ldquo;Uninstall &lt;app&gt;...&rdquo; in the folder drill-down.</p>
+
+<h2 id="tools">Tools</h2>
+<p>The Tools tab has six inner tabs for deeper jobs.</p>
+<h3>Drivers</h3>
+<p>Shows this PC's hardware (CPU, graphics, motherboard, disks, network) and finds drivers it doesn't need.</p>
+<table>
+  <tr><th>Group</th><th>What it is</th><th>Ticked by</th></tr>
+  <tr><td>Old versions</td><td>Every driver version you ever installed (old NVIDIA drivers are often 1 GB+ each); the newest is kept</td><td>&ldquo;Select all old versions&rdquo;</td></tr>
+  <tr><td>Not for this Windows</td><td>Built for another kind of Windows (32-bit or ARM)</td><td>&ldquo;Select drivers that don't fit this PC&rdquo;</td></tr>
+  <tr><td>No hardware uses these</td><td>Leftovers from devices you no longer have; pre-2015 ones say &ldquo;made for Windows 7/8&rdquo;</td><td>&ldquo;Select drivers that don't fit this PC&rdquo;</td></tr>
+  <tr><td>Not plugged in now</td><td>A phone, controller or similar</td><td>You only</td></tr>
+</table>
+<p>Drivers a device uses, drivers Windows needs to start, and printer and extension drivers are never offered. Each removed driver is backed up to Undo first.</p>
+<h3>Startup</h3>
+<p>Everything that starts with Windows, checked for who signed it and where it runs from. &ldquo;Needs a look&rdquo; flags hidden scripts, programs in Temp or Downloads, and broken or missing signatures. Turn entries off or on (the same switch as Task Manager), remove leftovers whose program is gone (kept in Undo), or scan any of them with Microsoft Defender. Not signed doesn't mean harmful; many small tools aren't signed.</p>
+<h3>System space</h3>
+<ul>
+  <li>Hibernation file: hiberfil.sys is often 6-16 GB. &ldquo;Make smaller&rdquo; keeps Fast Startup but drops Hibernate; &ldquo;Turn off&rdquo; frees all of it; &ldquo;Turn back on&rdquo; restores it.</li>
+  <li>WinSxS: see what DISM can really clean, then clean it.</li>
+  <li>Reserved storage: turn off to free about 7 GB (turn it on again before big updates).</li>
+  <li>Restore points: see how much space they use and set a limit.</li>
+  <li>Compact OS: Windows compresses its own files (about 2 GB), reversible.</li>
+  <li>WSL and Docker disks: shrink virtual disks that only ever grow.</li>
+</ul>
+<h3>Move off C:</h3>
+<p>Moves Downloads, Documents, Pictures, Videos, Music and Desktop to your second drive the way Windows does it (Properties &rsaquo; Location): every file is copied and checked, then Windows is pointed at the new place, then the old copies are deleted. &ldquo;Move back to C:&rdquo; undoes it. Folders kept in sync by OneDrive are left to OneDrive. Steam games on C: are listed by size; Steam moves them itself (Settings &rsaquo; Storage &rsaquo; Move). Buttons open Windows&rsquo; settings for moving Store apps and for saving new files on another drive.</p>
+<h3>Duplicates</h3>
+<p>Finds files with exactly the same content in Documents, Pictures, Videos, Music, Desktop, Downloads or folders you add. Windows, apps and AppData are never searched. Extra copies go to the Recycle Bin and at least one copy of each file is always kept.</p>
+<h3>Undo</h3>
+<p>Caution items, removed drivers and removed startup entries are kept here for 7 days, on your second drive when there is one, so C: space is freed right away. Restore puts them back exactly where they were; after 7 days they are deleted for good.</p>
+
+<h2 id="phone">Phone</h2>
+<p>The Phone tab cleans an Android phone over a USB cable and moves big photos and videos off an iPhone.</p>
+<p><strong>Android setup (once):</strong> on the phone open Settings &rsaquo; About phone and tap &ldquo;Build number&rdquo; 7 times (Samsung: Software information &rsaquo; Build number; Xiaomi: OS version). Then turn on Developer options &rsaquo; USB debugging, plug in, unlock and tap Allow. Elixar uses Google's free Android tools; &ldquo;Get Android tools&rdquo; downloads them and checks Google's signature.</p>
+<table>
+  <tr><th>Android tab</th><th>What it does</th></tr>
+  <tr><td>Clean</td><td><span class="safe">Safe:</span> cache of every app (you stay signed in), gallery thumbnails, WhatsApp statuses you watched. <span class="review">Review</span> (copied to this PC first): deleted photos in the trash, WhatsApp media you sent, Telegram downloads, old .apk files</td></tr>
+  <tr><td>Apps</td><td>Pre-installed extras you can remove for your account only (&ldquo;Put back&rdquo; restores them); your own apps by size and last use, flagged after 60 days unused</td></tr>
+  <tr><td>Big files</td><td>Your biggest videos and files; &ldquo;Move to PC&rdquo; copies each, checks the size, then deletes it from the phone</td></tr>
+</table>
+<p><strong>iPhone setup (once):</strong> install &ldquo;Apple Devices&rdquo; from the Microsoft Store, plug in, unlock and tap Trust. Elixar shows the storage and moves big photos and videos to this PC. Apple doesn't let a PC clean apps, so the Clean tab lists what to clean on the iPhone itself (Recently Deleted, Offload Unused Apps, WhatsApp storage and more). After moving, empty Photos &rsaquo; Recently Deleted to free the space.</p>
+<p>Copies go to a &ldquo;Phone backup&rdquo; folder on your second drive, or in Pictures.</p>
+
+<h2 id="automation">Automation</h2>
+<p>Two schedules run through Windows Task Scheduler even when Elixar is closed; click Save to turn them on or off.</p>
+<ul>
+  <li><strong>Low-space alert:</strong> a Windows notification when C: drops under the limit you choose (default 15%), checked daily and a few minutes after you sign in.</li>
+  <li><strong>Weekly auto-clean:</strong> cleans only the 11 default Safe items on the day and time you choose. Never Caution items, the Recycle Bin, browser caches, privacy items or DISM. Open apps are skipped, never closed, and a notification shows what was freed.</li>
+</ul>
+<div class="note">Schedules start the protected copy in C:\Program Files\Elixar. After updating Elixar, open Automation and click Save once so they use the new version.</div>
+
+<h2 id="settings">Settings and updates</h2>
+<p>Click <strong>Settings</strong> in the footer.</p>
+<ul>
+  <li><strong>Language:</strong> English or Hebrew (the window is laid out right to left). Some live status lines stay in English.</li>
+  <li><strong>Theme:</strong> follow Windows, light or dark.</li>
+  <li><strong>Install Elixar on this PC:</strong> adds it to the Start menu and to Windows&rsquo; installed apps list (with Uninstall), in C:\Program Files\Elixar.</li>
+  <li><strong>Check for updates:</strong> once Elixar is published on GitHub, it checks for a new version (also quietly once a week). An update is installed only if it is signed with Elisar&rsquo;s key and every file matches its fingerprint.</li>
+</ul>
+
+<h2 id="security">Security</h2>
+<p>Elixar runs as administrator, so since 1.7 it guards against a virus with normal rights tricking it into doing admin work.</p>
+<table>
+  <tr><th>Risk</th><th>Protection</th></tr>
+  <tr><td>A virus swaps Elixar.exe and the weekly schedule runs it as admin</td><td>Schedules run a copy in Program Files, which only admins can change</td></tr>
+  <tr><td>A fake backup planted in Undo gets restored as admin</td><td>The Undo folder is locked to admins; anything else in it is ignored; Restore never writes into Windows' folders</td></tr>
+  <tr><td>A link planted in Temp redirects deletion into Windows</td><td>Each file is checked for its real location while held open, then deleted; System32, drive roots and your main folders are never deleted</td></tr>
+  <tr><td>Swapped Android tools or uninstall commands run as admin</td><td>Google's signature is checked before the Android tools run; your account's uninstallers run without admin rights</td></tr>
+</table>
+<p>To check your copy, click &ldquo;Verify this copy&rdquo; in the footer: it shows Elixar's SHA-256 fingerprint to compare with SHA256.txt, and the state of the protected copy and the Undo folder. Elixar is not an antivirus, and Windows still shows the &ldquo;Windows protected your PC&rdquo; box because Elixar has no paid code-signing certificate.</p>
+
+<h2 id="files">Files and folders</h2>
+<table>
+  <tr><th>Where</th><th>What</th></tr>
+  <tr><td>Elixar folder</td><td>Elixar.exe, &ldquo;Run self-test (safe).bat&rdquo;, README.txt, UserGuide.html, SHA256.txt, source code, selftest-report.txt</td></tr>
+  <tr><td>C:\ProgramData\Elixar</td><td>cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt</td></tr>
+  <tr><td>C:\Program Files\Elixar</td><td>The protected copy used by the schedules, and the Android tools</td></tr>
+  <tr><td>X:\Elixar Undo (second drive) or C:\ProgramData\Elixar Undo</td><td>Undo backups, kept 7 days, locked to admins</td></tr>
+  <tr><td>Phone backup (second drive or Pictures)</td><td>Files copied or moved from your phone</td></tr>
+</table>
+<p>Elixar never touches Windows system files, Program Files, the Windows\Installer folder, your documents, pictures, downloads or other personal files (Duplicates only moves extra copies to the Recycle Bin).</p>
+
+<h2 id="trouble">Troubleshooting</h2>
+<table>
+  <tr><th>You see</th><th>Do this</th></tr>
+  <tr><td>&ldquo;Windows protected your PC&rdquo;</td><td>Click More info &rsaquo; Run anyway; check SHA256.txt if unsure</td></tr>
+  <tr><td>A self-test check failed</td><td>Send selftest-report.txt (in the Elixar folder) for a fix</td></tr>
+  <tr><td>Driver list empty in the self-test</td><td>Normal without admin rights; Windows lists drivers only to administrators</td></tr>
+  <tr><td>Automation says &ldquo;Not protected&rdquo;</td><td>Open Automation and click Save</td></tr>
+  <tr><td>An item was skipped</td><td>Its app was open or a file was in use; close the app and clean again</td></tr>
+  <tr><td>Phone not found</td><td>Android: unlock it and tap Allow on &ldquo;Allow USB debugging?&rdquo;. iPhone: unlock it and tap Trust</td></tr>
+</table>
+
+<h2 id="history">Version history</h2>
+<table>
+  <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-17</td><td>1.8.0</td><td>Windows.old, hibernation file, Free space for me, Move off C:, 6 more caches, Hebrew, dark mode, space trend, folder map, installer, signed updates, GitHub build and test</td></tr>
+  <tr><td>2026-10-17</td><td>1.7.3</td><td>This user guide built in: footer link &ldquo;User guide&rdquo; or F1, with &ldquo;Save a copy&rdquo;</td></tr>
+  <tr><td>2026-10-17</td><td>1.7.2</td><td>Hardware list in Tools &rsaquo; Drivers fixed; stronger signature self-test</td></tr>
+  <tr><td>2026-10-17</td><td>1.7.1</td><td>Folder deletion with the new link-safe delete fixed; Undo restore and cleanup fixed</td></tr>
+  <tr><td>2026-10-17</td><td>1.7.0</td><td>Security hardening, Tools &rsaquo; Startup, Privacy items, Verify this copy, Phone tab</td></tr>
+  <tr><td>2026-10-16</td><td>1.6.2</td><td>Drivers that don't fit this PC (other Windows, no hardware, not plugged in) and the hardware summary</td></tr>
+  <tr><td>2026-10-16</td><td>1.6.1</td><td>&ldquo;Made by Elisar&rdquo; branding</td></tr>
+  <tr><td>Earlier</td><td>up to 1.6.0</td><td>Started as C Drive Cleaner; renamed Elixar; added Dashboard, Apps, Automation, Undo, drivers, caches, system space and duplicates</td></tr>
+</table>
+
+<footer>Elixar &middot; made by Elisar &middot; This guide works offline; print it or save it as PDF from your browser (Ctrl+P).</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Every push and pull request: build Elixar on a real Windows PC in the cloud and run the full self-test as administrator.
+name: Build and self-test
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the self-test
+        shell: powershell
+        run: .\build.ps1 -SelfTest
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-report
+          path: out/selftest-report.txt

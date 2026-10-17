@@ -1,0 +1,56 @@
+# Push a tag like v1.8.0 -> build, self-test, (optionally) code-sign, package, sign the update manifest and publish a GitHub release.
+# Elixar's "Check for updates" installs a release only when its manifest is signed with the ELIXAR_SIGNING_KEY secret.
+name: Release
+on:
+  push:
+    tags: [ 'v*' ]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the self-test
+        shell: powershell
+        run: .\build.ps1 -SelfTest
+      - name: Code-sign Elixar.exe (only when a certificate is set up)
+        if: env.CODESIGN_PFX != ''
+        env:
+          CODESIGN_PFX: ${{ secrets.CODESIGN_PFX }}
+          CODESIGN_PASSWORD: ${{ secrets.CODESIGN_PASSWORD }}
+        shell: powershell
+        run: .\tools\sign-exe.ps1 -Exe out\Elixar.exe
+      - name: Package
+        shell: powershell
+        run: |
+          $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
+          $tag = "${{ github.ref_name }}".TrimStart('v')
+          if (-not $v.StartsWith($tag)) { throw "Tag $tag does not match the version in the code ($v). Change AssemblyVersion in src\CDriveCleaner.cs." }
+          $pkg = "pkg\Elixar"
+          New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
+          Copy-Item out\Elixar.exe, package\README.txt, "package\Run self-test (safe).bat", guide\UserGuide.html $pkg
+          Copy-Item -Recurse src, guide, tools, package, app.ico, brand.png, build.ps1, README.md "$pkg\source"
+          $exeHash = (Get-FileHash out\Elixar.exe -Algorithm SHA256).Hash
+          [IO.File]::WriteAllText("$pkg\SHA256.txt", "Elixar $v - made by Elisar`r`nSHA-256 of Elixar.exe:`r`n$exeHash`r`n")
+          Compress-Archive -Path $pkg -DestinationPath Elixar.zip -Force
+          $zipHash = (Get-FileHash Elixar.zip -Algorithm SHA256).Hash
+          [IO.File]::WriteAllText("elixar-manifest.txt", "version=$v`nzip-sha256=$zipHash`nexe-sha256=$exeHash`n", (New-Object Text.UTF8Encoding $false))
+      - name: Sign the update manifest
+        env:
+          ELIXAR_SIGNING_KEY: ${{ secrets.ELIXAR_SIGNING_KEY }}
+        shell: pwsh
+        run: |
+          if (-not $env:ELIXAR_SIGNING_KEY) { Write-Warning "No ELIXAR_SIGNING_KEY secret: this release can't be installed by Elixar's updater (people download it by hand)."; exit 0 }
+          $rsa = [System.Security.Cryptography.RSA]::Create()
+          $rsa.FromXmlString($env:ELIXAR_SIGNING_KEY)
+          $sig = $rsa.SignData([IO.File]::ReadAllBytes("elixar-manifest.txt"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+          [IO.File]::WriteAllText("elixar-manifest.sig", [Convert]::ToBase64String($sig))
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $files = @("Elixar.zip", "elixar-manifest.txt")
+          if (Test-Path elixar-manifest.sig) { $files += "elixar-manifest.sig" }
+          gh release create "${{ github.ref_name }}" @files --title "Elixar ${{ github.ref_name }}" --generate-notes
