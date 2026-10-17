@@ -49,8 +49,8 @@ namespace CDriveCleaner
         static string ClientFile { get { var d = Dir; return d == null ? null : Path.Combine(d, "google-client.json"); } }
         static string AccountFile { get { var d = Dir; return d == null ? null : Path.Combine(d, "account.dat"); } }
 
-        static Dictionary<string, object> Json(string s) { return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(s); }
-        static string Str(Dictionary<string, object> d, string k) { object v; return d != null && d.TryGetValue(k, out v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : ""; }
+        internal static Dictionary<string, object> Json(string s) { return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(s); }
+        internal static string Str(Dictionary<string, object> d, string k) { object v; return d != null && d.TryGetValue(k, out v) && v != null ? Convert.ToString(v, CultureInfo.InvariantCulture) : ""; }
 
         // ---------- the Google "app keys" (the client) ----------
         // From the file Google lets you download for a "Desktop app" client: {"installed":{"client_id":...,"client_secret":...}}
@@ -144,7 +144,7 @@ namespace CDriveCleaner
             switch (s.Length % 4) { case 2: s += "=="; break; case 3: s += "="; break; }
             return Convert.FromBase64String(s);
         }
-        static string Random(int bytes) { var b = new byte[bytes]; using (var r = RandomNumberGenerator.Create()) r.GetBytes(b); return B64Url(b); }
+        internal static string Random(int bytes) { var b = new byte[bytes]; using (var r = RandomNumberGenerator.Create()) r.GetBytes(b); return B64Url(b); }
         public static string Challenge(string verifier) { using (var h = SHA256.Create()) return B64Url(h.ComputeHash(Encoding.ASCII.GetBytes(verifier))); }
 
         public static string AuthorizeUrl(Client c, string redirect, string state, string challenge) { return AuthorizeUrl(c, redirect, state, challenge, false); }
@@ -191,7 +191,7 @@ namespace CDriveCleaner
             catch { return null; }
         }
 
-        static Dictionary<string, object> PostForm(string url, Dictionary<string, string> form)
+        internal static Dictionary<string, object> PostForm(string url, Dictionary<string, string> form)
         {
             ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
             string body = string.Join("&", form.Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
@@ -274,7 +274,7 @@ namespace CDriveCleaner
 
         static int ToInt(string s) { int v; return int.TryParse(s, out v) ? v : 3600; }
 
-        static string ReadLine(NetworkStream s)
+        internal static string ReadLine(NetworkStream s)
         {
             var sb = new StringBuilder();
             int b;
@@ -282,7 +282,7 @@ namespace CDriveCleaner
             return sb.ToString();
         }
 
-        static string Page(string text, bool ok)
+        internal static string Page(string text, bool ok)
         {
             return "<!doctype html><html><head><meta charset=\"utf-8\"><title>Elixar</title></head><body style=\"font-family:Segoe UI,sans-serif;background:#f6f8fb;color:#18202b;" +
                    "display:flex;align-items:center;justify-content:center;height:90vh\"><div style=\"background:#fff;border-radius:12px;padding:32px 40px;box-shadow:0 2px 12px #0001\">" +
@@ -291,7 +291,7 @@ namespace CDriveCleaner
 
         public static Action<string> BrowserOverride;   // tests only
 
-        static void OpenBrowser(string url)
+        internal static void OpenBrowser(string url)
         {
             if (BrowserOverride != null) { BrowserOverride(url); return; }
             if (Win.IsWindows) System.Diagnostics.Process.Start(Win.SystemExe("explorer.exe"), "\"" + url + "\"");

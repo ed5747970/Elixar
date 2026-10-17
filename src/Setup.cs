@@ -70,6 +70,7 @@ namespace CDriveCleaner
             string o;
             foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
             try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
+            try { MicrosoftAuth.SignOut(); OtherMail.Forget(); MailAccount.Disconnect(); } catch { }
             try { File.Delete(StartMenuLink); } catch { }
             try { using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) hklm.DeleteSubKeyTree(UninstallKey, false); } catch { }
             // the running file can't delete itself: Windows removes the folder a moment after Elixar closes

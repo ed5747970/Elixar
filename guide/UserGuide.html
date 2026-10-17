@@ -54,7 +54,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email reports</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -202,40 +202,29 @@
   <li><strong>Check for updates:</strong> once Elixar is published on GitHub, it checks for a new version (also quietly once a week). An update is installed only if it is signed with Elisar&rsquo;s key and every file matches its fingerprint.</li>
 </ul>
 
-<h2 id="email">Email reports</h2>
-<p>Elixar can email you, from your own Gmail to yourself: the <strong>weekly auto-clean report</strong> (what was cleaned, how much it freed, what is left for you to decide), <strong>alerts</strong> (C: almost full, a drive that may fail) and a <strong>weekly summary</strong> (free space and its trend, disk health, the biggest things you can delete).</p>
-<ol>
-  <li><strong>One-time setup (about 10 minutes):</strong> Settings &rsaquo; Email reports &rsaquo; &ldquo;Set up Google sign-in&rdquo;. Elixar has no server, so you register it in your own Google account as a small private app (Gmail API on, permission &ldquo;send email&rdquo; only, published, Desktop app client) and choose the file Google gives you. The window lists every step.</li>
-  <li><strong>Sign in with Google.</strong> Your browser opens Google's own page. Google says &ldquo;hasn't verified this app&rdquo; because the app is yours: click Advanced &rsaquo; Go to Elixar, and allow &ldquo;Send email on your behalf&rdquo;. A test email arrives.</li>
-  <li>Tick the emails you want and click <strong>Save email settings</strong>. A daily check (at the time you choose) sends alerts and the weekly summary; the weekly clean sends its own report.</li>
-</ol>
-<p>Settings shows how the last email went (&ldquo;Last email: Sun 18 Oct 09:00 &ndash; Your weekly Elixar summary &check;&rdquo;). The daily check also confirms the Google sign-in still works: if Google ever signs Elixar out, the line turns red and Windows shows a reminder (once a day) to sign in again, so emails never stop silently. The weekly summary includes a chart of free space on C: over the last 8 weeks, drawn on your PC and carried inside the email.</p>
+<h2 id="email">Email account and reports (Settings)</h2>
+<p>Connect your email in <strong>Settings &rsaquo; Email account</strong>. Choose which kind you have:</p>
 <table>
-  <tr><th>Question</th><th>Answer</th></tr>
-  <tr><td>Can Elixar read my mail?</td><td>No. It only has Google's &ldquo;send email&rdquo; permission. It never sees your password.</td></tr>
-  <tr><td>Who gets the emails?</td><td>Only the address you signed in with. Elixar can't send to anyone else.</td></tr>
-  <tr><td>What's in them?</td><td>Categories and sizes only, never file names or folders, and never a link. To delete anything, open Elixar on your PC. An email asking you to click or sign in is not from Elixar.</td></tr>
-  <tr><td>Where is the sign-in kept?</td><td>Encrypted for your Windows account, in a folder only administrators can open.</td></tr>
-  <tr><td>How do I stop it?</td><td>Untick the emails, or click Sign out (Google cancels the permission). Uninstalling Elixar also signs out.</td></tr>
+  <tr><th>Your email</th><th>How Elixar connects</th><th>One-time setup</th></tr>
+  <tr><td>Gmail</td><td>Sign in with Google in your browser. Elixar never sees your password; until you turn on Email cleaning it can only send email to you.</td><td>&ldquo;Set up Google sign-in&rdquo; (about 10 minutes, steps listed in Elixar)</td></tr>
+  <tr><td>Outlook, Hotmail, Live, MSN</td><td>Sign in with Microsoft in your browser. Same as Google: no password, send-only until you turn on Email cleaning.</td><td>&ldquo;Set up Microsoft sign-in&rdquo; (free, about 5 minutes)</td></tr>
+  <tr><td>Yahoo, iCloud, AOL, GMX, Zoho, Yandex and others</td><td>An <strong>app password</strong> from your provider (servers filled in for well-known providers). Always over secure connections (IMAP 993, SMTP 587).</td><td>Make an app password on your provider's site (Elixar shows where)</td></tr>
 </table>
+<p>An app password can open your whole mailbox (that's how email programs work), so Elixar keeps it encrypted on your PC in a folder only administrators can open and uses it only for what you turn on. Delete it on your provider's site to cut Elixar off at any time.</p>
+<p>Then tick the emails you want &ndash; the <strong>weekly auto-clean report</strong>, <strong>alerts</strong> (C: almost full, a drive that may fail) and a <strong>weekly summary</strong> with a free-space chart &ndash; and click <strong>Save email settings</strong>. A test email arrives when you connect. Settings shows how the last email went; if your provider signs Elixar out, Windows reminds you once a day to connect again. Emails list categories and sizes only, never file names, and never contain a link.</p>
 
 <h2 id="emailclean">Email cleaning (Email tab)</h2>
-<p>Finds what you can clean in your Gmail and moves what you pick to Gmail's Trash. It is <strong>off until you allow it</strong>: sign in first (Settings &rsaquo; Email reports), then on the Email tab click &ldquo;Allow Elixar to check my Gmail&rdquo;. Elixar explains what it will and won't do and asks you; only then does Google ask for the permission.</p>
+<p>Optional and <strong>off until you turn it on</strong> in Settings &rsaquo; Email account. Elixar first explains what it will and won't do and asks you; with Gmail and Outlook, Google or Microsoft then asks for the extra permission. The Email tab then scans and moves the emails you pick to the trash.</p>
 <table>
-  <tr><th>Group</th><th>Gmail search</th><th>Level</th></tr>
-  <tr><td>Ads and offers older than a month</td><td>Promotions, older than 30 days</td><td class="safe">Safe (ticked)</td></tr>
-  <tr><td>Social network notifications older than a month</td><td>Social, older than 30 days</td><td class="safe">Safe (ticked)</td></tr>
-  <tr><td>Group and mailing-list emails older than 3 months</td><td>Forums, older than 90 days</td><td class="safe">Safe (ticked)</td></tr>
-  <tr><td>Spam</td><td>The Spam folder (Gmail empties it after 30 days anyway)</td><td class="safe">Safe (ticked)</td></tr>
-  <tr><td>Automatic updates older than 6 months</td><td>Updates (receipts, alerts), older than 180 days</td><td class="review">Your decision</td></tr>
-  <tr><td>Large emails older than a year</td><td>Over 10 MB, older than a year</td><td class="review">Your decision</td></tr>
+  <tr><th>Email</th><th>Safe (ticked)</th><th>Your decision</th><th>Moved to</th></tr>
+  <tr><td>Gmail</td><td>Promotions and Social older than a month, Forums older than 3 months, Spam</td><td>Updates older than 6 months, emails over 10 MB older than a year</td><td>Gmail's Trash (30 days)</td></tr>
+  <tr><td>Outlook / Hotmail</td><td>Junk Email, &ldquo;Other&rdquo; inbox older than 2 months</td><td>&ldquo;Focused&rdquo; inbox older than 2 years</td><td>Deleted Items</td></tr>
+  <tr><td>Other (IMAP)</td><td>Spam/Junk folder, newsletters and ads (with an unsubscribe link) older than a month</td><td>Emails over 10 MB older than a year</td><td>Your Trash folder</td></tr>
 </table>
 <ul>
-  <li>Starred and Important emails, and chats, are never included.</li>
-  <li>Elixar reads only each email's sender, date and size, never what it says, and saves nothing about your emails. Click a row to see who sends the most and the exact search used.</li>
-  <li>&ldquo;Move to Gmail's Trash&rdquo; asks first. Gmail keeps the emails in its Trash for 30 days, so you can restore them. Elixar never deletes an email permanently: empty the Trash in Gmail to free the space now.</li>
-  <li>To turn it off, click &ldquo;Turn off Email cleaning&rdquo;: Elixar signs out so Google takes the permission back. Sign in again in Settings to keep email reports (send only).</li>
-  <li>One-time Google setup: in step 4, also tick <code>.../auth/gmail.modify</code>. Google shows its broadest wording for this permission (&ldquo;read, compose and send&rdquo;); Elixar uses it only as described here.</li>
+  <li>Starred, flagged and Important emails are never included. Elixar reads only senders, dates and sizes, never what an email says, and saves nothing about your emails. Scanning is read-only.</li>
+  <li>Moving asks first, and emails can be restored from the trash. Elixar never deletes an email permanently.</li>
+  <li>Turn it off in Settings. With Gmail and Outlook this signs Elixar out so the permission is taken back; connect again to keep the reports (send only).</li>
 </ul>
 
 <h2 id="security">Security</h2>
@@ -288,7 +277,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
-  <tr><td>2026-10-17</td><td>2.0.0</td><td>Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email, with a reminder if Google signs Elixar out. Optional Email cleaning (Email tab): old ads, social notifications, mailing lists, spam and large old emails moved to Gmail's Trash, off until you turn it on</td></tr>
+  <tr><td>2026-10-17</td><td>2.0.0</td><td>Email account in Settings for Gmail, Outlook/Hotmail (Microsoft sign-in) and any other email (Yahoo, iCloud, AOL... with an app password). Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email, with a reminder if Google signs Elixar out. Optional Email cleaning (Email tab): old ads, social notifications, mailing lists, spam and large old emails moved to Gmail's Trash, off until you turn it on</td></tr>
   <tr><td>2026-10-17</td><td>1.9.1</td><td>No more SmartScreen box once installed; 7 security fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>1.9.0</td><td>Disk health (read only, with daily alerts); Settings tab to switch English/Hebrew and light/dark; Windows tools always started by full path</td></tr>
   <tr><td>2026-10-17</td><td>1.8.0</td><td>Windows.old, hibernation file, Free space for me, Move off C:, 6 more caches, Hebrew, dark mode, space trend, folder map, installer, signed updates, GitHub build and test</td></tr>

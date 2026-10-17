@@ -1,4 +1,5 @@
-// Email tab: what can be cleaned in your Gmail, and moving it to Gmail's Trash. Off until you allow it.
+// Email tab: what can be cleaned in your mailbox (Gmail, Outlook or any other email), and moving it to the trash.
+// Connecting and turning Email cleaning on or off happen in Settings > Email account.
 
 using System;
 using System.Collections.Generic;
@@ -13,8 +14,8 @@ namespace CDriveCleaner
     public partial class MainForm
     {
         TabPage pageEmail;
-        Label emStatus, emWho; ListView emList; TextBox emDetail;
-        Button btnEmAllow, btnEmScan, btnEmTrash, btnEmOff, btnEmSettings;
+        Label emStatus, emWho, emIntro; ListView emList; TextBox emDetail;
+        Button btnEmScan, btnEmTrash, btnEmSettings;
         CancellationTokenSource emCts;
         public event Action EmailTabDone;
 
@@ -25,60 +26,60 @@ namespace CDriveCleaner
             for (int i = 0; i < 3; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 62)); t.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var intro = Note("Finds old ads, social notifications, mailing lists, spam and large old emails in your Gmail, and moves the ones you pick to Gmail's Trash. " +
-                             "Starred and Important emails are never touched, and Elixar only looks at senders, dates and sizes, never at what your emails say.");
+            emIntro = Note("");
             emWho = new Label { AutoSize = true, MaximumSize = new Size(S(1000), 0), Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(S(1), 0, 0, S(6)) };
             emList = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, HideSelection = false, MultiSelect = false };
             emList.Columns.Add("What", S(380)); emList.Columns.Add("Emails", S(90), HorizontalAlignment.Right); emList.Columns.Add("About", S(100), HorizontalAlignment.Right);
             emList.Columns.Add("Level", S(110)); emList.Columns.Add("Most from", S(420));
             emDetail = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical, BackColor = Color.White, Margin = new Padding(0, S(6), 0, 0) };
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, S(6), 0, 0) };
-            btnEmAllow = MakeButton("Allow Elixar to check my Gmail..."); btnEmAllow.Font = new Font("Segoe UI Semibold", 9f);
-            btnEmScan = MakeButton("Scan my Gmail");
-            btnEmTrash = MakeButton("Move selected to Gmail's Trash..."); btnEmTrash.Font = new Font("Segoe UI Semibold", 9f);
-            btnEmOff = MakeButton("Turn off Email cleaning...");
-            btnEmSettings = MakeButton("Sign in first (Settings)");
-            row.Controls.AddRange(new Control[] { btnEmSettings, btnEmAllow, btnEmScan, btnEmTrash, btnEmOff });
-            emStatus = Note("Moved emails stay in Gmail's Trash for 30 days, so you can restore them there. To free the space in your Google account right away, empty the Trash in Gmail.");
+            btnEmScan = MakeButton("Scan my email"); btnEmScan.Font = new Font("Segoe UI Semibold", 9f);
+            btnEmTrash = MakeButton("Move selected to the trash..."); btnEmTrash.Font = new Font("Segoe UI Semibold", 9f);
+            btnEmSettings = MakeButton("Email settings...");
+            row.Controls.AddRange(new Control[] { btnEmScan, btnEmTrash, btnEmSettings });
+            emStatus = Note("");
             emStatus.Margin = new Padding(S(1), S(6), 0, 0);
-            t.Controls.Add(Title("Email"), 0, 0); t.Controls.Add(intro, 0, 1); t.Controls.Add(emWho, 0, 2);
+            t.Controls.Add(Title("Email"), 0, 0); t.Controls.Add(emIntro, 0, 1); t.Controls.Add(emWho, 0, 2);
             t.Controls.Add(emList, 0, 3); t.Controls.Add(emDetail, 0, 4); t.Controls.Add(row, 0, 5); t.Controls.Add(emStatus, 0, 6);
             pageEmail.Controls.Add(t);
 
             btnEmSettings.Click += (o, e) => ShowSettings();
-            btnEmAllow.Click += (o, e) => AllowMailbox();
-            btnEmScan.Click += (o, e) => ScanMailbox();
+            btnEmScan.Click += (o, e) => { if (emCts != null) emCts.Cancel(); else if (MailAccount.Cleaning) ScanMailbox(); else ShowSettings(); };
             btnEmTrash.Click += (o, e) => TrashMail();
-            btnEmOff.Click += (o, e) => TurnOffMailbox();
             emList.ItemChecked += (o, e) => UpdateEmailUi();
             emList.SelectedIndexChanged += (o, e) => ShowMailDetail();
-            ShowMailCategories(Gmail.Categories(), false);
+            ShowMailCategories(MailAccount.Categories(), false);
             UpdateEmailUi();
         }
 
         public void ShowEmailTab() { tabs.SelectedTab = pageEmail; UpdateEmailUi(); if (EmailTabDone != null) EmailTabDone(); }
         public int EmailRows { get { return emList == null ? 0 : emList.Items.Count; } }
+        string lastKind = "";
 
         void UpdateEmailUi()
         {
             if (emList == null) return;
-            string who = GoogleAuth.SignedInEmail;
-            bool signed = who != null, access = signed && GoogleAuth.MailboxAccess, busy = emCts != null;
-            emWho.ForeColor = Theme.MapFore(access ? SafeColor : Color.DimGray);
-            emWho.Text = Lang.T(!signed ? "Not signed in. Sign in with Google in Settings > Email reports first." :
-                                !access ? "Signed in as " + who + ". Email cleaning is off: Elixar can't see your emails until you allow it." :
-                                "Email cleaning is on for " + who + ".");
-            btnEmSettings.Visible = !signed;
-            btnEmAllow.Visible = signed && !access;
-            btnEmAllow.Enabled = !busy && !testMode && GoogleAuth.HasClient;
-            btnEmScan.Visible = btnEmTrash.Visible = btnEmOff.Visible = access;
-            btnEmScan.Text = Lang.T(busy ? "Stop" : "Scan my Gmail");
+            string who = MailAccount.Email, kind = MailAccount.Kind ?? "google";
+            bool signed = who != null, on = signed && MailAccount.Cleaning, busy = emCts != null;
+            string prov = MailAccount.ProviderName, trash = MailAccount.TrashName;
+            if (kind != lastKind && !busy) { lastKind = kind; ShowMailCategories(MailAccount.Categories(), false); return; }
+            emIntro.Text = Lang.T("Finds old ads, notifications, newsletters, spam and large old emails in your " + prov + ", and moves the ones you pick to the trash. " +
+                                  "Starred, flagged and Important emails are never touched, and Elixar only looks at senders, dates and sizes, never at what your emails say.");
+            emWho.ForeColor = Theme.MapFore(on ? SafeColor : Color.DimGray);
+            if (!busy)
+                emWho.Text = Lang.T(!signed ? "Your email isn't connected. Connect it in Settings > Email account, then turn on Email cleaning there." :
+                                    !on ? "Email cleaning is off for " + who + ". Turn it on in Settings > Email account: Elixar asks you first." :
+                                    "Email cleaning is on for " + who + " (" + prov + ").");
+            btnEmScan.Text = Lang.T(busy ? "Stop" : on ? "Scan my email" : "Turn it on in Settings...");
             btnEmScan.Enabled = !testMode;
             var sel = emList.CheckedItems.Cast<ListViewItem>().Select(r => (MailCategory)r.Tag).Where(c => c.Count > 0).ToList();
             int n = sel.Sum(c => c.Count);
-            btnEmTrash.Enabled = access && !busy && !testMode && n > 0;
-            btnEmTrash.Text = n > 0 ? Lang.T("Move " + n.ToString("N0") + " emails to Gmail's Trash...") : Lang.T("Move selected to Gmail's Trash...");
-            btnEmOff.Enabled = !busy && !testMode;
+            btnEmTrash.Visible = on;
+            btnEmTrash.Enabled = on && !busy && !testMode && n > 0;
+            btnEmTrash.Text = n > 0 ? Lang.T("Move " + n.ToString("N0") + " emails to the trash...") : Lang.T("Move selected to the trash...");
+            emStatus.Text = Lang.T(kind == "microsoft" ? "Moved emails go to Outlook's Deleted Items, where you can restore them. Empty Deleted Items in Outlook to free the space right away."
+                                 : kind == "other" ? "Moved emails go to your mailbox's Trash folder, where you can restore them. Empty the Trash in your email to free the space right away."
+                                 : "Moved emails stay in Gmail's Trash for 30 days, so you can restore them there. To free the space in your Google account right away, empty the Trash in Gmail.");
         }
 
         void ShowMailCategories(List<MailCategory> cats, bool scanned)
@@ -104,8 +105,8 @@ namespace CDriveCleaner
         {
             if (emList.SelectedItems.Count == 0) return;
             var c = (MailCategory)emList.SelectedItems[0].Tag;
-            var lines = new List<string> { Lang.T(c.Name), Lang.T(c.About), "", Lang.T("Gmail search used:") + " " + c.Query };
-            if (c.Sampled > 0)
+            var lines = new List<string> { Lang.T(c.Name), Lang.T(c.About), "", Lang.T("Search used:") + " " + c.Query.Replace("|", "  ") };
+            if (c.Senders.Count > 0)
             {
                 lines.Add("");
                 lines.Add(Lang.T("Most from (in a sample of " + c.Sampled + " emails):"));
@@ -114,42 +115,13 @@ namespace CDriveCleaner
             emDetail.Text = string.Join(Environment.NewLine, lines);
         }
 
-        // Elixar asks in its own words first; only then does Google ask for the permission
-        void AllowMailbox()
-        {
-            string q = Lang.T("Allow Elixar to check your Gmail?") + "\n\n" +
-                       Lang.T("To find emails you can clean, Elixar needs Google's permission to see your emails' senders, dates and sizes, and to move emails to Gmail's Trash.") + "\n\n" +
-                       "• " + Lang.T("Elixar looks only at senders, dates and sizes. It never opens what your emails say and saves nothing about them.") + "\n" +
-                       "• " + Lang.T("Nothing leaves your PC: Elixar has no server.") + "\n" +
-                       "• " + Lang.T("Emails are only moved to Gmail's Trash, only after you confirm, and can be restored there for 30 days.") + "\n" +
-                       "• " + Lang.T("Starred and Important emails are never touched.") + "\n" +
-                       "• " + Lang.T("You can turn it off any time on this tab.") + "\n\n" +
-                       Lang.T("Google's own screen will describe this permission in broader words than what Elixar does with it. Continue?");
-            if (MessageBox.Show(this, q, "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2,
-                                Lang.Hebrew ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0) != DialogResult.Yes) return;
-            emCts = new CancellationTokenSource();
-            var token = emCts.Token;
-            UpdateEmailUi();
-            emWho.Text = Lang.T("Waiting for you to sign in to Google in your browser...");
-            Task.Factory.StartNew(() => GoogleAuth.SignIn(st => UI(() => emWho.Text = Lang.T(st)), token, true), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
-            {
-                emCts = null;
-                string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result;
-                UpdateEmailUi(); UpdateMailUi();
-                Activate();
-                tabs.SelectedTab = pageEmail;
-                if (err != null) { Lang.Box(this, "Email cleaning wasn't turned on: " + err, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-                Log("Email cleaning turned on for " + GoogleAuth.SignedInEmail + ".");
-                ScanMailbox();
-            }));
-        }
-
         void ScanMailbox()
         {
             if (emCts != null) { emCts.Cancel(); return; }
+            if (!MailAccount.Cleaning) return;
             emCts = new CancellationTokenSource();
             var token = emCts.Token;
-            var cats = Gmail.Categories();
+            var cats = MailAccount.Categories();
             UpdateEmailUi();
             Task.Factory.StartNew(() =>
             {
@@ -158,8 +130,8 @@ namespace CDriveCleaner
                 {
                     if (token.IsCancellationRequested) break;
                     int k = ++i;
-                    UI(() => emWho.Text = Lang.T("Checking your Gmail (" + k + " of " + cats.Count + ")..."));
-                    Gmail.Scan(c, token);
+                    UI(() => emWho.Text = Lang.T("Checking your email (" + k + " of " + cats.Count + ")..."));
+                    MailAccount.Scan(c, token);
                 }
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
@@ -169,7 +141,7 @@ namespace CDriveCleaner
                 long bytes = cats.Where(c => c.Tier == Tier.Safe && c.Bytes > 0).Sum(c => c.Bytes);
                 var bad = cats.FirstOrDefault(c => c.Error != null);
                 emWho.Text = bad != null ? Lang.T("Some checks didn't finish: ") + bad.Error
-                                         : Lang.T("Found " + total.ToString("N0") + " emails that are safe to clean (about " + Fs.Fmt(bytes) + "). The ones ticked are ready to move to Gmail's Trash.");
+                                         : Lang.T("Found " + total.ToString("N0") + " emails that are safe to clean (about " + Fs.Fmt(bytes) + "). The ones ticked are ready to move to the trash.");
                 Log("Email: scan found " + cats.Sum(c => c.Count) + " emails in " + cats.Count(c => c.Count > 0) + " groups.");   // counts only, never senders
                 if (emList.Items.Count > 0) emList.Items[0].Selected = true;
             }));
@@ -181,36 +153,24 @@ namespace CDriveCleaner
             if (sel.Count == 0) return;
             int n = sel.Sum(c => c.Ids.Count);
             string list = string.Join("\n", sel.Select(c => "  - " + Lang.T(c.Name) + ": " + c.Ids.Count.ToString("N0")));
-            if (Lang.Box(this, "Move " + n.ToString("N0") + " emails to Gmail's Trash?\n\n" + list + "\n\nYou can restore them from Gmail's Trash for 30 days. Starred and Important emails are not included.",
+            if (Lang.Box(this, "Move " + n.ToString("N0") + " emails to " + MailAccount.TrashName + "?\n\n" + list + "\n\nYou can restore them from there. Starred, flagged and Important emails are not included.",
                          "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
             emCts = new CancellationTokenSource();
             var token = emCts.Token;
             UpdateEmailUi();
-            var ids = sel.SelectMany(c => c.Ids).Distinct().ToList();
-            Task.Factory.StartNew(() => Gmail.Trash(ids, k => UI(() => emWho.Text = Lang.T("Moving to Gmail's Trash: " + k.ToString("N0") + " of " + ids.Count.ToString("N0") + "...")), token),
+            Task.Factory.StartNew(() => MailAccount.Trash(sel, k => UI(() => emWho.Text = Lang.T("Moving to the trash: " + k.ToString("N0") + " of " + n.ToString("N0") + "...")), token),
                                   TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 emCts = null;
                 int done = t.IsFaulted ? 0 : t.Result;
-                Log("Email: moved " + done + " of " + ids.Count + " emails to Gmail's Trash.");
-                Lang.Box(this, done == ids.Count ? "Moved " + done.ToString("N0") + " emails to Gmail's Trash. Empty the Trash in Gmail to free the space now, or Gmail does it after 30 days."
-                                                 : "Moved " + done.ToString("N0") + " of " + ids.Count.ToString("N0") + " emails to Gmail's Trash. Scan again to see what is left.",
-                         "Elixar", MessageBoxButtons.OK, done == ids.Count ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+                string err = t.IsFaulted ? t.Exception.GetBaseException().Message : null;
+                Log("Email: moved " + done + " of " + n + " emails to the trash.");
+                Lang.Box(this, err != null ? "Nothing more was moved: " + err :
+                               done == n ? "Moved " + done.ToString("N0") + " emails to " + MailAccount.TrashName + ". Empty it in your email to free the space now."
+                                         : "Moved " + done.ToString("N0") + " of " + n.ToString("N0") + " emails to the trash. Scan again to see what is left.",
+                         "Elixar", MessageBoxButtons.OK, err == null && done == n ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
                 ScanMailbox();
             }));
-        }
-
-        // Google can only take back a permission by signing out; email reports need one sign-in again (send only)
-        void TurnOffMailbox()
-        {
-            if (Lang.Box(this, "Turn off Email cleaning?\n\nElixar signs out of Google so the permission to see your emails is taken back. To keep getting email reports, sign in again in Settings (that sign-in can only send).",
-                         "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-            GoogleAuth.SignOut();
-            string o; Automation.RunSchtasks(Automation.DeleteArgs(Automation.MailTask), out o);
-            Log("Email cleaning turned off; signed out of Google.");
-            ShowMailCategories(Gmail.Categories(), false);
-            UpdateMailUi();
-            ShowSettings();
         }
     }
 }

@@ -2753,6 +2753,56 @@ namespace CDriveCleaner
                     check(true, "Email: Google app " + (GoogleAuth.BuiltInClient != null ? "built into this copy (no setup needed)" : "not built in (local build): each PC sets it up once"));
                 } catch (Exception ex) { check(false, "Email tests stopped: " + ex.GetType().Name + ": " + ex.Message); GoogleAuth.OverrideDir = null; }
 
+                // 3s. other email providers: Outlook (Microsoft sign-in) and any IMAP provider, against a pretend mail server on this PC
+                try {
+                    string mu1 = MicrosoftAuth.AuthorizeUrl("00000000-1111-2222-3333-444444444444", "http://localhost:5000/", "st", "ch", false);
+                    string mu2 = MicrosoftAuth.AuthorizeUrl("00000000-1111-2222-3333-444444444444", "http://localhost:5000/", "st", "ch", true);
+                    check(mu1.Contains("Mail.Send") && !mu1.Contains("Mail.ReadWrite") && mu2.Contains("Mail.ReadWrite") && mu1.Contains("code_challenge_method=S256") &&
+                          MicrosoftAuth.ValidId("00000000-1111-2222-3333-444444444444") && !MicrosoftAuth.ValidId("not-an-id") && new MicrosoftAuth.Account { Scopes = "Mail.Send Mail.ReadWrite" }.Clean,
+                          "Outlook: Sign in with Microsoft asks only to send, plus Mail.ReadWrite only when you turn on Email cleaning");
+                    check(OtherMail.PresetFor("me@yahoo.com").Imap == "imap.mail.yahoo.com" && OtherMail.PresetFor("x@icloud.com").Smtp == "smtp.mail.me.com" && OtherMail.PresetFor("a@aol.com").Imap == "imap.aol.com" &&
+                          OtherMail.PresetFor("a@walla.co.il").Imap == "imap.walla.co.il" && OtherMail.BetterChoice("x@gmail.com") == "google" && OtherMail.BetterChoice("x@hotmail.com") == "microsoft" &&
+                          OtherMail.BetterChoice("x@yahoo.com") == null, "Other email: servers filled in for Yahoo, iCloud, AOL and more; Gmail and Hotmail are sent to their safer sign-in");
+                    var okS = new OtherMail.Settings_ { Email = "me@example.com", Password = "abcd efgh", Imap = "imap.example.com", Smtp = "smtp.example.com" };
+                    bool qBad = false; try { Imap.Q("a\r\nE9 DELETE INBOX"); } catch (IOException) { qBad = true; }
+                    check(OtherMail.Check(okS) == null && OtherMail.Check(new OtherMail.Settings_ { Email = "me@example.com", Password = "p", Imap = "imap.example.com", Smtp = "smtp.example.com", ImapPort = 143 }) != null &&
+                          OtherMail.Check(new OtherMail.Settings_ { Email = "me@example.com", Password = "p", Imap = "imap.example.com", Smtp = "smtp.example.com", SmtpPort = 25 }) != null &&
+                          OtherMail.Check(new OtherMail.Settings_ { Email = "me@example.com", Password = "p", Imap = "evil host;", Smtp = "smtp.example.com" }) != null &&
+                          Imap.Q("pa\"ss\\") == "\"pa\\\"ss\\\\\"" && qBad, "Other email: secure connections only (993 and 587), and nothing typed can sneak extra commands in");
+                    string mdir2 = Path.Combine(root, "mail2"); Directory.CreateDirectory(mdir2);
+                    GoogleAuth.OverrideDir = mdir2;
+                    using (var fk = new FakeImap())
+                    {
+                        Imap.OpenOverride = (h, p) => fk.Connect();
+                        string bad = OtherMail.Connect(new OtherMail.Settings_ { Email = "me@example.com", Password = "wrong", Imap = "imap.example.com", Smtp = "smtp.example.com" });
+                        string good = OtherMail.Connect(okS);
+                        MailAccount.SetKind("other");
+                        bool offFirst = !MailAccount.Cleaning;
+                        var on = OtherMail.Load(); on.Clean = true; OtherMail.Save(on);
+                        var ocats = MailAccount.Categories();
+                        foreach (var c in ocats) MailAccount.Scan(c, System.Threading.CancellationToken.None);
+                        Func<string, MailCategory> OC = k => ocats.First(c => c.Key == k);
+                        bool readOnly = fk.Commands.Where(x => x.Contains(" UID ")).All(x => !x.Contains("MOVE") && !x.Contains("STORE")) && fk.Commands.Any(x => x.Contains("EXAMINE"));
+                        check(bad != null && good == null && offFirst && MailAccount.Email == "me@example.com" && OC("spam").Count == 12 && OC("spam").Folder == "Bulk Mail" &&
+                              OC("newsletters").Count == 40 && OC("large").Count == 3 && OC("large").Bytes > 40000000 && OC("newsletters").Senders.Count == 3 && readOnly && !fk.Commands.Any(x => x.Contains("abcd")),
+                              "Other email (IMAP): signs in, finds Spam, newsletters and large emails, read-only while scanning, never logs the password");
+                        int moved = MailAccount.Trash(ocats.Where(c => c.DefaultOn).ToList(), null, System.Threading.CancellationToken.None);
+                        check(moved == 52 && fk.Moved == 52 && fk.Boxes["Trash"].Count == 52 && fk.Boxes["INBOX"].Count == 3 && fk.Boxes["Bulk Mail"].Count == 0,
+                              "Other email (IMAP): moves only the picked emails to Trash (52), leaves the rest (large emails stay)");
+                        MailAccount.Disconnect();
+                        check(MailAccount.Email == null && OtherMail.Load() == null, "Other email: Disconnect forgets the app password");
+                        Imap.OpenOverride = null;
+                    }
+                    GoogleAuth.OverrideDir = null;
+                    string pick = Path.Combine(root, "smtp-pickup"); Directory.CreateDirectory(pick);
+                    using (var msg = OtherMail.Message("me@example.com", "Weekly clean: freed 2 GB", "plain", "<img src=\"cid:chart0@elixar\">", new List<Mailer.Inline> { new Mailer.Inline { Id = "chart0@elixar", Png = TrendChart.Png(new List<SpaceHistory.Point> { new SpaceHistory.Point { Day = DateTime.Today.AddDays(-9), Free = 50L << 30, Total = 500L << 30 }, new SpaceHistory.Point { Day = DateTime.Today, Free = 45L << 30, Total = 500L << 30 } }, DateTime.Today, 56) } }))
+                    using (var sc = new System.Net.Mail.SmtpClient("localhost") { DeliveryMethod = System.Net.Mail.SmtpDeliveryMethod.SpecifiedPickupDirectory, PickupDirectoryLocation = pick })
+                        sc.Send(msg);
+                    string eml = Directory.GetFiles(pick).Select(File.ReadAllText).FirstOrDefault() ?? "";
+                    check(eml.Contains("me@example.com") && eml.IndexOf("Content-ID: <chart0@elixar>", StringComparison.OrdinalIgnoreCase) >= 0 && eml.Contains("image/png") && eml.Contains("text/html"),
+                          "Other email (SMTP): the report email is built with its chart inside, to your own address only");
+                } catch (Exception ex) { check(false, "Other email tests stopped: " + ex.GetType().Name + ": " + ex.Message); Imap.OpenOverride = null; GoogleAuth.OverrideDir = null; }
+
                 // 4. the window, with cleaning switched off
                 bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false, emailOk = false;
                 string uiErr = null;

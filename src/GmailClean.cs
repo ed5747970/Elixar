@@ -34,6 +34,7 @@ namespace CDriveCleaner
         public List<string> Ids = new List<string>();
         public List<KeyValuePair<string, int>> Senders = new List<KeyValuePair<string, int>>();
         public string Error;
+        public string Folder;                   // IMAP: where the emails are
     }
 
     public static class Gmail

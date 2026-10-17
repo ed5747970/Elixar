@@ -16,6 +16,7 @@ jobs:
         env:
           ELIXAR_GOOGLE_ID: ${{ secrets.ELIXAR_GOOGLE_ID }}
           ELIXAR_GOOGLE_SECRET: ${{ secrets.ELIXAR_GOOGLE_SECRET }}
+          ELIXAR_MS_ID: ${{ secrets.ELIXAR_MS_ID }}
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@v4

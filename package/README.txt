@@ -4,19 +4,17 @@ Made by Elisar
 =======================
 
 NEW IN 2.0
-- Email reports (Settings > Email reports): sign in with Google and get the
-  weekly auto-clean report, alerts (C: almost full, a drive that may fail)
-  and a weekly summary with a free-space chart in your Gmail. This sign-in
-  can only SEND mail to you; emails never contain links or file names.
-  Settings shows how the last email went; if Google signs Elixar out,
-  Windows reminds you to sign in again.
-- Email cleaning (Email tab, optional): finds old ads, social notifications,
-  mailing lists, spam and large old emails in your Gmail and moves the ones
-  you pick to Gmail's Trash (restorable for 30 days). It stays OFF until you
-  turn it on; Elixar asks you first, then Google asks for the permission.
-  Starred and Important emails are never touched, and Elixar only looks at
-  senders, dates and sizes, never at what your emails say.
-- One-time Google setup: about 10 minutes, every step is listed in Elixar.
+- Email account (Settings): connect Gmail or Outlook/Hotmail with their own
+  safe sign-in (no password, send-only), or any other email (Yahoo, iCloud,
+  AOL, GMX, Zoho...) with an app password over secure connections.
+- Email reports: weekly auto-clean report, alerts (C: almost full, a drive
+  that may fail) and a weekly summary with a free-space chart. They never
+  contain links or file names. Settings shows how the last email went.
+- Email cleaning (Email tab, optional): finds spam, old ads, notifications,
+  newsletters and large old emails and moves the ones you pick to the trash
+  (restorable). OFF until you turn it on in Settings; Elixar asks you first.
+  Starred, flagged and Important emails are never touched, and Elixar only
+  looks at senders, dates and sizes, never at what your emails say.
 
 NEW IN 1.9.1
 - The blue "Windows protected your PC" box: click More info > Run anyway once,

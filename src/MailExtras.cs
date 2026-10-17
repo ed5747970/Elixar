@@ -65,7 +65,7 @@ namespace CDriveCleaner
             Load();
             level = 0;
             Func<DateTime, string> when = t => t.ToString("ddd d MMM HH:mm", CultureInfo.InvariantCulture);
-            if (SignedOut) { level = 2; return "Google signed Elixar out on " + when(LastFail) + ". Emails have stopped: click \"Sign in again\"."; }
+            if (SignedOut) { level = 2; return "Your email signed Elixar out on " + when(LastFail) + ". Emails have stopped: connect again above."; }
             if (LastFail > LastSent && LastError.Length > 0) { level = 1; return "The last email didn't go out (" + when(LastFail) + "): " + LastError; }
             if (LastSent != DateTime.MinValue) return "Last email: " + when(LastSent) + " - " + LastWhat + " ✓";
             return "No email sent yet.";

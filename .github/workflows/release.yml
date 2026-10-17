@@ -17,6 +17,7 @@ jobs:
         env:
           ELIXAR_GOOGLE_ID: ${{ secrets.ELIXAR_GOOGLE_ID }}
           ELIXAR_GOOGLE_SECRET: ${{ secrets.ELIXAR_GOOGLE_SECRET }}
+          ELIXAR_MS_ID: ${{ secrets.ELIXAR_MS_ID }}
       - name: Code-sign Elixar.exe (only when a certificate is set up)
         if: env.CODESIGN_PFX != ''
         env:

@@ -70,7 +70,7 @@ namespace CDriveCleaner
             t.Controls.Add(head("Language"), 0, 2); t.Controls.Add(langRow, 0, 3);
             t.Controls.Add(head("Theme"), 0, 4); t.Controls.Add(themeRow, 0, 5);
             t.Controls.Add(btnApplySettings, 0, 6);
-            t.Controls.Add(head("Email reports"), 0, 7); t.Controls.Add(BuildEmailBox(), 0, 8);
+            t.Controls.Add(head("Email account"), 0, 7); t.Controls.Add(BuildEmailBox(), 0, 8);
             t.Controls.Add(head("This PC"), 0, 9); t.Controls.Add(pcButtons, 0, 10);
             var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 11);
             pageSettings.Controls.Add(t);

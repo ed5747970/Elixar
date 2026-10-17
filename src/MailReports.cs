@@ -140,7 +140,7 @@ namespace CDriveCleaner
                 return t.ToString() + "--\r\n" + L("Sent by Elixar on " + Environment.MachineName + ". Elixar never asks you to click a link or sign in from an email. Change or stop these emails: Elixar > Settings > Email reports.",
                                                    "נשלח על ידי Elixar במחשב " + Environment.MachineName + ". Elixar אף פעם לא מבקש ללחוץ על קישור או להתחבר מתוך מייל. שינוי או הפסקה: Elixar > הגדרות > דוחות במייל.");
             }
-            public string Send() { return Mailer.Send(Subject, Text(), Html(), Images); }
+            public string Send() { return MailAccount.Send(Subject, Text(), Html(), Images); }
         }
 
         // ---------- what can be deleted ----------
@@ -252,8 +252,8 @@ namespace CDriveCleaner
         public static Doc Test()
         {
             var d = new Doc(L("Elixar email reports are on", "דוחות המייל של Elixar פעילים"), "#5b4cc4");
-            d.P(L("This is a test. Elixar will email you here, from your own Gmail, about what it finds on " + Environment.MachineName + ".",
-                  "זו בדיקה. Elixar ישלח לכאן, מה-Gmail שלך, מה הוא מוצא במחשב " + Environment.MachineName + "."));
+            d.P(L("This is a test. Elixar will email you here, from your own " + MailAccount.ProviderName + ", about what it finds on " + Environment.MachineName + ".",
+                  "זו בדיקה. Elixar ישלח לכאן, מה-" + MailAccount.ProviderName + " שלך, מה הוא מוצא במחשב " + Environment.MachineName + "."));
             d.Big(L("Free on C:", "פנוי ב-C:"), Fs.Fmt(Sys.Free()) + " (" + Pct(Sys.Free(), Sys.Total()) + ")", "#18202b");
             return d;
         }
@@ -261,17 +261,18 @@ namespace CDriveCleaner
         // ---------- the daily email check (scheduled task, runs as administrator) ----------
         public static int Daily()
         {
-            if (GoogleAuth.SignedInEmail == null) { Automation.Log("Email check: not signed in, nothing sent."); return 0; }
-            string terr;
-            if (GoogleAuth.AccessToken(out terr) == null)
+            if (MailAccount.Email == null) { Automation.Log("Email check: not signed in, nothing sent."); return 0; }
+            bool signedOut;
+            string terr = MailAccount.CheckSignIn(out signedOut);
+            if (terr != null)
             {
                 Automation.Log("Email check: " + terr);
-                if (terr != GoogleAuth.SignedOutText) { MailStatus.Failed(terr, false); return 0; }   // offline: try again tomorrow
+                if (!signedOut) { MailStatus.Failed(terr, false); return 0; }   // offline: try again tomorrow
                 MailStatus.Load();
                 if (MailStatus.ShouldNotify(DateTime.Today))
                 {
                     MailStatus.Notified();
-                    Automation.Notify(L("Elixar was signed out of Google", "Elixar נותק מ-Google"),
+                    Automation.Notify(L("Elixar was signed out of your email", "Elixar נותק מהמייל שלך"),
                                       L("Email reports have stopped. Open Elixar > Settings > Email reports and click \"Sign in again\".",
                                         "דוחות המייל הפסיקו. פתחו את Elixar > הגדרות > דוחות במייל ולחצו \"התחברות מחדש\"."), System.Windows.Forms.ToolTipIcon.Warning, true);
                 }

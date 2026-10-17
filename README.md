@@ -34,6 +34,10 @@ To build it in, do the steps from Elixar's setup window once in your Google acco
 Google treats Desktop-app clients as public, so this is safe to ship; Elixar only ever asks for the "send email" permission.
 To remove Google's "unverified app" warning, submit the app for verification in Google Auth Platform (needs a privacy policy page).
 
+### Optional: "Sign in with Microsoft" without setup for everyone
+Register Elixar once at entra.microsoft.com (personal and work accounts, public client, redirect `http://localhost`,
+delegated Mail.Send and Mail.ReadWrite) and add the repository secret `ELIXAR_MS_ID` (the Application ID; no secret needed).
+
 ### Optional: code signing
 
 With a code-signing certificate (.pfx), add the secrets `CODESIGN_PFX` (base64 of the file) and `CODESIGN_PASSWORD`.
