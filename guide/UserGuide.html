@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.9.1</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.10.0</p></div>
 </div></header>
 <main class="wrap">
 
@@ -54,7 +54,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email reports</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -202,6 +202,23 @@
   <li><strong>Check for updates:</strong> once Elixar is published on GitHub, it checks for a new version (also quietly once a week). An update is installed only if it is signed with Elisar&rsquo;s key and every file matches its fingerprint.</li>
 </ul>
 
+<h2 id="email">Email reports</h2>
+<p>Elixar can email you, from your own Gmail to yourself: the <strong>weekly auto-clean report</strong> (what was cleaned, how much it freed, what is left for you to decide), <strong>alerts</strong> (C: almost full, a drive that may fail) and a <strong>weekly summary</strong> (free space and its trend, disk health, the biggest things you can delete).</p>
+<ol>
+  <li><strong>One-time setup (about 10 minutes):</strong> Settings &rsaquo; Email reports &rsaquo; &ldquo;Set up Google sign-in&rdquo;. Elixar has no server, so you register it in your own Google account as a small private app (Gmail API on, permission &ldquo;send email&rdquo; only, published, Desktop app client) and choose the file Google gives you. The window lists every step.</li>
+  <li><strong>Sign in with Google.</strong> Your browser opens Google's own page. Google says &ldquo;hasn't verified this app&rdquo; because the app is yours: click Advanced &rsaquo; Go to Elixar, and allow &ldquo;Send email on your behalf&rdquo;. A test email arrives.</li>
+  <li>Tick the emails you want and click <strong>Save email settings</strong>. A daily check (at the time you choose) sends alerts and the weekly summary; the weekly clean sends its own report.</li>
+</ol>
+<p>Settings shows how the last email went (&ldquo;Last email: Sun 18 Oct 09:00 &ndash; Your weekly Elixar summary &check;&rdquo;). The daily check also confirms the Google sign-in still works: if Google ever signs Elixar out, the line turns red and Windows shows a reminder (once a day) to sign in again, so emails never stop silently. The weekly summary includes a chart of free space on C: over the last 8 weeks, drawn on your PC and carried inside the email.</p>
+<table>
+  <tr><th>Question</th><th>Answer</th></tr>
+  <tr><td>Can Elixar read my mail?</td><td>No. It only has Google's &ldquo;send email&rdquo; permission. It never sees your password.</td></tr>
+  <tr><td>Who gets the emails?</td><td>Only the address you signed in with. Elixar can't send to anyone else.</td></tr>
+  <tr><td>What's in them?</td><td>Categories and sizes only, never file names or folders, and never a link. To delete anything, open Elixar on your PC. An email asking you to click or sign in is not from Elixar.</td></tr>
+  <tr><td>Where is the sign-in kept?</td><td>Encrypted for your Windows account, in a folder only administrators can open.</td></tr>
+  <tr><td>How do I stop it?</td><td>Untick the emails, or click Sign out (Google cancels the permission). Uninstalling Elixar also signs out.</td></tr>
+</table>
+
 <h2 id="security">Security</h2>
 <p>Elixar runs as administrator, so since 1.7 it guards against a virus with normal rights tricking it into doing admin work.</p>
 <table>
@@ -252,6 +269,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-17</td><td>1.10.0</td><td>Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email; sign-in health with a reminder if Google signs Elixar out</td></tr>
   <tr><td>2026-10-17</td><td>1.9.1</td><td>No more SmartScreen box once installed; 7 security fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>1.9.0</td><td>Disk health (read only, with daily alerts); Settings tab to switch English/Hebrew and light/dark; Windows tools always started by full path</td></tr>
   <tr><td>2026-10-17</td><td>1.8.0</td><td>Windows.old, hibernation file, Free space for me, Move off C:, 6 more caches, Hebrew, dark mode, space trend, folder map, installer, signed updates, GitHub build and test</td></tr>

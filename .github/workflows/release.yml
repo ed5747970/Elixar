@@ -14,6 +14,9 @@ jobs:
       - name: Build and run the self-test
         shell: powershell
         run: .\build.ps1 -SelfTest
+        env:
+          ELIXAR_GOOGLE_ID: ${{ secrets.ELIXAR_GOOGLE_ID }}
+          ELIXAR_GOOGLE_SECRET: ${{ secrets.ELIXAR_GOOGLE_SECRET }}
       - name: Code-sign Elixar.exe (only when a certificate is set up)
         if: env.CODESIGN_PFX != ''
         env:

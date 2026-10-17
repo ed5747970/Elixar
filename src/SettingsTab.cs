@@ -33,8 +33,8 @@ namespace CDriveCleaner
         void BuildSettingsTab()
         {
             pageSettings = new TabPage("Settings") { BackColor = Color.FromArgb(246, 248, 251) };
-            var t = Page(10);
-            for (int i = 0; i < 9; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var t = Page(12);
+            for (int i = 0; i < 11; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             t.AutoScroll = true;
             Func<string, Label> head = text => new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11f), Text = text, Margin = new Padding(0, S(10), 0, S(4)) };
@@ -70,8 +70,9 @@ namespace CDriveCleaner
             t.Controls.Add(head("Language"), 0, 2); t.Controls.Add(langRow, 0, 3);
             t.Controls.Add(head("Theme"), 0, 4); t.Controls.Add(themeRow, 0, 5);
             t.Controls.Add(btnApplySettings, 0, 6);
-            t.Controls.Add(head("This PC"), 0, 7); t.Controls.Add(pcButtons, 0, 8);
-            var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 9);
+            t.Controls.Add(head("Email reports"), 0, 7); t.Controls.Add(BuildEmailBox(), 0, 8);
+            t.Controls.Add(head("This PC"), 0, 9); t.Controls.Add(pcButtons, 0, 10);
+            var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 11);
             pageSettings.Controls.Add(t);
 
             // the saved choices

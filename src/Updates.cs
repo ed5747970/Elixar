@@ -41,6 +41,7 @@ namespace CDriveCleaner
             }
         }
         public static string Repo { get { string v; return Config.TryGetValue("repo", out v) ? v : ""; } }
+        public static string ConfigValue(string key) { string v; return Config.TryGetValue(key, out v) ? v : ""; }
         public static string PublicKey { get { string v; return Config.TryGetValue("key", out v) ? v : ""; } }
         public static bool Configured { get { return Repo.Contains("/") && PublicKey.Contains("<Modulus>"); } }
         public static string ReleasesPage { get { return Repo.Length > 0 ? "https://github.com/" + Repo + "/releases" : ""; } }

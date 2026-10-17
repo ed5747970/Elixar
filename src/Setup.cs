@@ -68,7 +68,8 @@ namespace CDriveCleaner
             if (!quiet && System.Windows.Forms.MessageBox.Show("Remove Elixar from this PC?\n\nThe schedules, the Start menu entry and the copy in Program Files are removed. Undo backups are kept until their 7 days are up.",
                     "Elixar", System.Windows.Forms.MessageBoxButtons.OKCancel, System.Windows.Forms.MessageBoxIcon.Question) != System.Windows.Forms.DialogResult.OK) return 1;
             string o;
-            foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
+            foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
+            try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
             try { File.Delete(StartMenuLink); } catch { }
             try { using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) hklm.DeleteSubKeyTree(UninstallKey, false); } catch { }
             // the running file can't delete itself: Windows removes the folder a moment after Elixar closes

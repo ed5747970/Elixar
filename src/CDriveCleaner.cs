@@ -25,8 +25,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("1.9.1.0")]
-[assembly: AssemblyFileVersion("1.9.1.0")]
+[assembly: AssemblyVersion("1.10.0.0")]
+[assembly: AssemblyFileVersion("1.10.0.0")]
 
 namespace CDriveCleaner
 {
@@ -1237,6 +1237,12 @@ namespace CDriveCleaner
                     LoadAppIndex();
                     CheckForUpdates(false);
                     CheckDisksQuietly();
+                    try
+                    {
+                        int lvl = 0; string ml = GoogleAuth.SignedInEmail != null ? MailStatus.Line(out lvl) : null;
+                        if (ml != null && lvl == 2) Log("Email reports: " + ml + " (Settings > Email reports)");
+                    }
+                    catch { }
                     if (!testMode) Task.Factory.StartNew(() => Quarantine.PurgeOld(Log));
                 });
             };
@@ -2653,6 +2659,78 @@ namespace CDriveCleaner
                           "Security: names from a phone can't lead outside the backup folder");
                 } catch (Exception ex) { check(false, "1.9.1 security tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
 
+                // 3r. email reports: Google sign-in pieces and the emails themselves (nothing is sent by the self-test)
+                try {
+                    string cerr;
+                    var gc = GoogleAuth.ParseClientFile("{\"installed\":{\"client_id\":\"123-abc.apps.googleusercontent.com\",\"project_id\":\"elixar\",\"auth_uri\":\"https://accounts.google.com/o/oauth2/auth\",\"client_secret\":\"GOCSPX-test\",\"redirect_uris\":[\"http://localhost\"]}}", out cerr);
+                    string werr; GoogleAuth.ParseClientFile("{\"web\":{\"client_id\":\"1.apps.googleusercontent.com\",\"client_secret\":\"x\"}}", out werr);
+                    string berr; var bad = GoogleAuth.ParseClientFile("{\"installed\":{\"client_id\":\"evil.example.com\",\"client_secret\":\"x\"}}", out berr);
+                    string url = gc == null ? "" : GoogleAuth.AuthorizeUrl(gc, "http://127.0.0.1:50123/", "st8", GoogleAuth.Challenge("dBjftJeZ4CVP-mJ92K1QW7AlCl7QaPYhrXo9ZzG3CHs"));
+                    check(gc != null && gc.Secret == "GOCSPX-test" && werr != null && werr.Contains("Desktop app") && bad == null &&
+                          GoogleAuth.Challenge("dBjftJeZ4CVP-mJ92K1QW7AlCl7QaPYhrXo9ZzG3CHs") == "YWBkEzPoKgHufHmIl-EGam7u8O13MDYaK4GfqvdBdm8" &&
+                          url.StartsWith("https://accounts.google.com/o/oauth2/v2/auth?") && url.Contains("code_challenge_method=S256") && url.Contains("gmail.send") &&
+                          !url.Contains("gmail.readonly") && !url.Contains("mail.google.com") && url.Contains("redirect_uri=http%3A%2F%2F127.0.0.1"),
+                          "Email: Google sign-in asks only for permission to send (with PKCE), answered on this PC only");
+                    var q = GoogleAuth.ParseQuery("GET /?state=st8&code=4%2F0Ab-x&scope=email HTTP/1.1");
+                    Func<string, string> jwt = body => "eyJhbGciOiJSUzI1NiJ9." + GoogleAuth.B64Url(Encoding.UTF8.GetBytes(body)) + ".sig";
+                    bool v1, v2, v3;
+                    string em = GoogleAuth.EmailFromIdToken(jwt("{\"iss\":\"https://accounts.google.com\",\"aud\":\"123-abc.apps.googleusercontent.com\",\"email\":\"elisar@gmail.com\",\"email_verified\":true}"), "123-abc.apps.googleusercontent.com", out v1);
+                    string other = GoogleAuth.EmailFromIdToken(jwt("{\"iss\":\"https://accounts.google.com\",\"aud\":\"someone-else.apps.googleusercontent.com\",\"email\":\"x@gmail.com\",\"email_verified\":true}"), "123-abc.apps.googleusercontent.com", out v2);
+                    string inj = GoogleAuth.EmailFromIdToken(jwt("{\"iss\":\"https://accounts.google.com\",\"aud\":\"123-abc.apps.googleusercontent.com\",\"email\":\"a@b.com\\r\\nBcc: c@d.com\",\"email_verified\":true}"), "123-abc.apps.googleusercontent.com", out v3);
+                    check(q["code"] == "4/0Ab-x" && q["state"] == "st8" && GoogleAuth.ParseQuery("POST /?code=1 HTTP/1.1").Count == 0 && em == "elisar@gmail.com" && v1 && other == null && inj == null,
+                          "Email: the sign-in answer is checked (right app, verified address, nothing extra slipped into it)");
+                    string mdir = Path.Combine(root, "mail"); Directory.CreateDirectory(mdir);
+                    GoogleAuth.OverrideDir = mdir;
+                    GoogleAuth.Save(new GoogleAuth.Account { Email = "elisar@gmail.com", Refresh = "1//refresh-secret", ClientId = "c", ClientSecret = "s", Since = DateTime.Now });
+                    var back = GoogleAuth.Load();
+                    byte[] raw = File.ReadAllBytes(Path.Combine(mdir, "account.dat"));
+                    check(back != null && back.Email == "elisar@gmail.com" && back.Refresh == "1//refresh-secret" && (!win || Encoding.UTF8.GetString(raw).IndexOf("refresh-secret", StringComparison.Ordinal) < 0),
+                          "Email: the Google sign-in is stored encrypted for your Windows account" + (win ? "" : " (not on Windows: stored plain in the test)"));
+                    GoogleAuth.OverrideDir = null;
+                    string mime = Mailer.Mime("elisar@gmail.com", "Weekly clean: freed 3.2 GB", "plain text", "<b>html</b>");
+                    check(mime.Contains("To: <elisar@gmail.com>") && mime.Contains("multipart/alternative") && mime.Contains("=?UTF-8?B?") && mime.Contains(Convert.ToBase64String(Encoding.UTF8.GetBytes("plain text"))) &&
+                          !Mailer.Mime("a@b.com", "x\r\nBcc: evil@x.com", "t", "h").Contains("\r\nBcc:"), "Email: messages are built correctly and a subject can't add other recipients");
+                    var items = Catalog.Build().Where(i => !i.Privacy).ToList();
+                    foreach (var it in items) it.Size = it.Tier == Tier.Safe ? 700L << 20 : it.Tier == Tier.Review ? 2L << 30 : 0;
+                    var cr = MailReports.CleanReport(new List<MailReports.CleanResult> { new MailReports.CleanResult { Name = items[0].Name, Freed = 900L << 20 },
+                                                                                       new MailReports.CleanResult { Name = "Chrome cache", Skipped = "the app was open" } }, 900L << 20, 40L << 30, 500L << 30, items);
+                    var sm = MailReports.Summary(40L << 30, 500L << 30, items, DiskHealth.Parse("ADMIN\tTrue\nDISK\t0\tSamsung SSD\tSSD\tNVMe\tHealthy\tOK\t1000204886016\t6\t41\t68\t0\t0\t0\t0\t6380\tFalse\tC\nEND"), null);
+                    string all = cr.Html() + cr.Text() + sm.Html() + sm.Text();
+                    check(cr.Subject.Contains("900") && all.Contains("What you can delete") && all.Contains("Samsung SSD") && all.Contains("never asks you to click") &&
+                          !all.Contains("C:\\Users") && !all.Contains("C:\\Windows") && !all.Contains("href") && !all.Contains("http"),
+                          "Email: reports list what was cleaned and what you can delete, with sizes only: no file paths and no links");
+                    var today = new DateTime(2026, 10, 18);   // a Sunday
+                    check(MailPrefs.SummaryDue(DateTime.MinValue, today, "Sunday") && MailPrefs.SummaryDue(today.AddDays(-7), today, "Sunday") && !MailPrefs.SummaryDue(today.AddDays(-2), today, "Sunday") &&
+                          !MailPrefs.SummaryDue(today.AddDays(-3), today.AddDays(1), "Sunday") && MailPrefs.SummaryDue(today.AddDays(-8), today.AddDays(1), "Sunday"),
+                          "Email: the weekly summary goes out once a week on your day (or the next day the PC is on)");
+                    check(Automation.CreateMailArgs(@"C:\Program Files\Elixar\Elixar.exe", "09:00").Contains("--mail-daily") && Automation.CreateMailArgs("x", "09:00").Contains("/RL HIGHEST"),
+                          "Email: the daily email check runs from the protected copy");
+                    GoogleAuth.OverrideDir = mdir;
+                    int lv0, lv1, lv2;
+                    MailStatus.Reset(); MailStatus.Sent("Weekly summary"); string s0 = MailStatus.Line(out lv0);
+                    MailStatus.Failed("Could not reach Google: offline", false); string s1 = MailStatus.Line(out lv1);
+                    MailStatus.Failed(GoogleAuth.SignedOutText, true); string s2 = MailStatus.Line(out lv2);
+                    bool n1 = MailStatus.ShouldNotify(DateTime.Today); MailStatus.Notified(); MailStatus.Load(); bool n2 = MailStatus.ShouldNotify(DateTime.Today);
+                    MailStatus.Sent("Test"); MailStatus.Load(); bool cleared = !MailStatus.SignedOut;
+                    check(lv0 == 0 && s0.StartsWith("Last email:") && s0.Contains("Weekly summary") && lv1 == 1 && s1.Contains("offline") && lv2 == 2 && s2.Contains("signed Elixar out") &&
+                          n1 && !n2 && cleared, "Email: Settings shows the last email sent, a problem, or that Google signed Elixar out (with one reminder a day)");
+                    MailStatus.Reset();
+                    GoogleAuth.OverrideDir = null;
+                    var tpts = new List<SpaceHistory.Point>();
+                    for (int i = 40; i >= 0; i--) tpts.Add(new SpaceHistory.Point { Day = DateTime.Today.AddDays(-i), Free = (60L << 30) - (long)i * (1L << 28) * -1 - (i % 3) * (1L << 29), Total = 500L << 30 });
+                    byte[] png = TrendChart.Png(tpts, DateTime.Today, 56);
+                    string hf2 = Path.Combine(root, "space-history-mail.txt");
+                    File.WriteAllLines(hf2, tpts.Select(x => x.Day.ToString("yyyy-MM-dd") + "\t" + x.Free + "\t" + x.Total));
+                    SpaceHistory.OverrideFile = hf2;
+                    var sm2 = MailReports.Summary(40L << 30, 500L << 30, items, null, null);
+                    SpaceHistory.OverrideFile = null;
+                    string mime2 = Mailer.Mime("elisar@gmail.com", sm2.Subject, sm2.Text(), sm2.Html(), sm2.Images);
+                    check(TrendChart.IsPng(png) && png.Length < 120000 && TrendChart.Png(tpts.Take(1).ToList(), DateTime.Today, 56) == null && sm2.Images.Count == 1 &&
+                          sm2.Html().Contains("src=\"cid:chart0@elixar\"") && mime2.Contains("multipart/related") && mime2.Contains("Content-ID: <chart0@elixar>") && mime2.Contains("Content-Type: image/png"),
+                          "Email: the weekly summary carries a space-trend chart made on this PC (" + (png == null ? 0 : png.Length / 1024) + " KB, inside the email, no web link)");
+                    check(true, "Email: Google app " + (GoogleAuth.BuiltInClient != null ? "built into this copy (no setup needed)" : "not built in (local build): each PC sets it up once"));
+                } catch (Exception ex) { check(false, "Email tests stopped: " + ex.GetType().Name + ": " + ex.Message); GoogleAuth.OverrideDir = null; }
+
                 // 4. the window, with cleaning switched off
                 bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false;
                 string uiErr = null;
@@ -2783,6 +2861,11 @@ namespace CDriveCleaner
                 Automation.Notify("Test alert from Elixar",
                     "This is how the low-space alert looks. " + Fs.Fmt(Sys.Free()) + " is free on C: right now.", ToolTipIcon.Info, false);
                 return 0;
+            }
+            if (args.Contains("--mail-daily"))
+            {
+                Application.EnableVisualStyles();
+                return MailReports.Daily();
             }
             if (args.Contains("--auto-clean"))
             {

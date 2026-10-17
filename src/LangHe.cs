@@ -447,6 +447,44 @@ namespace CDriveCleaner
             d["Choose the language and how Elixar looks. To apply a change, Elixar restarts for a moment; nothing else changes."] = "בחרו את השפה ואת המראה של Elixar. כדי להחיל שינוי, Elixar מופעל מחדש לרגע; שום דבר אחר לא משתנה.";
             d["Wait until Elixar finishes, then apply the change."] = "המתינו ש-Elixar יסיים, ואז החילו את השינוי.";
             d["Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it."] = "ההתקנה מוסיפה את Elixar לתפריט התחל ולרשימת האפליקציות המותקנות של Windows (עם הסרה), בתיקייה שרק מנהלים יכולים לשנות. אחר כך הפעילו את Elixar מתפריט התחל: Windows כבר לא יציג עבורו את החלון הכחול \"Windows protected your PC\".";
+            d["Email reports"] = "דוחות במייל";
+            d["Sign in with Google"] = "התחברות עם Google";
+            d["Set up Google sign-in (one time)..."] = "הגדרת התחברות עם Google (פעם אחת)...";
+            d["Send a test email"] = "שליחת מייל בדיקה";
+            d["Sign out"] = "התנתקות";
+            d["Sign in again"] = "התחברות מחדש";
+            d["Cancel sign-in"] = "ביטול ההתחברות";
+            d["Save email settings"] = "שמירת הגדרות המייל";
+            d["Weekly auto-clean report: what was cleaned, how much it freed, and what is left for you to decide"] = "דוח הניקוי השבועי: מה נוקה, כמה התפנה, ומה נשאר להחלטתך";
+            d["Alerts: C: almost full (your limit in Automation, or 15%), or a drive that may fail"] = "התראות: C: כמעט מלא (הגבול שלך באוטומציה, או 15%), או כונן שעלול להיכשל";
+            d["Weekly summary every"] = "סיכום שבועי בכל";
+            d["(alerts are checked daily at this time too)"] = "(גם ההתראות נבדקות בשעה זו מדי יום)";
+            d["Elixar can only send email, never read your inbox. Emails go from your Gmail to you only, list categories and sizes (never your file names), and never contain a link: to delete anything, open Elixar. Your Google sign-in is encrypted on this PC in a folder only administrators can open."] = "Elixar יכול רק לשלוח מיילים, אף פעם לא לקרוא את תיבת הדואר. המיילים נשלחים מה-Gmail שלך אליך בלבד, מציגים קטגוריות וגדלים (אף פעם לא שמות קבצים), ואף פעם לא מכילים קישור: כדי למחוק משהו, פתחו את Elixar. ההתחברות ל-Google מוצפנת במחשב הזה בתיקייה שרק מנהלים יכולים לפתוח.";
+            d["Not signed in."] = "לא מחובר.";
+            d["Not signed in. Set up Google sign-in once, then sign in."] = "לא מחובר. הגדירו פעם אחת התחברות עם Google, ואז התחברו.";
+            d["Waiting for you to sign in to Google in your browser..."] = "ממתין להתחברות ל-Google בדפדפן...";
+            d["Finishing sign-in..."] = "מסיים את ההתחברות...";
+            d["Sending a test email..."] = "שולח מייל בדיקה...";
+            d["Email settings saved."] = "הגדרות המייל נשמרו.";
+            d["Sign out of Google? Elixar stops sending emails and Google cancels its permission."] = "להתנתק מ-Google? Elixar יפסיק לשלוח מיילים ו-Google יבטל את ההרשאה.";
+            d["Set up Google sign-in"] = "הגדרת התחברות עם Google";
+            d["Set up Google sign-in (one time, about 10 minutes)"] = "הגדרת התחברות עם Google (פעם אחת, כ-10 דקות)";
+            d["Elixar has no server of its own, so Google needs to know \"Elixar on your PC\" as your own small app. You do this once, in your Google account:"] = "ל-Elixar אין שרת משלו, ולכן Google צריך להכיר את \"Elixar במחשב שלך\" כאפליקציה קטנה משלך. עושים זאת פעם אחת, בחשבון Google שלך:";
+            d["1. Open console.cloud.google.com and sign in. Create a project named Elixar."] = "1. פתחו את console.cloud.google.com והתחברו. צרו פרויקט בשם Elixar.";
+            d["2. APIs & Services > Library: find \"Gmail API\" and click Enable."] = "2. APIs & Services > Library: חפשו \"Gmail API\" ולחצו Enable.";
+            d["3. Google Auth Platform > Get started: app name Elixar, your email, Audience: External."] = "3. Google Auth Platform > Get started: שם האפליקציה Elixar, המייל שלך, Audience: External.";
+            d["4. Data access > Add or remove scopes: tick \".../auth/gmail.send\" (send email on your behalf). Nothing else."] = "4. Data access > Add or remove scopes: סמנו \".../auth/gmail.send\" (שליחת מייל בשמך). שום דבר אחר.";
+            d["5. Audience > Publish app (In production). Otherwise Google signs Elixar out every 7 days."] = "5. Audience > Publish app (In production). אחרת Google ינתק את Elixar כל 7 ימים.";
+            d["6. Clients > Create client > Application type: Desktop app > Create > Download JSON."] = "6. Clients > Create client > Application type: Desktop app > Create > Download JSON.";
+            d["7. Click the button below and choose that file."] = "7. לחצו על הכפתור למטה ובחרו את הקובץ הזה.";
+            d["When you sign in, Google shows \"Google hasn't verified this app\" because the app is yours and private. Click Advanced > Go to Elixar. Then allow only \"Send email on your behalf\". Elixar can't read your mail."] = "בהתחברות, Google יציג \"Google hasn't verified this app\" כי האפליקציה שלך ופרטית. לחצו Advanced > Go to Elixar. ואז אשרו רק \"Send email on your behalf\". Elixar לא יכול לקרוא את המיילים שלך.";
+            d["A Google client is already set up. You can replace it."] = "כבר הוגדר חיבור ל-Google. אפשר להחליף אותו.";
+            d["No Google client set up yet."] = "עדיין לא הוגדר חיבור ל-Google.";
+            d["Open Google Cloud console"] = "פתיחת Google Cloud console";
+            d["Choose the downloaded file..."] = "בחירת הקובץ שהורד...";
+            d["Choose the file you downloaded from Google"] = "בחרו את הקובץ שהורדתם מ-Google";
+            d["Done. Close this window and click \"Sign in with Google\"."] = "מוכן. סגרו את החלון ולחצו \"התחברות עם Google\".";
+            d["No email sent yet."] = "עדיין לא נשלח מייל.";
             // texts with numbers in them
             Pat(@"Clean (\d+) \((.+)\)", m => "ניקוי " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")");
             Pat(@"Remove (\d+) \((.+)\)\.\.\.", m => "הסרה של " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")...");
@@ -468,6 +506,12 @@ namespace CDriveCleaner
             Pat(@"(\d+) hours", m => m.Groups[1].Value + " שעות");
             Pat(@"(\d+) days", m => m.Groups[1].Value + " ימים");
             Pat(@"([\d.]+) years", m => m.Groups[1].Value + " שנים");
+            Pat(@"Signed in as (.+) \(Google\)\. Emails go to this address\.", m => "מחובר בתור " + m.Groups[1].Value + " (Google). המיילים נשלחים לכתובת הזו.");
+            Pat(@"Signed in\. A test email was sent to (.+)\.", m => "מחובר. נשלח מייל בדיקה אל " + m.Groups[1].Value + ".");
+            Pat(@"Test email sent to (.+)\.", m => "מייל בדיקה נשלח אל " + m.Groups[1].Value + ".");
+            Pat(@"Last email: (.+) - (.+) ✓", m => "המייל האחרון: " + m.Groups[1].Value + " - " + T(m.Groups[2].Value) + " ✓");
+            Pat(@"The last email didn't go out \((.+)\): (.+)", m => "המייל האחרון לא נשלח (" + m.Groups[1].Value + "): " + T(m.Groups[2].Value));
+            Pat(@"Google signed Elixar out on (.+)\. Emails have stopped: click ""Sign in again""\.", m => "Google ניתק את Elixar ב-" + m.Groups[1].Value + ". המיילים הפסיקו: לחצו \"התחברות מחדש\".");
             return d;
         }
     }

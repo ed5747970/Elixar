@@ -14,10 +14,15 @@ $key = ""
 $pub = Join-Path $root "update-key.pub.xml"
 if (Test-Path $pub) { $key = (Get-Content -Raw $pub).Trim() }
 $cfg = Join-Path $outDir "update-config.txt"
-[IO.File]::WriteAllText($cfg, "repo=$($env:GITHUB_REPOSITORY)`nkey=$key", (New-Object Text.UTF8Encoding $false))
+# Optional: the Google app for "Sign in with Google" (Settings > Email reports), so people using this build need no setup.
+# It's a "Desktop app" client, which Google treats as public (its secret isn't a real secret). Repository secrets:
+# ELIXAR_GOOGLE_ID and ELIXAR_GOOGLE_SECRET.
+$gid = "$env:ELIXAR_GOOGLE_ID".Trim(); $gsec = "$env:ELIXAR_GOOGLE_SECRET".Trim()
+if ($gid -and -not $gid.EndsWith(".apps.googleusercontent.com")) { throw "ELIXAR_GOOGLE_ID doesn't look like a Google client ID" }
+[IO.File]::WriteAllText($cfg, "repo=$($env:GITHUB_REPOSITORY)`nkey=$key`ngoogle-id=$gid`ngoogle-secret=$gsec", (New-Object Text.UTF8Encoding $false))
 
 $refs = "System.dll","System.Core.dll","System.Drawing.dll","System.Windows.Forms.dll","Microsoft.VisualBasic.dll","System.Xml.dll",
-        "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll" | ForEach-Object { "/r:$_" }
+        "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll","System.Security.dll" | ForEach-Object { "/r:$_" }
 $src = Get-ChildItem (Join-Path $root "src\*.cs") | ForEach-Object { $_.FullName }
 $exe = Join-Path $outDir "Elixar.exe"
 & $csc /nologo /target:winexe /optimize+ "/out:$exe" "/win32icon:$root\app.ico" `

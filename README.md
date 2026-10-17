@@ -27,6 +27,13 @@ On any Windows 10/11 PC: `powershell -ExecutionPolicy Bypass -File build.ps1 -Se
 
 Elixar installs an update only when its manifest is signed with that key and every file matches its SHA-256.
 
+### Optional: "Sign in with Google" without setup for everyone
+Email reports need a Google "Desktop app" client. Without one, each person sets it up once in Elixar (Settings > Email reports).
+To build it in, do the steps from Elixar's setup window once in your Google account, then add two repository secrets:
+`ELIXAR_GOOGLE_ID` (the client ID, ending in `.apps.googleusercontent.com`) and `ELIXAR_GOOGLE_SECRET`.
+Google treats Desktop-app clients as public, so this is safe to ship; Elixar only ever asks for the "send email" permission.
+To remove Google's "unverified app" warning, submit the app for verification in Google Auth Platform (needs a privacy policy page).
+
 ### Optional: code signing
 
 With a code-signing certificate (.pfx), add the secrets `CODESIGN_PFX` (base64 of the file) and `CODESIGN_PASSWORD`.

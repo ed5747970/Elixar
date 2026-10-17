@@ -31,6 +31,7 @@ namespace CDriveCleaner
         public const string CheckTask = Folder + "Low space check";
         public const string LogonTask = Folder + "Low space check at sign-in";
         public const string CleanTask = Folder + "Weekly clean";
+        public const string MailTask = Folder + "Email reports";
         // schedules saved before the rename (version 1.3/1.4 was called "C Drive Cleaner")
         public const string OldFolder = @"C Drive Cleaner\";
         public static readonly string[] OldTasks = { OldFolder + "Low space check", OldFolder + "Low space check at sign-in", OldFolder + "Weekly clean" };
@@ -68,6 +69,12 @@ namespace CDriveCleaner
         {
             return "/Create /F /TN " + Quote(CleanTask) + " /TR " + Quote("\"" + exe + "\" --auto-clean") +
                    " /SC WEEKLY /D " + day.Substring(0, 3).ToUpperInvariant() + " /ST " + hhmm + " /RL HIGHEST";
+        }
+
+        // runs as administrator: the Google sign-in is kept in a folder only administrators can open
+        public static string CreateMailArgs(string exe, string hhmm)
+        {
+            return "/Create /F /TN " + Quote(MailTask) + " /TR " + Quote("\"" + exe + "\" --mail-daily") + " /SC DAILY /ST " + hhmm + " /RL HIGHEST";
         }
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
@@ -224,21 +231,34 @@ namespace CDriveCleaner
             if (!Sys.IsAdmin()) { Log("Weekly clean skipped: it needs administrator rights."); return 1; }
             Log("Weekly clean started.");
             long start = Sys.Free();
+            var results = new List<MailReports.CleanResult>();
             foreach (var it in AutoItems())
             {
                 if (it.Procs.Length > 0 && Sys.FindProcesses(it.Procs).Count > 0)
                 {
                     Log("  Skipped " + it.Name + " (the app is open; it is never closed automatically).");
+                    results.Add(new MailReports.CleanResult { Name = it.Name, Skipped = Lang.Hebrew ? "האפליקציה הייתה פתוחה" : "the app was open" });
                     continue;
                 }
                 long before = Sys.Free();
                 try { it.Clean(m => Log(m)); } catch (Exception ex) { Log("  Problem with " + it.Name + ": " + ex.Message); }
-                Log("  " + it.Name + ": freed " + Fs.Fmt(Math.Max(0, Sys.Free() - before)));
+                long got = Math.Max(0, Sys.Free() - before);
+                results.Add(new MailReports.CleanResult { Name = it.Name, Freed = got });
+                Log("  " + it.Name + ": freed " + Fs.Fmt(got));
             }
             long freed = Math.Max(0, Sys.Free() - start);
             Quarantine.PurgeOld(m => Log(m));
             Log("Weekly clean done. Freed " + Fs.Fmt(freed) + ".");
             try { File.AppendAllText(HistoryFile, DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "\t" + freed + Environment.NewLine); } catch { }
+            try
+            {
+                if (GoogleAuth.SignedInEmail != null && MailPrefs.Load().CleanReport)
+                {
+                    string e = MailReports.CleanReport(results, freed, Sys.Free(), Sys.Total(), MailReports.Measure()).Send();
+                    Log("Email: weekly clean report " + (e == null ? "sent." : "not sent: " + e));
+                }
+            }
+            catch (Exception ex) { Log("Email: weekly clean report not sent: " + ex.Message); }
             if (notify)
                 Notify("Weekly clean finished", "Freed " + Fs.Fmt(freed) + " on C:. " + Fs.Fmt(Sys.Free()) + " is free now.", ToolTipIcon.Info, false);
             return 0;
@@ -291,7 +311,7 @@ namespace CDriveCleaner
             chkClean = new CheckBox { AutoSize = true, Text = "Clean the Safe items automatically every", Margin = new Padding(0, S(4), S(4), 0) };
             cmbDay = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(110) };
             cmbDay.Items.AddRange(Automation.Days);
-            cmbDay.SelectedItem = "Sunday";
+            cmbDay.SelectedIndex = 6;   // Sunday (by position: the names are translated in Hebrew)
             timeClean = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = S(70), Value = DateTime.Today.AddHours(20) };
             r3.Controls.AddRange(new Control[] { chkClean, cmbDay, Lbl("at"), timeClean });
             lblAutoItems = new Label
@@ -371,7 +391,7 @@ namespace CDriveCleaner
                     (logon.Exists ? (check.Exists ? " and" : ", checks") + " after sign-in" : "") + "." + (check.Enabled ? "" : " (disabled in Task Scheduler)");
 
                 chkClean.Checked = clean.Exists;
-                if (clean.Day.Length > 0 && Automation.Days.Contains(clean.Day)) cmbDay.SelectedItem = clean.Day;
+                if (clean.Day.Length > 0 && Automation.Days.Contains(clean.Day)) cmbDay.SelectedIndex = Array.IndexOf(Automation.Days, clean.Day);
                 if (clean.Start.HasValue) timeClean.Value = DateTime.Today.Add(clean.Start.Value.TimeOfDay);
                 var hist = Automation.ReadHistory(Automation.HistoryFile);
                 string last = hist.Count == 0 ? "Not run yet." :
@@ -430,7 +450,7 @@ namespace CDriveCleaner
                 run("remove daily space check", Automation.DeleteArgs(Automation.CheckTask));
                 run("remove sign-in check", Automation.DeleteArgs(Automation.LogonTask));
             }
-            if (chkClean.Checked) run("weekly clean", Automation.CreateCleanArgs(exe, (string)cmbDay.SelectedItem, timeClean.Value.ToString("HH:mm")));
+            if (chkClean.Checked) run("weekly clean", Automation.CreateCleanArgs(exe, Automation.Days[Math.Max(0, cmbDay.SelectedIndex)], timeClean.Value.ToString("HH:mm")));
             else run("remove weekly clean", Automation.DeleteArgs(Automation.CleanTask));
             // clean up schedules left from the old name
             foreach (var oldTask in Automation.OldTasks)

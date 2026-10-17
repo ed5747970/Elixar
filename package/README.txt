@@ -1,7 +1,16 @@
-ELIXAR  (version 1.9.1)
+ELIXAR  (version 1.10.0)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.10
+- Email reports (Settings > Email reports): sign in with Google and get the
+  weekly auto-clean report, alerts (C: almost full, a drive that may fail)
+  and a weekly summary in your Gmail. Elixar can only send, never read, your
+  mail; emails go only to you and never contain links or file names.
+  One-time Google setup: about 10 minutes, every step is listed in Elixar.
+  Settings shows how the last email went; if Google signs Elixar out, Windows
+  reminds you to sign in again. The weekly summary has a free-space chart.
 
 NEW IN 1.9.1
 - The blue "Windows protected your PC" box: click More info > Run anyway once,
