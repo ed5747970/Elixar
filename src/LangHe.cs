@@ -523,6 +523,11 @@ namespace CDriveCleaner
             d["Google sign-in worked, but the permission to see and tidy your emails wasn't ticked, so Email cleaning stays off."] = "ההתחברות ל-Google הצליחה, אבל ההרשאה לראות ולסדר את המיילים לא סומנה, ולכן ניקוי המייל נשאר כבוי.";
             d["Could not check: "] = "לא הצלחתי לבדוק: ";
             d["Some checks didn't finish: "] = "חלק מהבדיקות לא הסתיימו: ";
+            d["Email cleaning: on (Email tab)."] = "ניקוי המייל: פעיל (לשונית מייל).";
+            d["Email cleaning: off. Optional: lets Elixar find old ads, notifications and spam in your Gmail."] = "ניקוי המייל: כבוי. אופציונלי: מאפשר ל-Elixar למצוא פרסומות ישנות, התראות וספאם ב-Gmail שלך.";
+            d["Turn on Email cleaning..."] = "הפעלת ניקוי המייל...";
+            d["Open the Email tab"] = "פתיחת לשונית המייל";
+            d["Emails go from your Gmail to you only, list categories and sizes (never your file names), and never contain a link. With Email cleaning on, Elixar can also see your emails' senders, dates and sizes and move emails to Gmail's Trash, only from the Email tab and only after you confirm. Your Google sign-in is encrypted on this PC in a folder only administrators can open."] = "המיילים נשלחים מה-Gmail שלך אליך בלבד, מציגים קטגוריות וגדלים (אף פעם לא שמות קבצים), ואף פעם לא מכילים קישור. כשניקוי המייל פעיל, Elixar יכול גם לראות שולח, תאריך וגודל של המיילים ולהעביר מיילים לאשפה של Gmail, רק מלשונית המייל ורק אחרי שאישרת. ההתחברות ל-Google מוצפנת במחשב הזה בתיקייה שרק מנהלים יכולים לפתוח.";
             // texts with numbers in them
             Pat(@"Clean (\d+) \((.+)\)", m => "ניקוי " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")");
             Pat(@"Remove (\d+) \((.+)\)\.\.\.", m => "הסרה של " + m.Groups[1].Value + " (" + m.Groups[2].Value + ")...");

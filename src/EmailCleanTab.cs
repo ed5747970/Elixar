@@ -137,6 +137,7 @@ namespace CDriveCleaner
                 string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result;
                 UpdateEmailUi(); UpdateMailUi();
                 Activate();
+                tabs.SelectedTab = pageEmail;
                 if (err != null) { Lang.Box(this, "Email cleaning wasn't turned on: " + err, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                 Log("Email cleaning turned on for " + GoogleAuth.SignedInEmail + ".");
                 ScanMailbox();

@@ -14,6 +14,7 @@ namespace CDriveCleaner
         Label mailStatus; Button btnMailSignIn, btnMailSetup, btnMailTest, btnMailOut, btnMailSave;
         CheckBox chkMailClean, chkMailAlerts, chkMailSummary; ComboBox cmbMailDay; DateTimePicker timeMail;
         CancellationTokenSource mailCts;
+        Label mailCleanState, mailNote; Button btnMailCleanOn;
 
         Control BuildEmailBox()
         {
@@ -42,10 +43,16 @@ namespace CDriveCleaner
             btnMailSave = MakeButton("Save email settings"); btnMailSave.Margin = new Padding(S(2), S(8), 0, 0);
             row2.Controls.Add(btnMailSave);
             choose.Controls.AddRange(new Control[] { chkMailClean, chkMailAlerts, sumRow, row2 });
-            var note = Note("Elixar can only send email, never read your inbox. Emails go from your Gmail to you only, list categories and sizes (never your file names), " +
+            var note = mailNote = Note("Elixar can only send email, never read your inbox. Emails go from your Gmail to you only, list categories and sizes (never your file names), " +
                             "and never contain a link: to delete anything, open Elixar. Your Google sign-in is encrypted on this PC in a folder only administrators can open.");
             note.Margin = new Padding(S(2), S(8), 0, 0);
-            box.Controls.AddRange(new Control[] { mailStatus, row, choose, note });
+            // optional: Email cleaning, a separate choice with its own permission
+            var cleanRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, S(10), 0, 0) };
+            mailCleanState = new Label { AutoSize = true, Margin = new Padding(S(2), S(7), S(8), 0) };
+            btnMailCleanOn = MakeButton("Turn on Email cleaning...");
+            cleanRow.Controls.Add(mailCleanState); cleanRow.Controls.Add(btnMailCleanOn);
+            btnMailCleanOn.Click += (o, e) => { ShowEmailTab(); if (!GoogleAuth.MailboxAccess) AllowMailbox(); };
+            box.Controls.AddRange(new Control[] { mailStatus, row, choose, cleanRow, note });
 
             btnMailSetup.Click += (o, e) => { using (var f = new GoogleSetupForm(s)) { f.Shown += (o2, e2) => { Theme.Apply(f); Lang.Apply(f); }; f.ShowDialog(this); } UpdateMailUi(); };
             btnMailSignIn.Click += (o, e) => SignInGoogle();
@@ -79,6 +86,14 @@ namespace CDriveCleaner
             btnMailTest.Enabled = btnMailOut.Enabled = signed && !busy && !testMode;
             btnMailSave.Enabled = signed && !busy && !testMode;
             foreach (Control c in new Control[] { chkMailClean, chkMailAlerts, chkMailSummary, cmbMailDay, timeMail }) c.Enabled = signed;
+            bool cleaning = signed && GoogleAuth.MailboxAccess;
+            mailCleanState.Text = Lang.T(cleaning ? "Email cleaning: on (Email tab)." : "Email cleaning: off. Optional: lets Elixar find old ads, notifications and spam in your Gmail.");
+            mailCleanState.ForeColor = Theme.MapFore(cleaning ? SafeColor : Color.DimGray);
+            btnMailCleanOn.Text = Lang.T(cleaning ? "Open the Email tab" : "Turn on Email cleaning...");
+            btnMailCleanOn.Enabled = signed && !busy && !testMode;
+            const string sendOnly = "Elixar can only send email, never read your inbox. Emails go from your Gmail to you only, list categories and sizes (never your file names), " +
+                                    "and never contain a link: to delete anything, open Elixar. Your Google sign-in is encrypted on this PC in a folder only administrators can open.";
+            mailNote.Text = Lang.T(cleaning ? "Emails go from your Gmail to you only, list categories and sizes (never your file names), and never contain a link. With Email cleaning on, Elixar can also see your emails' senders, dates and sizes and move emails to Gmail's Trash, only from the Email tab and only after you confirm. Your Google sign-in is encrypted on this PC in a folder only administrators can open." : sendOnly);
         }
 
         void SignInGoogle()

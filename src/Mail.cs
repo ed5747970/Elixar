@@ -28,7 +28,8 @@ namespace CDriveCleaner
         public const string Scope = "openid email https://www.googleapis.com/auth/gmail.send";
         // only when you turn on Email cleaning, after Elixar asks you: see senders, dates and sizes, and move emails to Gmail's Trash
         public const string ModifyScope = "https://www.googleapis.com/auth/gmail.modify";
-        const string AuthUrl = "https://accounts.google.com/o/oauth2/v2/auth", TokenUrl = "https://oauth2.googleapis.com/token", RevokeUrl = "https://oauth2.googleapis.com/revoke";
+        const string AuthUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+        public static string TokenUrl = "https://oauth2.googleapis.com/token", RevokeUrl = "https://oauth2.googleapis.com/revoke";   // changed only by tests (a fake Google on this PC)
         static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Elixar mail sign-in v1");
 
         public class Client { public string Id = "", Secret = ""; }
