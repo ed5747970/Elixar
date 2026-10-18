@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>Elixar</vendor>
+  <vendor_url>https://github.com/ed5747970/elixar</vendor_url>
+  <icon_name>elixar</icon_name>
+  <action id="com.elisar.elixar.system">
+    <description>Clean system files with Elixar</description>
+    <description xml:lang="he">ניקוי קבצי מערכת עם Elixar</description>
+    <message>Elixar wants to clean the system items you chose (update packages, old logs, old app versions, Docker leftovers, the log size limit). Only Elixar's fixed actions can run.</message>
+    <message xml:lang="he">Elixar רוצה לנקות את פריטי המערכת שבחרת (חבילות עדכון, יומנים ישנים, גרסאות ישנות של אפליקציות, שאריות Docker, הגבלת גודל היומנים). רק הפעולות הקבועות של Elixar יכולות לרוץ.</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/elixar/elixar-root</annotate>
+  </action>
+</policyconfig>

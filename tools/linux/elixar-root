@@ -1,0 +1,72 @@
+#!/bin/sh
+# Elixar's system helper. It runs as root only through pkexec (polkit action com.elisar.elixar.system),
+# and only for the fixed actions below. Every argument is checked before anything runs: one unknown
+# argument and nothing happens. Usage: elixar-root [--dry-run] ACTION...
+#   apt-clean  apt-autoremove  journal-vacuum  crash-clean  flatpak-unused
+#   snap-remove:NAME:REVISION  docker-safe:DOCKER  docker-all:DOCKER
+#   journal-cap:200M|500M|1G  journal-uncap
+set -u
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+LC_ALL=C
+export PATH LC_ALL
+umask 022
+CAP=/etc/systemd/journald.conf.d/60-elixar.conf
+
+refuse() { echo "elixar-root: refused: $1" >&2; exit 2; }
+tool() {
+  for d in /usr/bin /bin /usr/sbin /sbin; do [ -x "$d/$1" ] && { echo "$d/$1"; return 0; }; done
+  [ "$1" = snap ] && [ -x /snap/bin/snap ] && { echo /snap/bin/snap; return 0; }
+  return 1
+}
+
+DRY=0
+[ "${1:-}" = "--dry-run" ] && { DRY=1; shift; }
+[ "$#" -ge 1 ] || refuse "no action"
+[ "$#" -le 200 ] || refuse "too many actions"
+
+# 1. check every action
+for a in "$@"; do
+  case "$a" in
+    apt-clean|apt-autoremove|journal-vacuum|crash-clean|flatpak-unused|journal-uncap) ;;
+    journal-cap:200M|journal-cap:500M|journal-cap:1G) ;;
+    docker-safe:/usr/bin/docker|docker-safe:/bin/docker|docker-safe:/usr/sbin/docker|docker-safe:/sbin/docker|docker-safe:/snap/bin/docker) ;;
+    docker-all:/usr/bin/docker|docker-all:/bin/docker|docker-all:/usr/sbin/docker|docker-all:/sbin/docker|docker-all:/snap/bin/docker) ;;
+    snap-remove:*)
+      rest=${a#snap-remove:}; n=${rest%%:*}; r=${rest#*:}
+      [ "$n" != "$rest" ] || refuse "$a"
+      case "$n" in ''|-*|*[!a-z0-9-]*) refuse "$a" ;; esac
+      [ "${#n}" -le 40 ] || refuse "$a"
+      case "$r" in ''|*[!0-9]*) refuse "$a" ;; esac
+      [ "${#r}" -le 12 ] || refuse "$a" ;;
+    *) refuse "$a" ;;
+  esac
+done
+
+# 2. run them
+run() { if [ "$DRY" = 1 ]; then echo "$*"; else "$@"; fi; }
+rc=0
+for a in "$@"; do
+  case "$a" in
+    apt-clean)      t=$(tool apt-get) && run "$t" clean || rc=1 ;;
+    apt-autoremove) t=$(tool apt-get) && run "$t" autoremove --purge -y || rc=1 ;;
+    journal-vacuum) t=$(tool journalctl) && run "$t" --vacuum-size=200M || rc=1 ;;
+    crash-clean)    if [ "$DRY" = 1 ]; then echo "rm -f /var/crash/*.crash /var/crash/*.upload /var/crash/*.uploaded";
+                    else for f in /var/crash/*.crash /var/crash/*.upload /var/crash/*.uploaded; do [ -e "$f" ] || [ -L "$f" ] || continue; /bin/rm -f -- "$f" || rc=1; done; fi ;;
+    flatpak-unused) t=$(tool flatpak) && run "$t" uninstall --system --unused -y --noninteractive || rc=1 ;;
+    snap-remove:*)  rest=${a#snap-remove:}; t=$(tool snap) && run "$t" remove "${rest%%:*}" "--revision=${rest#*:}" || rc=1 ;;
+    docker-safe:*)  d=${a#docker-safe:}; run "$d" builder prune -f && run "$d" image prune -f || rc=1 ;;
+    docker-all:*)   d=${a#docker-all:}; run "$d" container prune -f && run "$d" image prune -a -f || rc=1 ;;
+    journal-cap:*)
+      s=${a#journal-cap:}
+      if [ "$DRY" = 1 ]; then echo "write $CAP: SystemMaxUse=$s"; else
+        mkdir -p /etc/systemd/journald.conf.d && tmp=$(mktemp /etc/systemd/journald.conf.d/.elixar.XXXXXX) &&
+        printf '[Journal]\nSystemMaxUse=%s\n' "$s" > "$tmp" && chmod 644 "$tmp" && mv -f "$tmp" "$CAP" || rc=1
+      fi
+      t=$(tool systemctl) && run "$t" restart systemd-journald || rc=1
+      t=$(tool journalctl) && run "$t" "--vacuum-size=$s" || rc=1 ;;
+    journal-uncap)
+      run rm -f "$CAP" || rc=1
+      t=$(tool systemctl) && run "$t" restart systemd-journald || rc=1 ;;
+  esac
+done
+exit $rc

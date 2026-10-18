@@ -76,8 +76,10 @@ namespace CDriveCleaner
             // the running file can't delete itself: Windows removes the folder a moment after Elixar closes
             try
             {
-                string cmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe");
-                Process.Start(new ProcessStartInfo(cmd, "/c ping -n 4 127.0.0.1 >nul & rmdir /s /q \"" + Install.Dir + "\"") { UseShellExecute = false, CreateNoWindow = true });
+                // full paths and System32 as the working folder: a "ping" in the current folder would otherwise run as administrator
+                string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                string cmd = Path.Combine(sys, "cmd.exe"), ping = Path.Combine(sys, "PING.EXE");
+                Process.Start(new ProcessStartInfo(cmd, "/c \"\"" + ping + "\" -n 4 127.0.0.1 >nul & rmdir /s /q \"" + Install.Dir + "\"\"") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sys });
             }
             catch { }
             if (!quiet) System.Windows.Forms.MessageBox.Show("Elixar was removed.", "Elixar");

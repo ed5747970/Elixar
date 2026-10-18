@@ -17,7 +17,7 @@ namespace CDriveCleaner
 
         public static List<string> BrowserRoots()
         {
-            string L = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string L = UserDirs.Local;
             return new[] { Path.Combine(L, "Google", "Chrome", "User Data"), Path.Combine(L, "Microsoft", "Edge", "User Data"),
                            Path.Combine(L, "BraveSoftware", "Brave-Browser", "User Data") }.ToList();
         }
@@ -111,7 +111,7 @@ namespace CDriveCleaner
 
         public static List<CleanItem> Items()
         {
-            string R = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string R = UserDirs.Roaming;
             string recent = Path.Combine(R, "Microsoft", "Windows", "Recent");
             string ff = Path.Combine(R, "Mozilla", "Firefox", "Profiles");
             var chromium = new[] { "chrome", "msedge", "brave" };

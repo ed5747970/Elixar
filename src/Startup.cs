@@ -292,9 +292,7 @@ namespace CDriveCleaner
         {
             get
             {
-                string pf = Environment.GetEnvironmentVariable("ProgramW6432");
-                if (string.IsNullOrEmpty(pf)) pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                return Path.Combine(Path.Combine(pf, "Windows Defender"), "MpCmdRun.exe");
+                return Path.Combine(Path.Combine(Win.ProgramFiles, "Windows Defender"), "MpCmdRun.exe");
             }
         }
 

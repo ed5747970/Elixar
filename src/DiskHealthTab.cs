@@ -47,8 +47,8 @@ namespace CDriveCleaner
             pageDisk.Controls.Add(t);
             btnDiskCheck.Click += (o, e) => RefreshDiskHealth();
             // Windows' own pages; Elixar does not change any drive setting itself
-            btnDiskBackup.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "ms-settings:backup"); } catch { } };
-            btnDiskWindows.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "ms-settings:disksandvolumes"); } catch { } };
+            btnDiskBackup.Click += (o, e) => { try { Shell.Open("ms-settings:backup"); } catch { } };
+            btnDiskWindows.Click += (o, e) => { try { Shell.Open("ms-settings:disksandvolumes"); } catch { } };
             diskList.SelectedIndexChanged += (o, e) => ShowDiskDetail();
         }
 

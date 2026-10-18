@@ -28,9 +28,13 @@ namespace CDriveCleaner
         public static string OverrideRoot;   // used by the self-test only
 
         // A second fixed drive with room to spare, else C:\ProgramData.
+        // Linux: only Elixar's own private folder (0700) - never a folder on a USB drive or a disk's top level
+        static string LinuxRoot { get { return Path.Combine(Paths.Data, "undo"); } }
+
         public static string RootFor(long need)
         {
             if (OverrideRoot != null) return OverrideRoot;
+            if (!Win.IsWindows) { Locked.Lock(LinuxRoot); return LinuxRoot; }
             try
             {
                 foreach (var d in DriveInfo.GetDrives())
@@ -62,6 +66,7 @@ namespace CDriveCleaner
         static IEnumerable<string> AllRoots()
         {
             if (OverrideRoot != null) { yield return OverrideRoot; yield break; }
+            if (!Win.IsWindows) { yield return LinuxRoot; yield break; }
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             DriveInfo[] drives = new DriveInfo[0];
             try { drives = DriveInfo.GetDrives(); } catch { }

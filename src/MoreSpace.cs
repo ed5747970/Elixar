@@ -186,7 +186,7 @@ namespace CDriveCleaner
 
         public static string HomeFor(string folderName)
         {
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), folderName);
+            return System.IO.Path.Combine(UserDirs.Home, folderName);
         }
 
         public class Result { public int Copied, Failed, LeftBehind; public long Bytes; public bool Switched; public List<string> Problems = new List<string>(); }
@@ -322,7 +322,7 @@ namespace CDriveCleaner
         // folder any program can write to (for example one in your user folder), and Elixar would run it as administrator.
         public static string Exe()
         {
-            string pf = Environment.GetEnvironmentVariable("ProgramW6432") ?? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            string pf = Win.ProgramFiles;
             string std = Path.Combine(pf ?? "", @"Docker\Docker\resources\bin\docker.exe");
             if (!File.Exists(std)) return null;
             if (Win.IsWindows && !Trust.SignedBy(std, Trust.DockerInc)) return null;

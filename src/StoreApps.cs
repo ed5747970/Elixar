@@ -164,13 +164,17 @@ namespace CDriveCleaner
 
         public static string RemoveScript(string fullName)
         {
-            return "$ErrorActionPreference = 'Stop'; try { Remove-AppxPackage -Package '" + fullName.Replace("'", "''") + "'; 'OK' } catch { 'ERROR: ' + $_.Exception.Message }";
+            // a package full name is letters, digits, dots, dashes, underscores and tildes; anything else is refused
+            if (!System.Text.RegularExpressions.Regex.IsMatch(fullName ?? "", "^[A-Za-z0-9._~-]{1,200}$")) return "'ERROR: not a valid package name'";
+            return "$ErrorActionPreference = 'Stop'; try { Remove-AppxPackage -Package " + Sys.PsQuote(fullName) + "; 'OK' } catch { 'ERROR: ' + $_.Exception.Message }";
         }
+
+        public static string RunPsScriptFor(string script) { return Sys.PsSafe(script); }
 
         public static string RunPs(string script, int timeoutMs)
         {
             var psi = new ProcessStartInfo(Win.SystemExe("powershell.exe"),
-                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script)))
+                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(RunPsScriptFor(script))))
             {
                 UseShellExecute = false, CreateNoWindow = true,
                 RedirectStandardOutput = true, RedirectStandardError = true,
@@ -304,7 +308,7 @@ namespace CDriveCleaner
             btnStoreRemove.Click += (o, e) => RemoveStoreApps(storeList.CheckedItems.Cast<ListViewItem>().Select(r => (StoreApp)r.Tag).ToList());
             btnStoreShop.Click += (o, e) =>
             {
-                try { Process.Start(new ProcessStartInfo("ms-windows-store://home") { UseShellExecute = true }); }
+                try { Shell.Open("ms-windows-store://home"); }
                 catch (Exception ex) { Log("Could not open the Microsoft Store: " + ex.Message); }
             };
         }

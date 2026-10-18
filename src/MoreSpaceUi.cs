@@ -105,8 +105,8 @@ namespace CDriveCleaner
             btnMoveGo.Click += (o, e) => MoveFolders(false);
             btnMoveBack.Click += (o, e) => MoveFolders(true);
             btnMoveRefresh.Click += (o, e) => RefreshMove();
-            btnStore.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "ms-settings:appsfeatures"); } catch { } };
-            btnNew.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "ms-settings:savelocations"); } catch { } };
+            btnStore.Click += (o, e) => { try { Shell.Open("ms-settings:appsfeatures"); } catch { } };
+            btnNew.Click += (o, e) => { try { Shell.Open("ms-settings:savelocations"); } catch { } };
             UpdateMoveButtons();
         }
 

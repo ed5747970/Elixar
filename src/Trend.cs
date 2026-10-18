@@ -240,7 +240,7 @@ namespace CDriveCleaner
             foreach (var d in dirs)
             {
                 if (ct.IsCancellationRequested) break;
-                try { if ((new DirectoryInfo(d).Attributes & FileAttributes.ReparsePoint) != 0) continue; } catch { continue; }
+                try { if ((new DirectoryInfo(d).Attributes & FileAttributes.ReparsePoint) != 0 || Lx.SkipDir(d, dir)) continue; } catch { continue; }
                 var n = new Node { Name = Path.GetFileName(d), Path = d, IsDir = true };
                 long sz;
                 if (!cache.TryGetValue(d, out sz)) { if (progress != null) progress(n.Name, nodes); sz = Fs.SizeOf(d); lock (cache) cache[d] = sz; }
@@ -283,7 +283,7 @@ namespace CDriveCleaner
             map.MouseMove += (o, e) => { var n = Hit(e.Location); string t = n == null ? "" : n.Name + "  " + Fs.Fmt(n.Bytes); if (tip.GetToolTip(map) != t) tip.SetToolTip(map, t); };
             Controls.Add(map); Controls.Add(status); Controls.Add(top);
             up.Click += (o, e) => { var p = Directory.GetParent(current); if (p != null) Go(p.FullName); };
-            open.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "\"" + current + "\""); } catch { } };
+            open.Click += (o, e) => { try { Shell.Open(current); } catch { } };
             KeyPreview = true;
             KeyDown += (o, e) => { if (e.KeyCode == Keys.Back) { var p = Directory.GetParent(current); if (p != null) Go(p.FullName); } };
             Shown += (o, e) => Go(start);

@@ -35,6 +35,7 @@ namespace CDriveCleaner
         public List<KeyValuePair<string, int>> Senders = new List<KeyValuePair<string, int>>();
         public string Error;
         public string Folder;                   // IMAP: where the emails are
+        public string UidValidity;              // IMAP: the folder's numbering when it was checked
     }
 
     public static class Gmail
@@ -73,7 +74,7 @@ namespace CDriveCleaner
                 string err;
                 string token = GoogleAuth.AccessToken(out err);
                 if (token == null) throw new IOException(err);
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                Sys.SecureTls();
                 var req = (HttpWebRequest)WebRequest.Create(url);
                 req.Method = method; req.Timeout = 60000; req.UserAgent = "Elixar/" + Updates.Current;
                 req.Headers[HttpRequestHeader.Authorization] = "Bearer " + token;

@@ -32,6 +32,7 @@ namespace CDriveCleaner
 
         public static bool WindowsUsesDark()
         {
+            if (Lx.On) return Lx.PrefersDark();
             try
             {
                 using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))

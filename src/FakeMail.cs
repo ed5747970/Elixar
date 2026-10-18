@@ -16,6 +16,7 @@ namespace CDriveCleaner
     {
         readonly TcpListener listener;
         public int Port, Moved, Logins, BadLogins;
+        public string Validity = "7";   // UIDVALIDITY the folders report
         public List<string> Commands = new List<string>();
         public string User = "me@example.com", Pass = "abcd efgh";
         public Dictionary<string, List<long>> Boxes = new Dictionary<string, List<long>>
@@ -72,7 +73,7 @@ namespace CDriveCleaner
                             W("* LIST (\\HasNoChildren) \"/\" \"INBOX\""); W("* LIST (\\HasNoChildren \\Junk) \"/\" \"Bulk Mail\"");
                             W("* LIST (\\HasNoChildren \\Trash) \"/\" \"Trash\""); W("* LIST (\\HasNoChildren \\Sent) \"/\" \"Sent\""); W(tag + " OK done"); break;
                         case "EXAMINE": case "SELECT":
-                            box = rest.Trim('"'); W("* " + (Boxes.ContainsKey(box) ? Boxes[box].Count : 0) + " EXISTS"); W(tag + " OK [" + (cmd == "EXAMINE" ? "READ-ONLY" : "READ-WRITE") + "] done"); break;
+                            box = rest.Trim('"'); W("* " + (Boxes.ContainsKey(box) ? Boxes[box].Count : 0) + " EXISTS"); W("* OK [UIDVALIDITY " + Validity + "] UIDs valid"); W(tag + " OK [" + (cmd == "EXAMINE" ? "READ-ONLY" : "READ-WRITE") + "] done"); break;
                         case "UID SEARCH":
                         {
                             var all = box != null && Boxes.ContainsKey(box) ? Boxes[box] : new List<long>();

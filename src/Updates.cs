@@ -106,7 +106,7 @@ namespace CDriveCleaner
 
         static WebClient Client()
         {
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
+            Sys.SecureTls();   // TLS 1.2
             var wc = new WebClient();
             wc.Headers[HttpRequestHeader.UserAgent] = "Elixar/" + Current;
             return wc;

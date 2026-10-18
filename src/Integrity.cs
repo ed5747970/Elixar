@@ -68,6 +68,22 @@ namespace CDriveCleaner
                 sb.AppendLine("Download mark: " + (SafeFile.HasDownloadMark(exe) ? "yes - Windows shows its SmartScreen box for this copy. Use the installed copy from the Start menu instead."
                                                                                 : "none - Windows doesn't show its SmartScreen box for this copy."));
             }
+            if (Lx.On)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Installed package (.deb):");
+                if (!exe.StartsWith("/usr/lib/elixar/")) sb.AppendLine("   This copy runs from a folder, not from the package. Install the .deb so only root can change Elixar.");
+                else
+                {
+                    string o; int c = Lx.Run("dpkg", "--verify elixar", 30000, out o);
+                    sb.AppendLine(c == 0 && o.Trim().Length == 0 ? "   Every file matches the package (dpkg --verify)." : "   WARNING: some files differ from the package. Reinstall it:\n   " + o.Replace("\n", "\n   "));
+                }
+                sb.AppendLine("System helper: " + (Lx.HelperTrusted(Lx.Helper) ? Lx.Helper + " - owned by root, nobody else can change it." :
+                                                   File.Exists(Lx.Helper) ? "WARNING: " + Lx.Helper + " can be changed by others, so Elixar doesn't use it." :
+                                                   "not installed (comes with the .deb); system items run Elixar's fixed commands by full path."));
+                sb.AppendLine("Sign-ins: " + (SecretBox.KeyringReady ? "encrypted with a key kept in your desktop keyring, in a folder only your account can open."
+                                                                     : "in a folder only your account can open (no desktop keyring found to encrypt them)."));
+            }
             sb.AppendLine();
             if (Win.IsWindows)
             {

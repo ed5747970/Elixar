@@ -2,6 +2,8 @@
 // and the protected copy in Program Files used by the schedules.
 
 using System;
+using Microsoft.Win32;
+using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -19,6 +21,32 @@ namespace CDriveCleaner
     public static class Win
     {
         public static bool IsWindows { get { return Environment.OSVersion.Platform == PlatformID.Win32NT; } }
+
+        // Program Files, from Windows' own record in HKLM (only administrators can change it). The %ProgramFiles% and
+        // %ProgramW6432% variables can be redefined by any program you run (in HKCU\Environment), and Elixar runs as
+        // administrator: a redefined variable could make it install, or start, a copy in a folder that program controls.
+        public static string ProgramFiles { get { return Pf("ProgramW6432Dir", "ProgramFilesDir", Environment.SpecialFolder.ProgramFiles, @"C:\Program Files"); } }
+        public static string ProgramFilesX86 { get { return Pf("ProgramFilesDir (x86)", "ProgramFilesDir", Environment.SpecialFolder.ProgramFilesX86, @"C:\Program Files (x86)"); } }
+
+        static string Pf(string name, string fallbackName, Environment.SpecialFolder folder, string last)
+        {
+            if (IsWindows)
+                try
+                {
+                    using (var hk = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Environment.Is64BitOperatingSystem ? Microsoft.Win32.RegistryView.Registry64 : Microsoft.Win32.RegistryView.Default))
+                    using (var k = hk.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion"))
+                    {
+                        foreach (var n in new[] { name, fallbackName })
+                        {
+                            string v = k == null ? null : k.GetValue(n, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+                            if (!string.IsNullOrEmpty(v) && Path.IsPathRooted(v) && !v.Contains("%")) return v.TrimEnd('\\');
+                        }
+                    }
+                }
+                catch { }
+            try { string f = Environment.GetFolderPath(folder); if (!string.IsNullOrEmpty(f)) return f.TrimEnd('\\'); } catch { }
+            return last;
+        }
 
         // The full path of a Windows tool. Starting "powershell.exe" by name makes Windows look in Elixar's own folder
         // and the current folder first, so a same-named file planted next to a downloaded Elixar.exe would run with
@@ -191,7 +219,7 @@ namespace CDriveCleaner
         // creates the folder (or re-locks it) so only Administrators and SYSTEM can change or read it
         public static bool Lock(string dir, bool usersRead = false)
         {
-            if (!Win.IsWindows) { Directory.CreateDirectory(dir); return true; }
+            if (!Win.IsWindows) { Directory.CreateDirectory(dir); return !Lx.On || (Lx.Private(dir, true) && Lx.OwnedSafely(dir, true)); }   // Linux: only you can open it (0700), and not a link
             try
             {
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir, AdminOnly(usersRead));
@@ -220,7 +248,7 @@ namespace CDriveCleaner
         // owner is Administrators/SYSTEM/TrustedInstaller and nobody else may write
         public static bool IsLocked(string path)
         {
-            if (!Win.IsWindows) return true;
+            if (!Win.IsWindows) return Lx.OwnedSafely(path, true);
             try
             {
                 FileSystemSecurity sec = Directory.Exists(path) ? (FileSystemSecurity)new DirectoryInfo(path).GetAccessControl()
@@ -267,7 +295,7 @@ namespace CDriveCleaner
         // made by an administrator (or Windows), not by a normal program
         public static bool OwnedByAdmins(string path)
         {
-            if (!Win.IsWindows) return true;
+            if (!Win.IsWindows) return Lx.OwnedSafely(path, false);
             try
             {
                 FileSystemSecurity sec = Directory.Exists(path) ? (FileSystemSecurity)new DirectoryInfo(path).GetAccessControl(AccessControlSections.Owner)
@@ -279,6 +307,64 @@ namespace CDriveCleaner
     }
 
     // ============================ places Elixar never deletes ============================
+    // Your own folders, checked against Windows' record of your profile.
+    // Elixar runs as administrator, but %TEMP% and the "User Shell Folders" (where AppData is) can be changed by any
+    // program you run, without administrator rights. Pointed at C:\Windows\Installer or Program Files, "Your temp files"
+    // would then empty that folder as administrator. So a folder is used only when it is inside your real profile
+    // (from HKLM\...\ProfileList, which only administrators can change); otherwise Windows' standard place is used.
+    public static class UserDirs
+    {
+        static string profile; static bool read;
+        public static string ProfileOverride;   // self-test
+
+        public static string Profile
+        {
+            get
+            {
+                if (ProfileOverride != null) return ProfileOverride;
+                if (read) return profile;
+                read = true;
+                if (!Win.IsWindows) return profile = null;
+                try
+                {
+                    string sid = System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
+                    using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\" + sid))
+                    {
+                        string v = k == null ? null : k.GetValue("ProfileImagePath", null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+                        if (string.IsNullOrEmpty(v)) return profile = null;
+                        // expanded from Windows' own folder, not from environment variables (those can be changed by you)
+                        string win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                        v = Regex.Replace(v, "%SystemDrive%", Path.GetPathRoot(win).TrimEnd('\\'), RegexOptions.IgnoreCase);
+                        v = Regex.Replace(v, "%SystemRoot%|%windir%", win.TrimEnd('\\'), RegexOptions.IgnoreCase);
+                        if (v.Contains("%") || !Path.IsPathRooted(v)) return profile = null;
+                        return profile = Path.GetFullPath(v).TrimEnd('\\');
+                    }
+                }
+                catch { return profile = null; }
+            }
+        }
+
+        // the folder Windows reports, if it is really inside your profile; otherwise the standard place in your profile
+        public static string Checked(string reported, string standard)
+        {
+            if (!Win.IsWindows) return reported;
+            string prof = Profile;
+            if (prof == null) return reported;   // no record (rare): nothing better to compare with
+            try
+            {
+                string full = Path.GetFullPath(reported).TrimEnd('\\');
+                if (full.StartsWith(prof + "\\", StringComparison.OrdinalIgnoreCase) && full.IndexOf("\\..", StringComparison.Ordinal) < 0) return full;
+            }
+            catch { }
+            return Path.Combine(prof, standard);
+        }
+
+        public static string Local { get { return Checked(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"AppData\Local"); } }
+        public static string Roaming { get { return Checked(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"AppData\Roaming"); } }
+        public static string Temp { get { return Checked(Path.GetTempPath(), @"AppData\Local\Temp"); } }
+        public static string Home { get { string p = Profile; return p ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile); } }
+    }
+
     public static class Protect
     {
         static string N(string p)
@@ -569,7 +655,12 @@ namespace CDriveCleaner
         {
             get
             {
-                if (!Win.IsWindows) return AppDomain.CurrentDomain.BaseDirectory;
+                if (!Win.IsWindows)
+                {
+                    string ld = Lx.DataDir;
+                    if (!ready) { ready = true; try { Locked.Lock(ld); } catch { } }
+                    return ld;
+                }
                 string pd = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                 if (string.IsNullOrEmpty(pd)) pd = @"C:\ProgramData";
                 string d = Path.Combine(pd, "Elixar");
@@ -603,13 +694,11 @@ namespace CDriveCleaner
         {
             get
             {
-                string pf = Environment.GetEnvironmentVariable("ProgramW6432");
-                if (string.IsNullOrEmpty(pf)) pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                if (string.IsNullOrEmpty(pf)) pf = @"C:\Program Files";
-                return Path.Combine(pf, "Elixar");
+                return Path.Combine(Win.ProgramFiles, "Elixar");
             }
         }
-        public static string Exe { get { return Path.Combine(Dir, "Elixar.exe"); } }
+        public static string Exe { get { return Win.IsWindows ? Path.Combine(Dir, "Elixar.exe") : (File.Exists(LinuxExe) ? LinuxExe : Current); } }
+        public const string LinuxExe = "/usr/lib/elixar/Elixar.exe";
         public static string Current { get { return System.Windows.Forms.Application.ExecutablePath; } }
 
         public static bool RunningInstalled { get { return string.Equals(Path.GetFullPath(Current), Path.GetFullPath(Exe), StringComparison.OrdinalIgnoreCase); } }
@@ -626,9 +715,14 @@ namespace CDriveCleaner
         // and it carries no "downloaded from the internet" mark, so Windows doesn't show its SmartScreen box for it again.
         public static string Ensure()
         {
+            if (!Win.IsWindows) return null;   // Linux: the package manager installs and updates Elixar
             try
             {
-                if (RunningInstalled) { if (Win.IsWindows && Sys.IsAdmin()) SafeFile.RemoveDownloadMark(Exe); return Locked.IsLocked(Exe) ? null : "The Program Files copy is not protected."; }
+                if (RunningInstalled)
+                {
+                    if (Sys.IsAdmin()) { SafeFile.RemoveDownloadMark(Exe); if (Locked.IsLocked(Dir)) { string le = WriteLauncher(); if (le != null) return le; } }
+                    return Locked.IsLocked(Exe) ? null : "The Program Files copy is not protected.";
+                }
                 if (!Sys.IsAdmin()) return "Administrator rights are needed.";
                 if (!SelfImage.Verified) return "The Elixar.exe file on disk is not the program that is running (it was changed or replaced), so it was not installed. Download Elixar again.";
                 Directory.CreateDirectory(Dir);
@@ -644,9 +738,82 @@ namespace CDriveCleaner
                     File.Move(tmp, Exe);
                 }
                 SafeFile.RemoveDownloadMark(Exe);
+                string lerr = WriteLauncher();
+                if (lerr != null) return lerr;
                 return Matches && Locked.IsLocked(Exe) ? null : "The copy in Program Files could not be checked.";
             }
             catch (Exception e) { return e.Message; }
+        }
+
+        [DllImport("kernel32.dll")] static extern bool AttachConsole(int pid);
+        [DllImport("kernel32.dll")] static extern bool FreeConsole();
+        [DllImport("kernel32.dll")] static extern IntPtr GetConsoleWindow();
+        [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+
+        // a scheduled run that came through the launcher: hide its small console window
+        public static void HideLauncherWindow()
+        {
+            if (!Win.IsWindows) return;
+            try { if (AttachConsole(-1)) { var h = GetConsoleWindow(); if (h != IntPtr.Zero) ShowWindow(h, 0); FreeConsole(); } } catch { }
+        }
+
+        // ---- the launcher for the schedules that run with administrator rights ----
+        // Task Scheduler starts a task with your account's environment variables, and any program you run can set those
+        // (HKCU\Environment) without administrator rights. A few of them make every .NET program load a DLL of their
+        // choosing (a "profiler") or another copy of .NET. A weekly task that runs with administrator rights would then hand
+        // that DLL administrator rights silently. So the task starts cmd.exe /d (which skips cmd's own AutoRun commands),
+        // runs this fixed file from the protected folder, which clears those variables, and only then starts Elixar.
+        public static string Launcher { get { return Path.Combine(Dir, "elixar-task.cmd"); } }
+        public static readonly string[] Cleared = { "COR_ENABLE_PROFILING", "COR_PROFILER", "COR_PROFILER_PATH", "COR_PROFILER_PATH_32", "COR_PROFILER_PATH_64",
+            "COMPLUS_ENABLEPROFILING", "COMPLUS_PROFAPI_PROFILERCOMPATIBILITYSETTING", "COMPLUS_INSTALLROOT", "COMPLUS_VERSION", "COMPLUS_DEFAULTVERSION",
+            "COMPLUS_ONLYUSELATESTCLR", "COMPLUS_INSTALLROOT32", "COMPLUS_INSTALLROOT64", "COMPLUS_ZAPDISABLE", "COMPLUS_NGENPATH", "COMPLUS_PRIVATEINSTALLROOT",
+            "COMPLUS_TRUSTEDPLATFORMASSEMBLIES", "COMPLUS_APPDOMAINMANAGERASM", "COMPLUS_APPDOMAINMANAGERTYPE", "APPDOMAIN_MANAGER_ASM", "APPDOMAIN_MANAGER_TYPE",
+            "PSMODULEPATH" };
+
+        public static string LauncherText
+        {
+            get
+            {
+                var sb = new StringBuilder();
+                sb.Append("@echo off\r\nrem Elixar's schedules that run with administrator rights start here.\r\n");
+                sb.Append("rem It clears environment variables that could make .NET load someone else's code, then starts Elixar.\r\n");
+                foreach (var v in Cleared) sb.Append("set \"" + v + "=\"\r\n");
+                // Elixar is started directly by its full path (never through "start" or a file-type handler); it hides this window
+                sb.Append("\"%~dp0Elixar.exe\" %*\r\nexit /b %errorlevel%\r\n");
+                return sb.ToString();
+            }
+        }
+
+        // what Task Scheduler is told to run, e.g. cmd.exe /d /c ""C:\Program Files\Elixar\elixar-task.cmd" --auto-clean"
+        public static string CmdExe { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"); } }
+        public static string LauncherArgs(string arg) { return "/d /c \"\"" + Launcher + "\" " + arg + "\""; }
+
+        // a task with administrator rights is safe when it runs the launcher exactly like this (or, on Linux, as before)
+        public static bool IsSafeElevatedTask(string command, string arguments, string arg)
+        {
+            if (!Win.IsWindows) return IsProtectedExe(command);
+            try
+            {
+                return string.Equals(Path.GetFullPath((command ?? "").Trim('"')), CmdExe, StringComparison.OrdinalIgnoreCase) &&
+                       string.Equals((arguments ?? "").Trim(), LauncherArgs(arg), StringComparison.OrdinalIgnoreCase) && LauncherOk;
+            }
+            catch { return false; }
+        }
+
+        public static bool LauncherOk
+        {
+            get { try { return File.Exists(Launcher) && File.ReadAllText(Launcher) == LauncherText && Locked.IsLocked(Launcher); } catch { return false; } }
+        }
+
+        static string WriteLauncher()
+        {
+            if (LauncherOk) return null;
+            string tmp = Launcher + ".new";
+            if (File.Exists(tmp)) File.Delete(tmp);
+            File.WriteAllText(tmp, LauncherText, new UTF8Encoding(false));
+            if (File.Exists(Launcher)) File.Delete(Launcher);
+            File.Move(tmp, Launcher);
+            return LauncherOk ? null : "The schedule launcher could not be checked.";
         }
 
         // starts Elixar again: the protected copy when there is one (never a file in a folder other programs can change)
@@ -654,6 +821,7 @@ namespace CDriveCleaner
         {
             string exe = Current;
             if (Win.IsWindows && Sys.IsAdmin() && Ensure() == null && IsInstalled) exe = Exe;
+            if (!Win.IsWindows) { Process.Start(new ProcessStartInfo(Lx.Tool("mono") ?? "/usr/bin/mono", Lx.Arg(Exe) + " " + (args ?? "")) { UseShellExecute = false }); return; }
             Process.Start(new ProcessStartInfo(exe, args ?? "") { UseShellExecute = false });
         }
 
@@ -661,16 +829,25 @@ namespace CDriveCleaner
         public static bool IsProtectedExe(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+            if (!Win.IsWindows) return true;   // Linux timers run as you, never as root: nothing to take over
             try { return string.Equals(Path.GetFullPath(path.Trim('"')), Path.GetFullPath(Exe), StringComparison.OrdinalIgnoreCase); } catch { return false; }
         }
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool SetDllDirectoryW(string path);
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetDefaultDllDirectories(uint flags);
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetSearchPathMode(uint flags);
+        const uint LoadFromSystem32 = 0x800, SafeSearchPermanent = 0x8001;
+        public static bool DllSearchHardened;   // for the self-test
 
-        // stop Windows from loading DLLs from the current folder
+        // Windows looks for a DLL in the program's own folder first. For a copy in Downloads, any program could put a fake
+        // DLL there, and Elixar runs as administrator. From here on, DLLs come only from System32; the current folder is
+        // never searched, and SearchPath uses its safe order.
         public static void HardenDllSearch()
         {
             if (!Win.IsWindows) return;
             try { SetDllDirectoryW(""); } catch { }
+            try { DllSearchHardened = SetDefaultDllDirectories(LoadFromSystem32); } catch { }   // Windows 8+, or 7 with KB2533623
+            try { SetSearchPathMode(SafeSearchPermanent); } catch { }
         }
     }
 }

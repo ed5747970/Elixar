@@ -106,8 +106,7 @@ namespace CDriveCleaner
             string full;
             try { full = Path.GetFullPath(path); } catch { return false; }
             var roots = new List<string>();
-            foreach (var r in new[] { Environment.GetFolderPath(Environment.SpecialFolder.Windows), Environment.GetEnvironmentVariable("ProgramW6432"),
-                                      Environment.GetEnvironmentVariable("ProgramFiles"), Environment.GetEnvironmentVariable("ProgramFiles(x86)") })
+            foreach (var r in new[] { Environment.GetFolderPath(Environment.SpecialFolder.Windows), Win.ProgramFiles, Win.ProgramFilesX86 })
                 if (!string.IsNullOrEmpty(r)) roots.Add(r.TrimEnd('\\') + "\\");
             return roots.Any(r => full.StartsWith(r, StringComparison.OrdinalIgnoreCase)) && !full.Contains("..");
         }
@@ -341,7 +340,7 @@ namespace CDriveCleaner
             btnUninstall.Click += (o, e) => UninstallSelected();
             btnAppsSettings.Click += (o, e) =>
             {
-                try { Process.Start(new ProcessStartInfo("ms-settings:appsfeatures") { UseShellExecute = true }); }
+                try { Shell.Open("ms-settings:appsfeatures"); }
                 catch (Exception ex) { Log("Could not open Windows settings: " + ex.Message); }
             };
         }
@@ -355,7 +354,7 @@ namespace CDriveCleaner
         {
             var a = SelectedApp();
             if (a == null || a.Location.Length == 0) return;
-            try { Process.Start(Win.SystemExe("explorer.exe"), "\"" + a.Location + "\""); }
+            try { Shell.Open(a.Location); }
             catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
         }
 

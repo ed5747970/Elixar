@@ -17,7 +17,7 @@ namespace CDriveCleaner
     // one drive in "All drives"; the whole card is a button
     public class DriveCard : PaintedCard
     {
-        public string Title = "", Line1 = "", Line2 = "", Center = "", CenterSub = "";
+        public string Title = "", Line1 = "", Line2 = "", Line3 = "", Center = "", CenterSub = "";
         public double UsedShare = -1;
         public Color LevelColor = Color.Gray, HealthColor = Color.Empty;
         public Font TitleFont, CenterFont, SmallFont;
@@ -48,7 +48,7 @@ namespace CDriveCleaner
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | (Rtl ? TextFormatFlags.RightToLeft : 0));
 
             int x = pad + ring + S(18), w = Width - x - pad;
-            int y = (Height - (tf.Height + Font.Height + sf.Height + S(14))) / 2;
+            int y = (Height - (tf.Height + Font.Height + sf.Height + S(14) + (Line3.Length > 0 ? sf.Height + S(4) : 0))) / 2;
             Txt(g, Title, tf, new Rectangle(x, y, w, tf.Height + 2), Theme.Ink, TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
             y += tf.Height + S(6);
             Txt(g, Line1, Font, new Rectangle(x, y, w, Font.Height), Theme.Ink, TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
@@ -61,6 +61,8 @@ namespace CDriveCleaner
                 tx = x + S(14);
             }
             Txt(g, Line2, sf, new Rectangle(tx, y, Width - tx - pad, sf.Height), Theme.Quiet, TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
+            if (Line3.Length > 0)
+                Txt(g, Line3, sf, new Rectangle(x, y + sf.Height + S(4), w, sf.Height), Theme.Quiet, TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
         }
 
         protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hover = true; Invalidate(); }
@@ -85,6 +87,15 @@ namespace CDriveCleaner
         public event Action DriveViewDone;
         static readonly Color[] DrivePalette = { Color.FromArgb(91, 76, 196), Color.FromArgb(40, 90, 200), Color.FromArgb(18, 140, 150), Color.FromArgb(190, 105, 0), Color.FromArgb(150, 160, 175) };
 
+        // the line under the drive picker: "Disk 0 of ELISAR-PC  ·  Windows 11 Pro  ·  Updated 21:58"
+        string statusTail = "";
+        string StatusText()
+        {
+            string host = Lang.T(curDrive == "*" ? DiskNumber.Host : DiskNumber.Tag(Win.IsWindows ? curDrive : RootOf(curDrive)));
+            return host + "   \u00b7   " + OsInfo.Current.Name + (statusTail.Length > 0 ? "   \u00b7   " + statusTail : "");
+        }
+        public string DashStatusText { get { return dashStatus.Text; } }   // self-test
+
         public string CurrentDrive { get { return curDrive; } }
         public int DriveChoices { get { return pickKeys.Count; } }
         public int DriveFolderRows { get { return dFolders == null ? 0 : dFolders.Rows.Count; } }
@@ -92,11 +103,28 @@ namespace CDriveCleaner
 
         Control BuildDrivePicker()
         {
-            drivePick = new Segmented { Options = new[] { "C:  " + Lang.T("Windows"), Lang.T("All drives") }, Scale_ = s, Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(0, 0, 0, S(4)) };
+            drivePick = new Segmented { Options = new[] { PickC(), Lang.T("All drives") }, Scale_ = s, Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(0, 0, 0, S(4)) };
             drivePick.FitWidth();
             drivePick.Changed += () => SelectDrive(pickKeys[Math.Min(drivePick.Selected, pickKeys.Count - 1)]);
             return drivePick;
         }
+
+        // how a drive is named: "D:" on Windows; on Linux its name ("Home", "Backup") or the folder it is mounted at
+        string DT(string key)
+        {
+            if (Win.IsWindows) return key + ":";
+            if (key == "C") return Lang.T("System disk");
+            var d = knownDrives.FirstOrDefault(x => x.Letter == key);
+            return d != null && d.Label.Length > 0 ? d.Label : key;
+        }
+        // "D:  Data" on Windows; "Backup  (/media/you/Backup)" on Linux
+        string DriveName(DriveRow r)
+        {
+            if (Win.IsWindows) return r.Letter + ":" + (r.Label.Length > 0 ? "  " + r.Label : "");
+            return r.Letter == "C" ? Lang.T("System disk") + "  (/)" : DT(r.Letter) + (r.Root.Length > 0 && r.Root != DT(r.Letter) ? "  (" + r.Root + ")" : "");
+        }
+
+        static string PickC() { return Win.IsWindows ? "C:  " + Lang.T("Windows") : Lang.T("System disk"); }
 
         string RootOf(string key)
         {
@@ -118,7 +146,7 @@ namespace CDriveCleaner
 
         void ShowInFolder(string path)
         {
-            try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + path + "\""); } catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
+            try { Shell.Select(path); } catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
         }
 
         // ---------------- building the two extra views ----------------
@@ -149,7 +177,7 @@ namespace CDriveCleaner
                 var cur = knownDrives.FirstOrDefault(x => x.Letter == curDrive);
                 if (cur != null && cur.Health == HealthLevel.Failing && !readFailing.Contains(curDrive) && !folderCache.ContainsKey(curDrive))
                 {
-                    if (Lang.BoxNo(this, curDrive + ": may fail soon. Measuring reads through the whole drive, which strains it. Back up first if you can.\n\nMeasure it now?", "Elixar") != DialogResult.Yes) return;
+                    if (Lang.BoxNo(this, DT(curDrive) + " may fail soon. Measuring reads through the whole drive, which strains it. Back up first if you can.\n\nMeasure it now?", "Elixar") != DialogResult.Yes) return;
                     readFailing.Add(curDrive);
                     ShowDrive(curDrive, true);
                     return;
@@ -197,6 +225,7 @@ namespace CDriveCleaner
             int i = pickKeys.IndexOf(key);
             if (drivePick.Selected != i) { drivePick.Selected = i; drivePick.Invalidate(); }
             ShowDashArea();
+            if (dashStatus != null) dashStatus.Text = StatusText();
             if (key == "*") RefreshAllDrives();
             else if (key != "C") ShowDrive(key, false);
         }
@@ -216,8 +245,9 @@ namespace CDriveCleaner
             var keys = new List<string> { "C" };
             keys.AddRange(knownDrives.Select(d => d.Letter));
             keys.Add("*");
-            var labels = new List<string> { "C:  " + Lang.T("Windows") };
-            labels.AddRange(knownDrives.Select(d => d.Letter + ":" + (d.Label.Length > 0 ? "  " + (d.Label.Length > 12 ? d.Label.Substring(0, 11) + "\u2026" : d.Label) : "")));
+            var labels = new List<string> { PickC() };
+            Func<string, string> cut = x => x.Length > 12 ? x.Substring(0, 11) + "\u2026" : x;
+            labels.AddRange(knownDrives.Select(d => Win.IsWindows ? d.Letter + ":" + (d.Label.Length > 0 ? "  " + cut(d.Label) : "") : cut(DT(d.Letter))));
             labels.Add(Lang.T("All drives"));
             bool changed = !keys.SequenceEqual(pickKeys) || !labels.SequenceEqual(drivePick.Options);
             pickKeys = keys;
@@ -251,16 +281,16 @@ namespace CDriveCleaner
             dHero.LevelColor = Theme.MapFore(LevelTint(level));
             dHero.Big = Fs.Fmt(d.Free);
             dHero.BigSub = Lang.T("free of " + Fs.Fmt(d.Total));
-            dHero.Headline = Lang.T(letter + ": " + (level == 2 ? "is almost full" : level == 1 ? "is getting full" : "has plenty of room"));
+            dHero.Headline = Lang.T(DT(letter) + " " + (level == 2 ? "is almost full" : level == 1 ? "is getting full" : "has plenty of room"));
             var lines = new List<string> { KindText(d) + "." };
             if (d.Health == HealthLevel.Failing) lines.Add(Lang.T("This drive may fail soon: back up what is on it."));
             else if (level == 0) lines.Add(Lang.T("Room to spare: a good place for big folders moved off C:."));
             else lines.Add(Lang.T("The biggest folders below show what fills it."));
             if (folderMeasuring != null) lines.Add(Lang.T("Measuring " + folderMeasuring + "..."));
             dHero.Sub = string.Join(" ", lines);
-            dHero.Primary = Lang.T("Explore " + letter + ":");
+            dHero.Primary = Lang.T("Explore " + DT(letter));
             dHero.Secondary = Lang.T("Folder map");
-            dHero.BreakTitle = Lang.T("What fills " + letter + ":");
+            dHero.BreakTitle = Lang.T("What fills " + DT(letter));
             List<Treemap.Node> nodes;
             dHero.Break = new List<Tuple<string, long, Color>>();
             if (folderCache.TryGetValue(letter, out nodes) || (nodes = lastFolders) != null)
@@ -288,8 +318,8 @@ namespace CDriveCleaner
             var d = knownDrives.FirstOrDefault(x => x.Letter == letter);
             if (d == null) { SelectDrive("C"); return; }
             lastFolders = null;
-            dFolders.Title = Lang.T("Biggest folders on " + letter + ":");
-            dFiles.Title = Lang.T("Largest files on " + letter + ":");
+            dFolders.Title = Lang.T("Biggest folders on " + DT(letter));
+            dFiles.Title = Lang.T("Largest files on " + DT(letter));
             List<Treemap.Node> nodes;
             if (!remeasure && folderCache.TryGetValue(letter, out nodes)) { folderMeasuring = null; ShowFolders(letter, nodes); }
             else if (d.Health == HealthLevel.Failing && !readFailing.Contains(letter))
@@ -323,7 +353,7 @@ namespace CDriveCleaner
             folderCts = new CancellationTokenSource();
             var tok = folderCts.Token;
             var sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-            folderMeasuring = letter + ":";
+            folderMeasuring = DT(letter);
             dFolders.Rows = new List<ListCard.Row>(); dFolders.Empty = Lang.T("Measuring..."); dFolders.Invalidate();
             Task.Factory.StartNew(() => Treemap.Read(root, sizes, (measuring, sofar) =>
             {
@@ -371,18 +401,18 @@ namespace CDriveCleaner
             var d = knownDrives.FirstOrDefault(x => x.Letter == letter);
             if (d == null) return;
             if (d.Health == HealthLevel.Failing &&
-                Lang.BoxNo(this, letter + ": may fail soon. Finding the largest files reads through the whole drive, which strains it. Back up first if you can.\n\nLook through it now?", "Elixar") != DialogResult.Yes) return;
+                Lang.BoxNo(this, DT(letter) + " may fail soon. Finding the largest files reads through the whole drive, which strains it. Back up first if you can.\n\nLook through it now?", "Elixar") != DialogResult.Yes) return;
             filesCts = new CancellationTokenSource();
             var cts = filesCts; var tok = cts.Token;
             string root = d.RootPath();
             dFiles.Rows = new List<ListCard.Row>();
-            dFiles.Empty = Lang.T("Looking through " + letter + ": ...");
+            dFiles.Empty = Lang.T("Looking through " + DT(letter) + " ...");
             dFiles.Footer = Lang.T("Stop");
             dFiles.Invalidate();
             Task.Factory.StartNew(() => Scanner.LargestFiles(root, 50L << 20, 60, dir => UI(() =>
             {
                 if (tok.IsCancellationRequested || curDrive != letter || dFiles.Rows.Count > 0) return;
-                dFiles.Empty = Lang.T("Looking through " + letter + ": ...") + "\n" + (dir.Length > 70 ? "..." + dir.Substring(dir.Length - 67) : dir);
+                dFiles.Empty = Lang.T("Looking through " + DT(letter) + " ...") + "\n" + (dir.Length > 70 ? "..." + dir.Substring(dir.Length - 67) : dir);
                 dFiles.Invalidate();
             }), tok), tok, TaskCreationOptions.LongRunning, TaskScheduler.Default).ContinueWith(t => UI(() =>
             {
@@ -412,7 +442,7 @@ namespace CDriveCleaner
         {
             var rows = new List<DriveRow>();
             long free = dashSum != null && dashSum.Total > 0 ? dashSum.Free : Sys.Free(), total = dashSum != null && dashSum.Total > 0 ? dashSum.Total : Sys.Total();
-            var c = new DriveRow { Letter = "C", Label = Lang.T("Windows"), Free = free, Total = total, Root = Win.IsWindows ? @"C:\" : "/" };
+            var c = new DriveRow { Letter = "C", Label = Win.IsWindows ? Lang.T("Windows") : "", Free = free, Total = total, Root = Win.IsWindows ? @"C:\" : "/" };
             var rep = lastDiskReport;
             if (rep != null && rep.Error == null) { var disk = rep.Disks.FirstOrDefault(x => x.HoldsC); if (disk != null) { c.Health = disk.Level; c.Media = disk.Kind; } }
             rows.Add(c);
@@ -433,15 +463,15 @@ namespace CDriveCleaner
             aHero.BigSub = Lang.T(n == 1 ? "free on 1 drive" : "free on " + n + " drives");
             aHero.Headline = Lang.T("All your drives");
             var lines = new List<string>();
-            foreach (var bad in rows.Where(r => r.Health == HealthLevel.Failing)) lines.Add(Lang.T(bad.Letter + ": may fail soon: back up what is on it."));
+            foreach (var bad in rows.Where(r => r.Health == HealthLevel.Failing)) lines.Add(Lang.T(DT(bad.Letter) + " may fail soon: back up what is on it."));
             if (total > 0) lines.Add(Lang.T(Fs.Fmt(free) + " free of " + Fs.Fmt(total) + " across " + n + (n == 1 ? " drive." : " drives.")));
             var best = rows.Where(r => r.Letter != "C" && r.Health != HealthLevel.Failing).OrderByDescending(r => r.Free).FirstOrDefault();
             var cRow = rows.FirstOrDefault(r => r.Letter == "C");
             bool cFull = cRow != null && DashSummary.LevelOf(cRow.Free, cRow.Total) >= 1;
-            if (best != null) lines.Add(Lang.T("The most room is on " + best.Letter + ": (" + Fs.Fmt(best.Free) + " free)."));
-            bool offer = cFull && best != null && best.Free >= (20L << 30);
+            if (best != null) lines.Add(Lang.T("The most room is on " + DT(best.Letter) + " (" + Fs.Fmt(best.Free) + " free)."));
+            bool offer = Win.IsWindows && cFull && best != null && best.Free >= (20L << 30);
             if (offer) lines.Add(Lang.T("C: is getting full: big folders can move to " + best.Letter + ":."));
-            else if (best == null) lines.Add(Lang.T("C: is the only drive. A second drive or a USB drive gives you room to move big folders off C:."));
+            else if (best == null) lines.Add(Lang.T(Win.IsWindows ? "C: is the only drive. A second drive or a USB drive gives you room to move big folders off C:." : "Your system disk is the only disk. A second disk or a USB drive gives you room for big folders."));
             aHero.Sub = string.Join(" ", lines);
             aHero.Primary = offer ? Lang.T("Move files off C:") : "";
             aHero.Secondary = "";
@@ -449,7 +479,7 @@ namespace CDriveCleaner
             aHero.Break = new List<Tuple<string, long, Color>>();
             var byUse = rows.OrderByDescending(r => r.Total - r.Free).ToList();
             for (int i = 0; i < byUse.Count && i < 4; i++)
-                aHero.Break.Add(Tuple.Create(byUse[i].Letter + ":" + (byUse[i].Label.Length > 0 ? "  " + byUse[i].Label : ""), byUse[i].Total - byUse[i].Free, Theme.MapFore(DrivePalette[i])));
+                aHero.Break.Add(Tuple.Create(DriveName(byUse[i]), byUse[i].Total - byUse[i].Free, Theme.MapFore(DrivePalette[i])));
             if (byUse.Count > 4) aHero.Break.Add(Tuple.Create(Lang.T("Other drives"), byUse.Skip(4).Sum(r => r.Total - r.Free), Theme.MapFore(DrivePalette[4])));
             if (total > 0) aHero.Break.Add(Tuple.Create(Lang.T("Free"), free, Theme.Dark ? Color.FromArgb(150, 150, 170) : Color.FromArgb(160, 168, 182)));
             aHero.BreakTotal = total;
@@ -473,12 +503,13 @@ namespace CDriveCleaner
                 var card = new DriveCard
                 {
                     Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, TitleFont = tf, CenterFont = cf, SmallFont = sf, Font = cardFonts[3],
-                    Title = r.Letter + ":" + (r.Label.Length > 0 ? "  " + r.Label : ""),
+                    Title = DriveName(r),
                     Line1 = Lang.T(Fs.Fmt(r.Free) + " free of " + Fs.Fmt(r.Total)),
                     Line2 = KindText(new DriveRow { Removable = r.Removable, Media = r.Media, Health = r.Health }),
+                    Line3 = Lang.T(DiskNumber.Tag(Win.IsWindows ? r.Letter : r.Root)),
                     Center = Math.Round(r.Free * 100.0 / r.Total) + "%", CenterSub = Lang.T("free"),
                     UsedShare = 1 - r.Free / (double)r.Total, LevelColor = LevelTint(level), HealthColor = HealthColorOf(r.Health),
-                    AccessibleName = r.Letter + ":"
+                    AccessibleName = DT(r.Letter)
                 };
                 string key = r.Letter;
                 card.Click += (o, e) => SelectDrive(key);

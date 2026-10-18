@@ -70,7 +70,15 @@ namespace CDriveCleaner
 
     public static class MailReports
     {
-        static string L(string en, string he) { return Lang.Hebrew ? he : en; }
+        static string L(string en, string he)
+        {
+            if (Lx.On)   // Linux has no C: - the system disk
+            {
+                en = en.Replace("The cure for a full C: drive", "The cure for a full disk").Replace("Drive C: is almost full", "Your system disk is almost full").Replace(" C:", " the system disk");
+                he = he.Replace("התרופה לכונן C: מלא", "התרופה לדיסק מלא").Replace("כונן C: כמעט מלא", "דיסק המערכת כמעט מלא").Replace("ב-C:", "בדיסק המערכת").Replace("C:", "דיסק המערכת");
+            }
+            return Lang.Hebrew ? he : en;
+        }
         static string H(string s) { return WebUtility.HtmlEncode(s ?? ""); }
         static string Pct(long part, long whole) { return whole <= 0 ? "?" : Math.Round(part * 100.0 / whole) + "%"; }
 

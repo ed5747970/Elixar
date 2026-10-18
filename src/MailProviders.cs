@@ -32,7 +32,8 @@ namespace CDriveCleaner
             string f = PathOf(name);
             if (f == null) throw new IOException("Could not prepare Elixar's protected mail folder.");
             var b = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(values));
-            File.WriteAllBytes(f, Win.IsWindows ? ProtectedData.Protect(b, Entropy, DataProtectionScope.CurrentUser) : b);
+            File.WriteAllBytes(f, SecretBox.Protect(b, Entropy));
+            if (Lx.On) Lx.Private(f, false);
         }
         public static Dictionary<string, object> Load(string name)
         {
@@ -41,8 +42,11 @@ namespace CDriveCleaner
                 string f = PathOf(name);
                 if (f == null || !File.Exists(f)) return null;
                 var b = File.ReadAllBytes(f);
-                if (Win.IsWindows) b = ProtectedData.Unprotect(b, Entropy, DataProtectionScope.CurrentUser);
-                return GoogleAuth.Json(Encoding.UTF8.GetString(b));
+                var raw = b;
+                b = SecretBox.Unprotect(b, Entropy);
+                var json = GoogleAuth.Json(Encoding.UTF8.GetString(b));
+                if (Lx.On && json != null && !SecretBox.IsSealed(raw)) SecretBox.Upgrade(f, b, Entropy);
+                return json;
             }
             catch { return null; }
         }
@@ -204,7 +208,7 @@ namespace CDriveCleaner
             {
                 string err; string t = AccessToken(out err);
                 if (t == null) throw new IOException(err);
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                Sys.SecureTls();
                 var req = (HttpWebRequest)WebRequest.Create(url);
                 req.Method = method; req.Timeout = 60000; req.UserAgent = "Elixar/" + Updates.Current;
                 req.Headers[HttpRequestHeader.Authorization] = "Bearer " + t;
@@ -450,7 +454,7 @@ namespace CDriveCleaner
             if (s == null) return "Not connected.";
             try
             {
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                Sys.SecureTls();
                 using (var msg = Message(s.Email, subject, text, html, images))
                 using (var smtp = new SmtpClient(s.Smtp, s.SmtpPort) { EnableSsl = true, DeliveryMethod = SmtpDeliveryMethod.Network, Timeout = 60000,
                                                                         UseDefaultCredentials = false, Credentials = new NetworkCredential(s.User.Length > 0 ? s.User : s.Email, s.Password) })
@@ -497,6 +501,7 @@ namespace CDriveCleaner
                     if (folder == null) { c.Bytes = 0; return; }   // no spam folder: nothing to do
                     c.Folder = folder;
                     im.Examine(folder);   // read-only: nothing changes, not even "read" marks
+                    c.UidValidity = im.LastValidity;
                     var uids = im.UidSearch(p[1]);
                     if (uids.Count > Gmail.Cap) { c.More = true; uids = uids.Skip(uids.Count - Gmail.Cap).ToList(); }
                     c.Ids.AddRange(uids.Select(u => u.ToString(CultureInfo.InvariantCulture)));
@@ -527,6 +532,8 @@ namespace CDriveCleaner
                 {
                     if (string.Equals(c.Folder, trash, StringComparison.OrdinalIgnoreCase)) continue;
                     im.Select(c.Folder);
+                    // the folder was renumbered since the check: these numbers may now be other emails, so nothing is moved
+                    if (c.UidValidity != null && im.LastValidity != c.UidValidity) throw new IOException("Your mailbox changed since it was checked. Check it again, then clean.");
                     foreach (var chunk in c.Ids.Select((id, i) => new { id, i }).GroupBy(x => x.i / 200).Select(g => g.Select(x => long.Parse(x.id, CultureInfo.InvariantCulture)).ToList()))
                     {
                         if (cancel.IsCancellationRequested) return done;
@@ -564,7 +571,7 @@ namespace CDriveCleaner
                 t.EndConnect(ar);
                 t.ReceiveTimeout = 60000; t.SendTimeout = 60000;
                 var ssl = new SslStream(t.GetStream(), false);   // the server's certificate is checked by Windows as usual
-                ssl.AuthenticateAsClient(s.Imap, null, (SslProtocols)3072 | SslProtocols.Tls11, true);
+                ssl.AuthenticateAsClient(s.Imap, null, (SslProtocols)3072, true);   // TLS 1.2 only: 1.0 and 1.1 are broken
                 im = new Imap(ssl, t);
             }
             string hello = im.ReadLine();
@@ -658,8 +665,14 @@ namespace CDriveCleaner
             return null;
         }
 
-        public void Examine(string folder) { Command("EXAMINE " + Q(folder)); }
-        public void Select(string folder) { Command("SELECT " + Q(folder)); }
+        public void Examine(string folder) { LastValidity = Validity(Command("EXAMINE " + Q(folder))); }
+        public void Select(string folder) { LastValidity = Validity(Command("SELECT " + Q(folder))); }
+        public string LastValidity;   // UIDVALIDITY: if it changes, the same numbers can mean other emails
+        static string Validity(List<string> lines)
+        {
+            foreach (var l in lines) { var m = Regex.Match(l, @"\[UIDVALIDITY (\d+)\]", RegexOptions.IgnoreCase); if (m.Success) return m.Groups[1].Value; }
+            return null;
+        }
 
         public List<long> UidSearch(string criteria)
         {

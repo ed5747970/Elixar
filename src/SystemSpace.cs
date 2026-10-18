@@ -114,7 +114,7 @@ namespace CDriveCleaner
         public static List<string> FindVirtualDisks()
         {
             var list = new List<string>();
-            string L = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string L = UserDirs.Local;
             Action<string, string, SearchOption> add = (dir, pat, opt) =>
             {
                 try { if (Directory.Exists(dir)) list.AddRange(Directory.GetFiles(dir, pat, opt)); } catch { }
@@ -186,7 +186,7 @@ namespace CDriveCleaner
                 string p = Environment.GetFolderPath(f);
                 if (!string.IsNullOrEmpty(p) && Directory.Exists(p)) list.Add(p);
             }
-            string dl = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            string dl = Path.Combine(UserDirs.Home, "Downloads");
             if (Directory.Exists(dl)) list.Add(dl);
             return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
@@ -266,8 +266,21 @@ namespace CDriveCleaner
         }
 
         // Recycle Bin, so it can be undone from the desktop
+        // Windows only, in a method of its own: Ubuntu's Mono has no Microsoft.VisualBasic, and a method that mentions it
+        // can't even start there. Linux never calls this one.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        static void ToRecycleBin(string path)
+        {
+            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+        }
+
         public static bool Recycle(string path)
         {
+            if (Lx.On)
+            {
+                // Linux: the desktop's Trash (gio), never a link's target
+                try { return !Protect.IsProtected(path) && (new FileInfo(path).Attributes & FileAttributes.ReparsePoint) == 0 && Lx.Trash(path); } catch { return false; }
+            }
             try
             {
                 // as administrator: only when no link leads it somewhere else (like Windows' own folders), and with every folder
@@ -275,7 +288,7 @@ namespace CDriveCleaner
                 using (var hold = SafeDelete.HoldParents(path))
                 {
                     if (hold == null || Protect.IsProtected(path) || !SafeDelete.RealPathMatches(path)) return false;
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    ToRecycleBin(path);
                     return true;
                 }
             }

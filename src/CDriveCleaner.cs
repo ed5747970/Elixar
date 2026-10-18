@@ -20,13 +20,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+// every DllImport looks only in System32, never next to Elixar.exe (a Downloads folder is writable by any program)
+[assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
 [assembly: AssemblyTitle("Elixar")]
 [assembly: AssemblyProduct("Elixar")]
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("2.1.0.0")]
-[assembly: AssemblyFileVersion("2.1.0.0")]
+[assembly: AssemblyVersion("2.2.0.0")]
+[assembly: AssemblyFileVersion("2.2.0.0")]
 
 namespace CDriveCleaner
 {
@@ -45,6 +47,7 @@ namespace CDriveCleaner
         public long Size;
         public bool SizeUnknown;
         public bool Privacy;               // traces of what you did, not disk space
+        public string RootScript;          // Linux: fixed commands run as root after one password prompt (null: runs as you)
     }
 
     // ---------------- file helpers ----------------
@@ -72,12 +75,12 @@ namespace CDriveCleaner
                     var di = new DirectoryInfo(dir);
                     foreach (var f in di.EnumerateFiles())
                     {
-                        try { total += f.Length; } catch { }
+                        try { if (!Lx.On || (f.Attributes & FileAttributes.ReparsePoint) == 0) total += f.Length; } catch { }
                     }
                     foreach (var d in di.EnumerateDirectories())
                     {
-                        // skip junctions and symlinks so nothing is counted twice
-                        if ((d.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(d.FullName);
+                        // skip junctions and symlinks so nothing is counted twice; on Linux also /proc, /sys and other disks
+                        if ((d.Attributes & FileAttributes.ReparsePoint) == 0 && !Lx.SkipDir(d.FullName, path)) stack.Push(d.FullName);
                     }
                 }
                 catch { }
@@ -113,23 +116,21 @@ namespace CDriveCleaner
         public static void Delete(string path)
         {
             if (Win.IsWindows) { try { SafeDelete.Delete(path); } catch { } return; }
+            DeleteLinux(path, new HashSet<string>(Lx.Mounts().Select(m => m.Point)));
+        }
+
+        // Linux: a link is removed as a link (its target is never touched, and its permissions are never changed),
+        // and a folder where another disk, a network share or a cloud drive is mounted is left alone completely.
+        static void DeleteLinux(string path, HashSet<string> mountPoints)
+        {
             try
             {
-                if (File.Exists(path))
-                {
-                    try { File.SetAttributes(path, FileAttributes.Normal); } catch { }
-                    File.Delete(path);
-                    return;
-                }
+                if (mountPoints.Contains(path.TrimEnd('/'))) return;
+                if (File.Exists(path)) { File.Delete(path); return; }
                 if (!Directory.Exists(path)) return;
                 var di = new DirectoryInfo(path);
-                if ((di.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    Directory.Delete(path, false);
-                    return;
-                }
-                foreach (var c in Directory.GetFileSystemEntries(path)) Delete(c);
-                try { di.Attributes = FileAttributes.Directory; } catch { }
+                if ((di.Attributes & FileAttributes.ReparsePoint) != 0) { Directory.Delete(path, false); return; }
+                foreach (var c in Directory.GetFileSystemEntries(path)) DeleteLinux(c, mountPoints);
                 Directory.Delete(path, false);
             }
             catch { }
@@ -183,11 +184,14 @@ namespace CDriveCleaner
             SHEmptyRecycleBin(IntPtr.Zero, "C:\\", 0x7);
         }
 
-        public static long Free() { try { return new DriveInfo("C").AvailableFreeSpace; } catch { return 0; } }
-        public static long Total() { try { return new DriveInfo("C").TotalSize; } catch { return 0; } }
+        public static long Free() { try { return new DriveInfo(Win.IsWindows ? "C" : "/").AvailableFreeSpace; } catch { return 0; } }
+        public static long Total() { try { return new DriveInfo(Win.IsWindows ? "C" : "/").TotalSize; } catch { return 0; } }
+        public static string Root { get { return Win.IsWindows ? @"C:\" : "/"; } }
+        public static string Main { get { return Win.IsWindows ? "C:" : "/"; } }      // short label
 
         public static bool IsAdmin()
         {
+            if (!Win.IsWindows) return Lx.IsRoot;
             try
             {
                 using (var id = WindowsIdentity.GetCurrent())
@@ -218,9 +222,32 @@ namespace CDriveCleaner
             }
         }
 
+        // a PowerShell string literal: PowerShell also ends a '...' string at the curly quotes, so those are doubled too
+        public static string PsQuote(string v)
+        {
+            var sb = new StringBuilder("'");
+            foreach (char c in v ?? "") { if (c == '\'' || c == '\u2018' || c == '\u2019' || c == '\u201A' || c == '\u201B') sb.Append(c); sb.Append(c); }
+            return sb.Append('\'').ToString();
+        }
+
+        // TLS 1.2 (and 1.3 where Windows offers it) only. Adding 1.2 to the old default would still allow SSL 3 and TLS 1.0.
+        public static void SecureTls()
+        {
+            var keep13 = System.Net.ServicePointManager.SecurityProtocol & (System.Net.SecurityProtocolType)12288;
+            System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072 | keep13;
+        }
+
+        // PowerShell looks for the commands it loads (Remove-AppxPackage, Checkpoint-Computer...) in the folders listed in
+        // PSModulePath, starting with Documents\WindowsPowerShell\Modules, which any program you run can write to.
+        // As administrator, a planted module there would run instead of Windows' own. So only Windows' modules are used.
+        public static string PsSafe(string script)
+        {
+            return "$env:PSModulePath = Join-Path $PSHOME 'Modules'; " + script;
+        }
+
         public static string RunPowerShell(string script, int timeoutMs)
         {
-            string enc = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            string enc = Convert.ToBase64String(Encoding.Unicode.GetBytes(PsSafe(script)));
             return Run("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc, timeoutMs);
         }
 
@@ -277,11 +304,13 @@ namespace CDriveCleaner
     // ---------------- what can be cleaned ----------------
     public static class Catalog
     {
+        public static bool WindowsOnLinux;   // self-test only: check the Windows list's logic on a Linux test machine
         public static List<CleanItem> Build()
         {
-            string L = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string R = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string T = Path.GetTempPath();
+            if (Lx.On && !WindowsOnLinux) return LinuxCatalog.Build();
+            string L = UserDirs.Local;
+            string R = UserDirs.Roaming;
+            string T = UserDirs.Temp;
 
             string nvDx = Path.Combine(L, "NVIDIA", "DXCache");
             string nvGl = Path.Combine(L, "NVIDIA", "GLCache");
@@ -479,9 +508,18 @@ namespace CDriveCleaner
             return new Rule { Re = new Regex(re, RegexOptions.IgnoreCase | RegexOptions.Compiled), Tier = tier, Reason = reason };
         }
 
+        static readonly Rule[] LinuxRules = LinuxCatalog.Rules.Select(r => R(r[0], r[1], r[2])).ToArray();
+
         public static void Classify(string path, out string tier, out string reason)
         {
             string l = path.ToLowerInvariant();
+            if (Lx.On && !l.Contains(":\\"))
+            {
+                foreach (var r in LinuxRules)
+                    if (r.Re.IsMatch(l)) { tier = r.Tier; reason = r.Reason; return; }
+                tier = "caution"; reason = "Unrecognised location. Check what created it before deleting.";
+                return;
+            }
             foreach (var r in Rules)
                 if (r.Re.IsMatch(l)) { tier = r.Tier; reason = r.Reason; return; }
             tier = "caution"; reason = "Unrecognised location. Check what created it before deleting.";
@@ -490,10 +528,11 @@ namespace CDriveCleaner
         // id, name, path, tier, action, tool
         public static string[][] Locations()
         {
-            string L = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string U = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (Lx.On && !Catalog.WindowsOnLinux) return LinuxCatalog.Locations();
+            string L = UserDirs.Local;
+            string U = UserDirs.Home;
             string desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string R = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string R = UserDirs.Roaming;
             return new[]
             {
                 new[] { "system32", "Windows system files", @"C:\Windows\System32", "critical", "Never delete.", "-" },
@@ -516,7 +555,7 @@ namespace CDriveCleaner
                 new[] { "desktop", "Desktop", desk, "review", "Review large files you no longer need.", "WizTree" },
                 new[] { "nvdx", "NVIDIA shader cache", Path.Combine(L, "NVIDIA", "DXCache"), "safe", "Clear with Elixar (close games first).", "Elixar" },
                 new[] { "stremio", "Stremio cache", Path.Combine(R, "stremio", "stremio-server", "stremio-cache"), "safe", "Clear with Elixar or set a limit in Stremio settings.", "Elixar" },
-                new[] { "usertemp", "Your temp files", Path.GetTempPath().TrimEnd('\\'), "safe", "Safe to clear. Files in use are skipped automatically.", "Elixar" },
+                new[] { "usertemp", "Your temp files", UserDirs.Temp.TrimEnd('\\'), "safe", "Safe to clear. Files in use are skipped automatically.", "Elixar" },
                 new[] { "wintemp", "Windows temp files", @"C:\Windows\Temp", "safe", "Safe to clear.", "Elixar" },
                 new[] { "wudl", "Windows Update downloads", @"C:\Windows\SoftwareDistribution\Download", "safe", "Safe after updates finished installing.", "Elixar" },
                 new[] { "dosvc", "Delivery Optimization cache", @"C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache", "safe", "Safe to clear.", "Elixar" },
@@ -557,7 +596,7 @@ namespace CDriveCleaner
                         catch { }
                     }
                     foreach (var d in di.EnumerateDirectories())
-                        if ((d.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(d.FullName);
+                        if ((d.Attributes & FileAttributes.ReparsePoint) == 0 && !Lx.SkipDir(d.FullName, root)) stack.Push(d.FullName);
                 }
                 catch { }
             }
@@ -640,7 +679,7 @@ namespace CDriveCleaner
                 bytes.Add(exists ? (long?)Fs.SizeOf(l[2]) : null);
             }
             if (status != null) status("Looking for the largest files on C: (a few minutes)...");
-            var files = LargestFiles(@"C:\", 50L << 20, 200, d => { if (status != null) status("Scanning " + d); });
+            var files = LargestFiles(Sys.Root, 50L << 20, 200, d => { if (status != null) status("Scanning " + d); });
 
             string json = BuildJson(Environment.MachineName, Sys.IsAdmin(), 50, Sys.Total(), Sys.Free(), locs, bytes, files);
             string desk = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
@@ -871,8 +910,9 @@ namespace CDriveCleaner
             var ns = TextRenderer.MeasureText(g, "Elixar", nf);
             TextRenderer.DrawText(g, "Elixar", nf, new Point(x, (Height - ns.Height) / 2), Color.White);
             var tf = TagFont ?? Font;
-            var ts = TextRenderer.MeasureText(g, "The cure for a full C: drive", tf);
-            TextRenderer.DrawText(g, "The cure for a full C: drive", tf, new Point(x + ns.Width + 8, (Height - ts.Height) / 2 + 1), Color.FromArgb(190, 225, 230));
+            string tag = Win.IsWindows ? "The cure for a full C: drive" : "The cure for a full disk";
+            var ts = TextRenderer.MeasureText(g, tag, tf);
+            TextRenderer.DrawText(g, tag, tf, new Point(x + ns.Width + 8, (Height - ts.Height) / 2 + 1), Color.FromArgb(190, 225, 230));
             // signature on the right
             var v = typeof(BrandBar).Assembly.GetName().Version;
             string sig = "Made by Elisar   v" + v.Major + "." + v.Minor + "." + v.Build;
@@ -988,6 +1028,10 @@ namespace CDriveCleaner
         readonly string snapFile;
         Label lblScan;
 
+        // Linux: only the parts that make sense there (the self-test can ask for the Windows layout on a Linux test machine)
+        public static bool ForceWindowsUi;
+        bool LinuxUi { get { return Lx.On && !ForceWindowsUi; } }
+
         // dashboard
         public event Action DashboardDone;
         TabControl tabs;
@@ -1031,7 +1075,7 @@ namespace CDriveCleaner
 
             using (var g = CreateGraphics()) s = Math.Max(1f, g.DpiX / 96f);
 
-            Text = testMode ? "Elixar - TEST MODE (cleaning is switched off)" : "Elixar - drive C: care";
+            Text = testMode ? "Elixar - TEST MODE (cleaning is switched off)" : LinuxUi ? "Elixar - disk care" : "Elixar - drive C: care";
             Font = new Font("Segoe UI", 9f);
             StartPosition = FormStartPosition.CenterScreen;
             var wa = Screen.PrimaryScreen.WorkingArea;
@@ -1109,7 +1153,7 @@ namespace CDriveCleaner
 
             lblInfo = new Label { Dock = DockStyle.Fill, Text = "Click an item to see what it removes." };
 
-            chkRestore = new CheckBox { AutoSize = true, Checked = true, Text = "Create a restore point first (recommended)", Margin = new Padding(S(2), S(2), 0, S(4)) };
+            chkRestore = new CheckBox { AutoSize = true, Checked = !LinuxUi, Visible = !LinuxUi, Text = "Create a restore point first (recommended)", Margin = new Padding(S(2), S(2), 0, S(4)) };
 
             var btnRow = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
             btnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -1124,6 +1168,7 @@ namespace CDriveCleaner
             btnPlan = MakeButton("Free space for me...");
             btnPlan.Click += (o, e) => OnPlan();
             flow.Controls.AddRange(new Control[] { btnPlan, btnMeasure, btnSafe, btnNone, btnScan, btnCleanApps });
+            if (LinuxUi) { btnPlan.Visible = false; btnCleanApps.Visible = false; }   // the Dashboard's "Free ... safely" does this on Linux; apps are removed with the App Center
             btnClean = MakeButton("Clean selected");
             btnClean.Font = new Font("Segoe UI Semibold", 9.5f);
             btnClean.Padding = new Padding(S(18), S(4), S(18), S(4));
@@ -1169,13 +1214,15 @@ namespace CDriveCleaner
             BuildPhone();
             BuildSettingsTab();
             BuildEmailClean();
+            BuildLinuxTab();
             tabs.TabPages.Add(pageDash);
-            tabs.TabPages.Add(pageApps);
+            if (!LinuxUi) tabs.TabPages.Add(pageApps);
             tabs.TabPages.Add(pageClean);
             tabs.TabPages.Add(pageTools);
-            tabs.TabPages.Add(pagePhone);
+            if (!LinuxUi) tabs.TabPages.Add(pagePhone);
             tabs.TabPages.Add(pageEmail);
             tabs.TabPages.Add(pageAuto);
+            if (LinuxUi) tabs.TabPages.Add(pageLinux);
             tabs.TabPages.Add(pageSettings);
             bool appsLoaded = false, autoLoaded = false;
             tabs.SelectedIndexChanged += (o, e) =>
@@ -1186,8 +1233,11 @@ namespace CDriveCleaner
                 if (tabs.SelectedTab == pageDash && ready && (DateTime.Now - lastOverview).TotalSeconds > 20) RefreshOverview();
                 if (tabs.SelectedTab == pageTools) OnToolsTab();
                 if (tabs.SelectedTab == pagePhone) OnPhoneTab();
+                if (tabs.SelectedTab == pageLinux) OnLinuxTab();
             };
-            Controls.Add(tabs);
+            BuildNav();
+            Controls.Add(tabHost);
+            Controls.Add(nav);
             Controls.Add(new BrandBar
             {
                 Dock = DockStyle.Top, Height = S(46), AppIcon = Icon,
@@ -1230,6 +1280,7 @@ namespace CDriveCleaner
                 else if (tabs.SelectedTab == pageApps) { if (appsTabs.SelectedTab == pageStore) RefreshStoreApps(); else RefreshApps(); }
                 else if (tabs.SelectedTab == pageAuto) LoadAutomationState();
                 else if (tabs.SelectedTab == pagePhone) DetectPhone();
+                else if (tabs.SelectedTab == pageLinux) OnLinuxTab();
                 else if (tabs.SelectedTab == pageTools) { if (toolsTabs.SelectedTab == pageDrivers) ScanDrivers(); else if (toolsTabs.SelectedTab == pageUndo) RefreshUndo(); }
                 else if (btnMeasure.Enabled) StartMeasure(null);
             };
@@ -1252,7 +1303,7 @@ namespace CDriveCleaner
             Theme.Apply(this); Lang.Apply(this); Theme.Watch(this);
             Shown += (o, e) =>
             {
-                Log("Elixar " + (Sys.IsAdmin() ? "(running as administrator)" : "(NOT running as administrator - some items will be skipped)"));
+                Log("Elixar " + (LinuxUi ? "(running as you; system items ask for your password when you clean them)" : Sys.IsAdmin() ? "(running as administrator)" : "(NOT running as administrator - some items will be skipped)"));
                 Log(lastScan == null ? "First scan..." : "Scanning and comparing with the scan from " + ScanSnapshot.FmtWhen(lastScan.Time) + "...");
                 RefreshOverview();
                 StartMeasure(() =>
@@ -1262,6 +1313,9 @@ namespace CDriveCleaner
                     LoadAppIndex();
                     CheckForUpdates(false);
                     CheckDisksQuietly();
+                    if (!testMode && Win.IsWindows && Sys.IsAdmin())
+                        Task.Factory.StartNew(() => Automation.UpgradeElevatedTasks()).ContinueWith(t =>
+                        { if (!t.IsFaulted && t.Result.Count > 0) UI(() => Log("Secured the " + string.Join(" and ", t.Result) + " schedule (it now starts through Elixar's protected launcher).")); });
                     try
                     {
                         int lvl = 0; string ml = GoogleAuth.SignedInEmail != null ? MailStatus.Line(out lvl) : null;
@@ -1298,6 +1352,12 @@ namespace CDriveCleaner
                 if (!interactive) return;
                 if (r == null) { Lang.Box(this, err ?? "Could not check for updates.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                 if (!newer) { Lang.Box(this, "Elixar is up to date (" + Updates.Current.ToString(3) + ").", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                if (!Win.IsWindows)
+                {
+                    if (Lang.Box(this, "Elixar " + r.Version.ToString(3) + " is available (you have " + Updates.Current.ToString(3) + ").\n\nOpen the download page for the new .deb package?", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                        Shell.Open(Updates.ReleasesPage);
+                    return;
+                }
                 if (Lang.Box(this, "Elixar " + r.Version.ToString(3) + " is available (you have " + Updates.Current.ToString(3) + ").\n\n" + (r.Notes.Length > 600 ? r.Notes.Substring(0, 600) + "..." : r.Notes) +
                         "\n\nDownload and install it now? Elixar checks Elisar's signature and the file fingerprints first, then restarts.", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
                 updBusy = true;
@@ -1310,7 +1370,7 @@ namespace CDriveCleaner
                         string e3 = t2.IsFaulted ? t2.Exception.GetBaseException().Message : t2.Result.Item2;
                         Log("Update: " + e3);
                         if (Lang.Box(this, e3 + "\n\nOpen the download page?", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes && Updates.ReleasesPage.Length > 0)
-                            try { Process.Start(Win.SystemExe("explorer.exe"), Updates.ReleasesPage); } catch { }
+                            try { Shell.Open(Updates.ReleasesPage); } catch { }
                         return;
                     }
                     Log("Installing the update and restarting...");
@@ -1338,7 +1398,7 @@ namespace CDriveCleaner
                     Log("Saved the user guide to " + d.FileName);
                     if (Lang.Box(this, "Saved:\n" + d.FileName + "\n\nOpen it now? (It works offline, and your browser can print it or save it as PDF.)", "Elixar",
                             MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes && Win.IsWindows)
-                        Process.Start(Win.SystemExe("explorer.exe"), "\"" + d.FileName + "\"");
+                        Shell.Open(d.FileName);
                 }
                 catch (Exception ex) { Lang.Box(this, "Could not save it: " + ex.Message, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             }
@@ -1386,7 +1446,7 @@ namespace CDriveCleaner
         {
             long sum = 0;
             foreach (ListViewItem r in list.CheckedItems) { var it = (CleanItem)r.Tag; if (!it.SizeUnknown) sum += it.Size; }
-            lblTop.Text = string.Format("Free on C:  {0} of {1}          Selected to clean:  {2}",
+            lblTop.Text = string.Format("Free on " + Sys.Main + "  {0} of {1}          Selected to clean:  {2}",
                 Fs.Fmt(Sys.Free()), Fs.Fmt(Sys.Total()), Fs.Fmt(sum));
         }
 
@@ -1469,7 +1529,8 @@ namespace CDriveCleaner
             for (int i = 0; i < 5; i++) head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             var titles = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
             dashHeader = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = "Drive C:", Margin = new Padding(0) };
-            dashStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "Waiting for the first scan...", Margin = new Padding(S(2), 0, 0, 0) };
+            statusTail = Lang.T("Waiting for the first scan...");
+            dashStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = StatusText(), Margin = new Padding(S(2), 0, 0, 0) };
             titles.Controls.Add(BuildDrivePicker()); titles.Controls.Add(dashStatus);
             dashView = new Segmented { Options = new[] { Lang.T("Overview"), Lang.T("Details") }, Scale_ = s, Font = new Font("Segoe UI", 9.5f), Margin = new Padding(0, S(9), S(14), 0) };
             dashView.FitWidth();
@@ -1485,6 +1546,7 @@ namespace CDriveCleaner
             var btnExplore = tool("Explore");
             var btnMap = tool("Folder map");
             var btnDashApps = tool("Remove apps...");
+            btnDashApps.Visible = !LinuxUi;
             head.Controls.Add(titles, 0, 0); head.Controls.Add(dashView, 1, 0); head.Controls.Add(btnDashRefresh, 2, 0);
             head.Controls.Add(btnExplore, 3, 0); head.Controls.Add(btnMap, 4, 0); head.Controls.Add(btnDashApps, 5, 0);
             btnMap.Click += (o, e) => OpenMap(CurRoot());
@@ -1500,9 +1562,9 @@ namespace CDriveCleaner
             var bigFont = new Font("Segoe UI Semibold", 17f);
             var subs = new Dictionary<string, string>
             {
-                { "critical", "Windows and installed apps. Never delete; uninstall apps you don't use." },
+                { "critical", LinuxUi ? "The system and installed apps. Never delete; remove apps you don't use." : "Windows and installed apps. Never delete; uninstall apps you don't use." },
                 { "caution", "Leftovers and system stores. Only with the tool named in each row." },
-                { "review", "Your own files: Downloads, Videos, Recycle Bin. Your decision." },
+                { "review", LinuxUi ? "Your own files: Downloads, Videos, Trash. Your decision." : "Your own files: Downloads, Videos, Recycle Bin. Your decision." },
                 { "safe", "Caches and temp files. Clean them in the Cleaner tab." }
             };
             for (int i = 0; i < 4; i++)
@@ -1519,7 +1581,7 @@ namespace CDriveCleaner
                 cardRow.Controls.Add(c, i, 0);
             }
 
-            var sec = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 10.5f), Text = "Everything on C:, from critical to safe   (double-click a folder to see what is inside)", Margin = new Padding(0, S(2), 0, S(4)) };
+            var sec = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 10.5f), Text = LinuxUi ? "Everything on your system disk, from critical to safe   (double-click a folder to see what is inside)" : "Everything on C:, from critical to safe   (double-click a folder to see what is inside)", Margin = new Padding(0, S(2), 0, S(4)) };
 
             dashList = new ListView { View = View.Details, FullRowSelect = true, HideSelection = false, Dock = DockStyle.Fill, ShowItemToolTips = true };
             dashList.Columns.Add("Location", S(250));
@@ -1556,7 +1618,7 @@ namespace CDriveCleaner
             fhead.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fhead.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             var ftitle = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0), WrapContents = false };
-            ftitle.Controls.Add(new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 10.5f), Text = "Largest files on C:", Margin = new Padding(0, S(4), S(10), 0) });
+            ftitle.Controls.Add(new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 10.5f), Text = LinuxUi ? "Largest files on your system disk" : "Largest files on C:", Margin = new Padding(0, S(4), S(10), 0) });
             filesStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "Not scanned yet. Read-only; double-click a file to show it in its folder.", Margin = new Padding(0, S(6), 0, 0) };
             ftitle.Controls.Add(filesStatus);
             btnFindFiles = MakeButton("Find largest files (2-5 min)");
@@ -1630,7 +1692,7 @@ namespace CDriveCleaner
                 if (dashList.SelectedItems.Count == 0) return;
                 var d = (DashLoc)dashList.SelectedItems[0].Tag;
                 if (Directory.Exists(d.Path)) OpenDrill(d.Path);
-                else if (File.Exists(d.Path)) { try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + d.Path + "\""); } catch { } }
+                else if (File.Exists(d.Path)) { try { Shell.Select(d.Path); } catch { } }
             };
             btnFindFiles.Click += (o, e) => FindLargestFiles();
         }
@@ -1647,7 +1709,7 @@ namespace CDriveCleaner
         {
             if (filesList.SelectedItems.Count == 0) return;
             string path = (string)filesList.SelectedItems[0].Tag;
-            try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + path + "\""); }
+            try { Shell.Select(path); }
             catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
         }
 
@@ -1685,6 +1747,9 @@ namespace CDriveCleaner
                 }
             }));
         }
+
+        public List<string> TabNames { get { return tabs.TabPages.Cast<TabPage>().Select(p => p.Text).ToList(); } }
+        public List<string> CleanerItemNames { get { return items.Select(i => i.Name).ToList(); } }
 
         public bool DashboardFilled()
         {
@@ -1733,7 +1798,8 @@ namespace CDriveCleaner
 
             dashHeader.Text = Lang.T("Drive C:");
             string tookText = took.TotalSeconds < 1 ? "under 1 s" : ((int)Math.Round(took.TotalSeconds)) + " s";
-            dashStatus.Text = Lang.T("Updated " + DateTime.Now.ToString("HH:mm") + " (took " + tookText + ").");
+            statusTail = Lang.T("Updated " + DateTime.Now.ToString("HH:mm") + " (took " + tookText + ").");
+            dashStatus.Text = StatusText();
             dashNote.Text = Lang.T(total > 0 ? Fs.Fmt(free) + " free of " + Fs.Fmt(total) + "." : "") + (Sys.IsAdmin() ? "" : "  " + Lang.T("Not running as administrator: some Windows folders may show smaller than they are.")) +
                 "  " + Lang.T("WinSxS looks bigger than it is because many of its files are shared with System32.");
             RefreshOverview();
@@ -1747,10 +1813,10 @@ namespace CDriveCleaner
             filesBusy = true;
             btnFindFiles.Enabled = false;
             filesList.Items.Clear();
-            filesStatus.Text = "Scanning C: ...";
+            filesStatus.Text = "Scanning " + Sys.Main + " ...";
             var watch = Stopwatch.StartNew();
             string last = "";
-            Task.Factory.StartNew(() => Scanner.LargestFiles(@"C:\", 50L << 20, 200, d =>
+            Task.Factory.StartNew(() => Scanner.LargestFiles(Sys.Root, 50L << 20, 200, d =>
             {
                 if (d == last) return;
                 last = d;
@@ -1894,8 +1960,22 @@ namespace CDriveCleaner
                 }
 
                 long start = Sys.Free();
-                foreach (var it in toRun)
+                var asRoot = toRun.Where(i => i.RootScript != null).ToList();
+                if (asRoot.Count > 0)
                 {
+                    Log("Asking for your password for: " + string.Join(", ", asRoot.Select(i => i.Name)) + "...");
+                    long before = Sys.Free();
+                    string script = string.Join("\n", asRoot.Select(i => i.RootScript));
+                    string outp;
+                    int code = Lx.RunAsRoot(script, out outp);
+                    if (code == 126 || code == 127) Log("  Not done: the password wasn't entered.");
+                    else if (code != 0) Log("  Finished with a problem (" + code + "): " + (outp.Length > 300 ? outp.Substring(0, 300) + "..." : outp));
+                    Log("  Freed " + Fs.Fmt(Math.Max(0, Sys.Free() - before)));
+                    foreach (var it in asRoot) UI(() => progress.Value = Math.Min(progress.Maximum, progress.Value + 1));
+                }
+                foreach (var it in toRun.Where(i => i.RootScript == null || i.Clean != null))
+                {
+                    if (it.Clean == null) continue;
                     Log("Cleaning " + it.Name + "...");
                     long before = Sys.Free();
                     try { it.Clean(Log); }
@@ -1965,13 +2045,14 @@ namespace CDriveCleaner
         {
             var rep = new StringBuilder();
             int fails = 0;
+            if (Lx.On) Catalog.WindowsOnLinux = true;   // sections 1-4 check Windows' lists and logic; 4L checks Linux
             var failed = new List<string>();
             Action<bool, string> check = (ok, what) => { rep.AppendLine((ok ? "PASS  " : "FAIL  ") + what); if (!ok) { fails++; failed.Add(what); } };
             rep.AppendLine("Elixar self-test  " + DateTime.Now.ToString("s") + "   (Elixar " + typeof(SelfTest).Assembly.GetName().Version + ", made by Elisar)");
-            rep.AppendLine("Windows: " + Environment.OSVersion + "   .NET: " + Environment.Version + "   64-bit process: " + Environment.Is64BitProcess + "   admin: " + Sys.IsAdmin());
+            rep.AppendLine("System: " + OsInfo.Current.Name + "   (" + Environment.OSVersion + ")   .NET: " + Environment.Version + "   64-bit process: " + Environment.Is64BitProcess + "   admin: " + Sys.IsAdmin());
             rep.AppendLine();
 
-            string root = Path.Combine(Path.GetTempPath(), "CDC-SelfTest-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string root = Path.Combine(UserDirs.Temp, "CDC-SelfTest-" + Guid.NewGuid().ToString("N").Substring(0, 8));
             try
             {
                 // 1. delete logic, in a throwaway folder
@@ -2182,7 +2263,37 @@ namespace CDriveCleaner
                                                     "Microsoft.VCLibs.140.00\tMicrosoft.VCLibs_x\t14\tCN=Microsoft\tTrue\tFalse\tStore\tC:\\y\r\nbad line\r\n");
                     check(parsed.Count == 2 && parsed[0].Friendly == "Copilot" && parsed[0].Level == "optional" && parsed[1].Level == "keep",
                           "Store apps: the app list is read correctly");
-                    check(StoreData.RemoveScript("A.B_1.0_x64__x'y").Contains("-Package 'A.B_1.0_x64__x''y'"), "Store apps: remove command is quoted safely");
+                    check(StoreData.RemoveScript("Microsoft.BingWeather_4.53.0.0_x64__8wekyb3d8bbwe").Contains("-Package 'Microsoft.BingWeather_4.53.0.0_x64__8wekyb3d8bbwe'") &&
+                          !StoreData.RemoveScript("A.B_1.0_x64__x'y").Contains("Remove-AppxPackage") && !StoreData.RemoveScript("A\u2019; Remove-Item C:\\ -Recurse #").Contains("Remove-AppxPackage") &&
+                          Sys.PsQuote("a'b\u2019c") == "'a''b\u2019\u2019c'",
+                          "Store apps: the remove command takes only a real package name, quoted safely (curly quotes too)");
+                    {
+                        string lt = Install.LauncherText;
+                        check(lt.Contains("set \"COR_ENABLE_PROFILING=\"") && lt.Contains("set \"COR_PROFILER_PATH=\"") && lt.Contains("set \"COMPLUS_INSTALLROOT=\"") &&
+                              lt.Contains("\r\n\"%~dp0Elixar.exe\" %*\r\n") && !lt.Contains("\r\nstart ") && !lt.Contains("%PATH%") &&
+                              Install.LauncherArgs("--auto-clean").StartsWith("/d /c \"\"") &&
+                              (!win || (Automation.CreateCleanArgs(Install.Exe, "Sunday", "20:00").Contains("cmd.exe\\\" /d /c") && Automation.CreateMailArgs(Install.Exe, "09:00").Contains("--mail-daily"))) &&
+                              !Install.IsSafeElevatedTask(Install.Exe, "--auto-clean", "--auto-clean") == win,
+                              "Schedules with admin rights start through a fixed launcher that clears the variables that could make .NET load someone else's code" + (win ? "" : " (launcher text checked)"));
+                        check(Sys.PsSafe("Get-Date").StartsWith("$env:PSModulePath = Join-Path $PSHOME 'Modules'; ") && StoreData.RunPsScriptFor("x").StartsWith("$env:PSModulePath"),
+                              "PowerShell as administrator uses only Windows' own modules (not ones planted in Documents)");
+                        if (win)
+                        {
+                            UserDirs.ProfileOverride = @"C:\Users\elisar";
+                            try
+                            {
+                                check(UserDirs.Checked(@"C:\Users\elisar\AppData\Local\Temp", @"AppData\Local\Temp") == @"C:\Users\elisar\AppData\Local\Temp" &&
+                                      UserDirs.Checked(@"C:\Windows\Installer", @"AppData\Local\Temp") == @"C:\Users\elisar\AppData\Local\Temp" &&
+                                      UserDirs.Checked(@"C:\Users\elisar\..\..\Program Files", @"AppData\Local") == @"C:\Users\elisar\AppData\Local" &&
+                                      UserDirs.Checked(@"C:\Users\elisar2\AppData\Local", @"AppData\Local") == @"C:\Users\elisar\AppData\Local",
+                                      "Security: a %TEMP% or AppData redirected outside your profile (e.g. to C:\\Windows\\Installer) is never cleaned as administrator");
+                            }
+                            finally { UserDirs.ProfileOverride = null; }
+                            check(UserDirs.Profile != null && Directory.Exists(UserDirs.Profile), "Security: your real profile folder is read from Windows' own record (HKLM)");
+                            check(Win.ProgramFiles.Length > 3 && Directory.Exists(Win.ProgramFiles) && Install.Dir.StartsWith(Win.ProgramFiles), "Security: Program Files comes from Windows' own record, not from a variable any program can change");
+                        }
+                    }
+                    check(!win || Install.DllSearchHardened, "Security: DLLs load only from System32, never from the folder Elixar.exe sits in (like Downloads)" + (win ? "" : " (Windows only: not tried)"));
                     var progs = new List<AppEntry> { new AppEntry { Name = "Epic Games Launcher", Location = @"C:\Program Files (x86)\Epic Games", Uninstall = "x" } };
                     var store = new List<StoreApp> { new StoreApp { Name = "Microsoft.Copilot", Friendly = "Copilot", Level = "optional", Location = @"C:\Program Files\WindowsApps\Microsoft.Copilot_1.0_x64__8wekyb3d8bbwe" } };
                     var o1 = MainForm.FindOwner(@"C:\Program Files (x86)\Epic Games\Launcher\Portal\Binaries\a.pak", progs, store) as AppEntry;
@@ -2322,6 +2433,7 @@ namespace CDriveCleaner
                     if (win) { Adb.Exe = me; Adb.Prefix = "--fake-adb"; } else { Adb.Exe = "mono"; Adb.Prefix = Adb.WinArg(me) + " --fake-adb"; }
                     string flog = Path.Combine(root, "fake-adb.log");
                     Environment.SetEnvironmentVariable("ELIXAR_FAKE_ADB_LOG", flog);
+                    Environment.SetEnvironmentVariable("ELIXAR_SELFTEST", "1");
                     check(Adb.WinArg("a b") == "\"a b\"" && Adb.WinArg("x\"y") == "\"x\\\"y\"" && Adb.WinArg("C:\\a b\\") == "\"C:\\a b\\\\\"" && Adb.Q("it's") == "'it'\\''s'",
                           "Phone: commands are quoted safely for Windows and for the phone");
                     string derr; var devs = Adb.Devices(out derr);
@@ -2692,7 +2804,7 @@ namespace CDriveCleaner
                         string work = Paths.Work;
                         check(!Sys.IsAdmin() || (work != null && Locked.IsLocked(work)), "Security: files an administrator writes and then uses (like diskpart's script) go in a locked folder" + (Sys.IsAdmin() ? "" : " (not admin: not tried)"));
                         string dk = Docker.Exe();
-                        check(dk == null || (dk.StartsWith(Environment.GetEnvironmentVariable("ProgramW6432") ?? "C:\\Program Files", StringComparison.OrdinalIgnoreCase) && Trust.SignedBy(dk, Trust.DockerInc)),
+                        check(dk == null || (dk.StartsWith(Win.ProgramFiles, StringComparison.OrdinalIgnoreCase) && Trust.SignedBy(dk, Trust.DockerInc)),
                               "Security: Docker is only run from Program Files and signed by Docker" + (dk == null ? " (not installed)" : ""));
                         string me = Install.Current;
                         check(SafeFile.HasDownloadMark(me) || !SafeFile.HasDownloadMark(me), "Download mark on this copy: " + (SafeFile.HasDownloadMark(me) ? "yes (Windows asks before running it; the installed copy has none)" : "none") +
@@ -2831,6 +2943,13 @@ namespace CDriveCleaner
                         check(bad != null && good == null && offFirst && MailAccount.Email == "me@example.com" && OC("spam").Count == 12 && OC("spam").Folder == "Bulk Mail" &&
                               OC("newsletters").Count == 40 && OC("large").Count == 3 && OC("large").Bytes > 40000000 && OC("newsletters").Senders.Count == 3 && readOnly && !fk.Commands.Any(x => x.Contains("abcd")),
                               "Other email (IMAP): signs in, finds Spam, newsletters and large emails, read-only while scanning, never logs the password");
+                        fk.Validity = "8";   // the server renumbered the folders after the check
+                        bool renumRefused = false;
+                        try { MailAccount.Trash(new List<MailCategory> { OC("spam") }, null, System.Threading.CancellationToken.None); } catch (IOException) { renumRefused = true; }
+                        int movedRenum = fk.Moved;
+                        fk.Validity = "7";
+                        check(renumRefused && movedRenum == 0 && OC("spam").UidValidity == "7",
+                              "Other email (IMAP): if the mailbox was renumbered after the check, nothing is moved (the numbers could mean other emails)");
                         int moved = MailAccount.Trash(ocats.Where(c => c.DefaultOn).ToList(), null, System.Threading.CancellationToken.None);
                         check(moved == 52 && fk.Moved == 52 && fk.Boxes["Trash"].Count == 52 && fk.Boxes["INBOX"].Count == 3 && fk.Boxes["Bulk Mail"].Count == 0,
                               "Other email (IMAP): moves only the picked emails to Trash (52), leaves the rest (large emails stay)");
@@ -2855,7 +2974,7 @@ namespace CDriveCleaner
                     Func<long, long, DashSummary> mk = (free, total) => new DashSummary { Free = free, Total = total, Measured = true };
                     check(mk(120 * G, 476 * G).Level == 0 && mk(61 * G, 476 * G).Level == 1 && mk(30 * G, 476 * G).Level == 2 && mk(7 * G, 1000 * G).Level == 2 && mk(30 * G, 120 * G).Level == 0,
                           "Dashboard: says fine / getting full / almost full at the right amount of free space");
-                    check(mk(61 * G, 476 * G).Headline == "C: is getting full" && new DashSummary().Headline == "Measuring drive C:...", "Dashboard: the headline matches the level");
+                    check(mk(61 * G, 476 * G).Headline == (Win.IsWindows ? "C: is getting full" : "Your system disk is getting full") && new DashSummary().Headline == (Win.IsWindows ? "Measuring drive C:..." : "Measuring your system disk..."), "Dashboard: the headline matches the level");
                     var ms = mk(61 * G, 476 * G); ms.Safe = 34 * G;
                     var notYet = mk(61 * G, 476 * G); notYet.Measured = false; notYet.Safe = 34 * G;
                     var busy = mk(61 * G, 476 * G); busy.Safe = 34 * G; busy.Cleaning = true;
@@ -2864,7 +2983,7 @@ namespace CDriveCleaner
                           "Dashboard: \"Free ... safely\" is offered only when measured, not cleaning, and there is something safe to free");
                     var soon = mk(61 * G, 476 * G); soon.Forecast = new SpaceHistory.Forecast { FullOn = DateTime.Today.AddDays(200) };
                     var far = mk(61 * G, 476 * G); far.Forecast = new SpaceHistory.Forecast { FullOn = DateTime.Today.AddDays(900) };
-                    check(soon.SubLines.Any(l => l.StartsWith("At this pace C: is full around")) && !far.SubLines.Any(l => l.StartsWith("At this pace")),
+                    check(soon.SubLines.Any(l => l.StartsWith("At this pace ") && l.Contains(" is full around")) && !far.SubLines.Any(l => l.StartsWith("At this pace")),
                           "Dashboard: warns when C: fills within a year, stays quiet otherwise");
                     var pickFrom = new List<CleanItem>
                     {
@@ -2913,7 +3032,7 @@ namespace CDriveCleaner
                     var dll = AppsData.RiskyPrograms("rundll32.exe C:\\Users\\Public\\x\\setup.dll,Uninstall", p => false);
                     var msi = AppsData.RiskyPrograms("MsiExec.exe /X{12345678-1234-1234-1234-123456789012}", p => false);
                     var signedOk = AppsData.RiskyPrograms("\"C:\\Users\\me\\AppData\\Local\\Tool\\unins000.exe\"", p => true);
-                    string pfx = Environment.GetEnvironmentVariable("ProgramFiles");
+                    string pfx = Win.IsWindows ? Win.ProgramFiles : null;
                     bool pfOk = pfx == null || AppsData.RiskyPrograms("\"" + pfx + "\\Some App\\uninstall.exe\" /S", p => false).Count == 0;
                     check(risky.Count == 1 && dll.Count == 1 && msi.Count == 0 && signedOk.Count == 0 && pfOk,
                           "Security: an unsigned uninstaller in a folder other programs can change is flagged before it runs as administrator");
@@ -2962,87 +3081,281 @@ namespace CDriveCleaner
                 check(DashSummary.LevelOf(100L << 30, 200L << 30) == 0 && DashSummary.LevelOf(30L << 30, 200L << 30) == 1 && DashSummary.LevelOf(5L << 30, 2000L << 30) == 2,
                       "Drives: every drive gets the same fine / getting full / almost full rule");
 
-                // 4. the window, with cleaning switched off
-                string settingsWhy = "", driveWhy = ""; bool driveOk = false, overOk = false, uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false, emailOk = false;
-                string uiErr = null;
+                bool winUi = Win.IsWindows || Environment.GetEnvironmentVariable("ELIXAR_TEST_WINDOWS_UI") == "1";
+                if (!winUi) rep.AppendLine("SKIP  The Windows window checks (this PC runs " + OsInfo.Current.Name + "; the Linux window is checked below)");
+                else
+                {
+                MainForm.ForceWindowsUi = true;
+                    // 4. the window, with cleaning switched off
+                    string settingsWhy = "", driveWhy = ""; bool navOk = false; string navWhy = ""; bool driveOk = false, overOk = false, uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false, emailOk = false;
+                    string uiErr = null;
+                    try
+                    {
+                        var form = new MainForm(true);
+                        int scans = 0;
+                        bool changeOk = false, overDone = false, driveStarted = false, driveDone = false, dashDone = false, appsDone = false, storeDone = false, undoDone = false, phoneDone = false, startDone = false, moveDone = false, diskDone = false;
+                        bool closing = false;
+                        Action maybeClose = () =>
+                        {
+                            if (closing) return;
+                            if (scans >= 2 && dashDone && appsDone && storeDone && undoDone && phoneDone && startDone && moveDone && diskDone && overDone && driveDone)
+                            {
+                                toolsOk = true;
+                                storeOk = !win || form.StoreCount > 0;
+                                dashOk = form.DashboardFilled();
+                                appsOk = !win || form.AppsCount > 0;
+                                uiOk = changeOk;
+                                phoneOk = form.PhoneRows > 10;
+                                diskOk = !win || form.DiskRows > 0;
+                                settingsOk = form.SettingsTabReady;
+                                navOk = form.NavGreyed.SequenceEqual(new[] { "Linux" }) && form.NavRight == "Settings" && !form.TabNames.Contains("Linux") && form.NavEnabled.Contains("Apps") && form.NavEnabled.Contains("Phone");
+                                if (!navOk) navWhy = "  (greyed " + string.Join(",", form.NavGreyed) + ", right " + form.NavRight + ")";
+                                if (!settingsOk) settingsWhy = "  (" + form.SettingsState + ")";
+                                emailOk = form.EmailRows == 6;
+                                closing = true;
+                                form.Close();
+                            }
+                        };
+                        form.MeasureDone += () =>
+                        {
+                            scans++;
+                            if (scans == 1) form.Rescan();                       // second scan compares with the first
+                            else { changeOk = form.ChangeColumnFilled(); maybeClose(); }
+                        };
+                        form.DashboardDone += () => { dashDone = true; maybeClose(); };
+                        form.OverviewDone += () =>
+                        {
+                            if (form.OverviewFilled) { overDone = true; overOk = true; }
+                            if (!driveStarted && form.DriveChoices == 3) { driveStarted = true; form.SelectDrive("D"); }
+                            maybeClose();
+                        };
+                        form.DriveViewDone += () =>
+                        {
+                            if (driveDone) return;
+                            int folders = form.DriveFolderRows;
+                            form.SelectDrive("*"); int cards = form.AllDriveCards;
+                            form.SelectDrive("C");
+                            driveOk = folders == 2 && cards == (Sys.Total() > 0 ? 2 : 1) && form.CurrentDrive == "C";   // C: shows when this PC has one
+                            if (!driveOk) driveWhy = "  (folders " + folders + ", cards " + cards + ", now on " + form.CurrentDrive + ")";
+                            driveDone = true; maybeClose();
+                        };
+                        form.AppsDone += () => { appsDone = true; maybeClose(); };
+                        form.StoreDone += () => { storeDone = true; maybeClose(); };
+                        form.UndoDone += () => { undoDone = true; maybeClose(); };
+                        form.UndoDone += () => { if (!phoneDone) form.ShowPhone(); };
+                        form.PhoneDone += () => { phoneDone = true; if (!startDone) form.ShowStartup(); };
+                        form.StartupDone += () => { startDone = true; if (!moveDone) form.ShowMove(); };
+                        form.MoveDone += () => { moveDone = true; form.ShowDiskHealth(); };
+                        form.DiskHealthDone += () => { diskDone = true; maybeClose(); };
+                        form.StoreDone += () => form.ShowUndo();
+                        form.Shown += (o, e) => { form.RefreshApps(); form.ShowStoreTab(); };
+                        var timeout = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
+                        timeout.Tick += (o, e) => { timeout.Stop(); form.Close(); };
+                        timeout.Start();
+                        Application.Run(form);
+                        timeout.Dispose();
+                    }
+                    catch (Exception ex) { uiErr = ex.GetType().Name + ": " + ex.Message; }
+                    check(uiOk, "Window opens, scans, rescans with the Change column filled, and closes" + (uiErr != null ? "  ERROR: " + uiErr : ""));
+                    check(dashOk, "Dashboard measures every location and fills the cards");
+                    check(overOk, "Dashboard overview fills in: the ring, Free ... safely, the six tiles, quick wins, drives and activity");
+                    check(driveOk, "Drives: switching to another drive measures its folders, All drives shows a card per drive, and C: comes back" + driveWhy);
+                    MainForm.DrivesOverride = null;
+                    check(appsOk, "Apps tab reads and measures installed apps");
+                    check(storeOk, "Built-in and Store apps list opens and fills in");
+                    check(toolsOk, "Tools tab opens and the Undo list loads");
+                    check(phoneOk, "Phone tab finds the (simulated) phone and lists what to clean and its apps");
+                    check(diskOk, "Disk health tab opens and lists the drives");
+                    check(settingsOk, "Settings tab shows the saved language and theme, ready to switch" + settingsWhy);
+                    check(navOk, "Tab bar: Settings sits on the right, and the Linux tab is greyed out on Windows" + navWhy);
+                    check(emailOk, "Email tab lists what it can clean in Gmail (off until you allow it)");
+                    Adb.Exe = null; Adb.Prefix = "";
+                MainForm.ForceWindowsUi = false;
+                }
+
+
+                // 4L. Linux (and which system this is): everything Elixar does differently on Linux
                 try
                 {
-                    var form = new MainForm(true);
-                    int scans = 0;
-                    bool changeOk = false, overDone = false, driveStarted = false, driveDone = false, dashDone = false, appsDone = false, storeDone = false, undoDone = false, phoneDone = false, startDone = false, moveDone = false, diskDone = false;
-                    bool closing = false;
-                    Action maybeClose = () =>
+                    var ubuntu = OsInfo.ReadLinux(new[] { "PRETTY_NAME=\"Ubuntu 24.04.5 LTS\"", "NAME=\"Ubuntu\"", "VERSION_ID=\"24.04\"", "ID=ubuntu", "ID_LIKE=debian" });
+                    var mint = OsInfo.ReadLinux(new[] { "NAME=\"Linux Mint\"", "VERSION_ID=\"22\"", "ID=linuxmint", "ID_LIKE=\"ubuntu debian\"" });
+                    var fedora = OsInfo.ReadLinux(new[] { "PRETTY_NAME=\"Fedora Linux 41 (Workstation Edition)\"", "ID=fedora" });
+                    var arch = OsInfo.ReadLinux(new[] { "PRETTY_NAME=\"Arch Linux\"", "ID=arch" });
+                    var junk = OsInfo.ReadLinux(new[] { "garbage", "=x" });
+                    check(ubuntu.Name == "Ubuntu 24.04.5 LTS" && ubuntu.Family == "debian" && ubuntu.Supported && mint.Name == "Linux Mint 22" && mint.Family == "debian" &&
+                          fedora.Family == "fedora" && !fedora.Supported && arch.Family == "arch" && junk.Name == "Linux" && junk.Family == "other",
+                          "System: recognises Ubuntu, Linux Mint, Fedora and Arch from /etc/os-release");
+                    check(OsInfo.FromWindows("Windows 10 Pro", "24H2", 26100, 2033).Name == "Windows 11 Pro 24H2 (build 26100.2033)" &&
+                          OsInfo.FromWindows("Windows 10 Home", "22H2", 19045, 0).Name == "Windows 10 Home 22H2 (build 19045)",
+                          "System: tells Windows 11 from Windows 10 by its build number (Windows still calls 11 \"Windows 10\")");
+                    check(OsInfo.Current.Name.Length > 0, "System: this PC runs " + OsInfo.Current.Name);
+                    check(DiskNumber.DiskOfDevice("/dev/nvme0n1p2") == "nvme0n1" && DiskNumber.DiskOfDevice("/dev/sda1") == "sda" && DiskNumber.DiskOfDevice("/dev/mmcblk0p1") == "mmcblk0" &&
+                          DiskNumber.DiskOfDevice("/dev/mapper/vg-root") == "" && DiskNumber.Host.Length > 0 && !DiskNumber.Host.Contains(" ") &&
+                          (!win || System.Text.RegularExpressions.Regex.IsMatch(DiskNumber.Of("C"), "^[0-9]+$")) && DiskNumber.Tag(win ? "C" : "/").EndsWith(" of " + DiskNumber.Host) == (DiskNumber.Of(win ? "C" : "/").Length > 0),
+                          "Dashboard: shows which disk a drive is on and this PC's name (" + DiskNumber.Tag(win ? "C" : "/") + ")");
+
+                    var mts = Lx.ParseMounts(new[] { "/dev/sda2 / ext4 rw 0 0", "/dev/sda3 /home ext4 rw 0 0", "proc /proc proc rw 0 0", "/dev/loop3 /snap/firefox/123 squashfs ro 0 0",
+                                                     "/dev/sdb1 /media/elisar/My\\040Backup exfat rw 0 0", "/dev/nvme0n1p1 /boot/efi vfat rw 0 0", "tmpfs /run tmpfs rw 0 0" });
+                    var data = Lx.DataMounts(mts);
+                    check(data.Count == 2 && data[0].Point == "/home" && data[1].Point == "/media/elisar/My Backup" && Lx.RemovableMount(data[1].Point) && !Lx.RemovableMount("/home"),
+                          "Linux: finds your other disks (a /home partition, a USB drive with a space in its name), never /proc, /boot or the snap images");
+                    var snaps = Lx.OldSnaps("Name     Version   Rev    Tracking       Publisher   Notes\nfirefox  130.0     4793   latest/stable  mozilla**   disabled\nfirefox  131.0     4848   latest/stable  mozilla**   -\n" +
+                                            "evil;rm  1         12     latest/stable  x           disabled\ncore22   2024      1621   latest/stable  canonical** base,disabled\nbad      1         12a    latest/stable  x           disabled\n");
+                    check(snaps.Count == 2 && snaps[0].Item1 == "firefox" && snaps[0].Item2 == "4793" && snaps[1].Item1 == "core22" && !Lx.SnapName("x$(reboot)") && !Lx.Digits("1;2"),
+                          "Linux: only old Snap versions with plain names and numbers go into the root command (a name like \"evil;rm\" is refused)");
+                    check(Lx.ParseSize("Archived and active journals take up 1.5G in the file system.") == (long)(1.5 * (1L << 30)) && Lx.ParseSize("nothing") == -1,
+                          "Linux: reads the size of the system journal");
+                    var allowed = new HashSet<string> { "apt-clean", "journal-vacuum", "crash-clean", "flatpak-unused", "apt-autoremove" };
+                    var lcat = LinuxCatalog.Build();
+                    check(lcat.Any(i => i.Name == "Thumbnail cache") && lcat.Where(i => i.RootScript != null).All(i => allowed.Contains(i.RootScript)) &&
+                          lcat.Where(i => i.RootScript != null).All(i => i.Info.Contains("password")),
+                          "Linux: everything that runs as root is one of a few fixed commands written in Elixar, and says it asks for your password");
+                    var dfu = LxSystem.ParseDf("Images|14.2GB|9.8GB (69%)\nContainers|310MB|120MB (38%)\nLocal Volumes|3.1GB|0B (0%)\nBuild Cache|6.4GB|6.4GB\nnoise");
+                    check(dfu.Images == 14200000000L && dfu.ImagesFree == 9800000000L && dfu.ContainersFree == 120000000L && dfu.Volumes == 3100000000L && dfu.CacheFree == 6400000000L &&
+                          LxSystem.DockerSize("1.2kB") == 1200 && LxSystem.DockerSize("0B") == 0 && LxSystem.DockerSize("junk") == 0,
+                          "Docker: reads what images, containers, volumes and the build cache take (\"docker system df\")");
+                    string ds = LxSystem.DockerScript("/usr/bin/docker", false), da = LxSystem.DockerScript("/snap/bin/docker", true);
+                    check(ds == "docker-safe:/usr/bin/docker" && da == "docker-all:/snap/bin/docker" &&
+                          Lx.Fallback(ds) == "/usr/bin/docker builder prune -f && /usr/bin/docker image prune -f" && Lx.Fallback(da) == "/snap/bin/docker container prune -f && /snap/bin/docker image prune -a -f" &&
+                          LxSystem.DockerScript("/tmp/docker", false) == null && LxSystem.DockerScript("/usr/bin/docker; rm -rf /", true) == null && LxSystem.DockerScript(null, true) == null &&
+                          !(Lx.Fallback(ds) + Lx.Fallback(da)).Contains("volume") && !(Lx.Fallback(ds) + Lx.Fallback(da)).Contains("system prune"),
+                          "Docker: only fixed prune commands from the real docker, and never volumes (where databases live)");
+                    check(LxSystem.CapScript("500M") == "journal-cap:500M" && Lx.Fallback("journal-cap:500M").Contains("SystemMaxUse=500M") && Lx.Fallback("journal-cap:500M").Contains("/etc/systemd/journald.conf.d/60-elixar.conf") &&
+                          LxSystem.CapScript("200M") != null && LxSystem.CapScript("1G") != null && LxSystem.CapScript("100M") == null && LxSystem.CapScript("500M; rm -rf /") == null && LxSystem.CapScript(null) == null &&
+                          LxSystem.UncapScript == "journal-uncap" && LxSystem.CapText("500M") == "500 MB" && LxSystem.CapText("1G") == "1 GB",
+                          "System logs: the size limit is one of 200 MB, 500 MB or 1 GB, written to Elixar's own settings file");
+                    string rout;
+                    check(Lx.RootAction("apt-clean") && Lx.RootAction("snap-remove:firefox:4793") && Lx.RootAction("journal-cap:1G") && Lx.RootAction("docker-all:/usr/bin/docker") &&
+                          !Lx.RootAction("apt-get clean") && !Lx.RootAction("snap-remove:x$(id):1") && !Lx.RootAction("snap-remove:firefox:12a") && !Lx.RootAction("snap-remove:a:1:2") &&
+                          !Lx.RootAction("journal-cap:100M") && !Lx.RootAction("docker-safe:/tmp/docker") && !Lx.RootAction("") && !Lx.RootAction(null) &&
+                          Lx.RunAsRoot("apt-clean reboot", out rout) == -1 && Lx.RunAsRoot("", out rout) == -1 && Lx.RunAsRoot("apt-clean;id", out rout) == -1,
+                          "Root actions: Elixar asks only for its own named actions; anything else is refused before the password prompt");
+                    if (Lx.On && Lx.HelperTrusted(Lx.Helper))
                     {
-                        if (closing) return;
-                        if (scans >= 2 && dashDone && appsDone && storeDone && undoDone && phoneDone && startDone && moveDone && diskDone && overDone && driveDone)
+                        string h1, h2, h3;
+                        int good = Lx.Run(Lx.Helper, "--dry-run journal-vacuum journal-uncap", 10000, out h1);
+                        int bad1 = Lx.Run(Lx.Helper, "--dry-run apt-clean snap-remove:x;id:1", 10000, out h2);
+                        int bad2 = Lx.Run(Lx.Helper, "--dry-run journal-cap:500M;reboot", 10000, out h3);
+                        check(good == 0 && h1.Contains("--vacuum-size=200M") && bad1 == 2 && bad2 == 2 && !h2.Contains("apt-get"),
+                              "Root helper (installed): runs only its fixed actions, and refuses everything if one argument is wrong");
+                    }
+                    else if (Lx.On) rep.AppendLine("SKIP  Root helper: not installed here (it comes with the .deb); the same fixed commands run by full path instead");
+                    check(!Lx.HelperTrusted(Path.Combine(root, "nope")), "Root helper: a missing or user-owned helper is never used");
+                    if (Lx.On)
+                    {
+                        string hm = Lx.Home.TrimEnd('/');
+                        check(!Lx.SafeUserDir("/") && !Lx.SafeUserDir(hm) && !Lx.SafeUserDir(hm + "/") && !Lx.SafeUserDir(Path.GetDirectoryName(hm)) && !Lx.SafeUserDir("/usr/share") &&
+                              !Lx.SafeUserDir("relative/.cache") && !Lx.SafeUserDir(hm + "/../..") && !Lx.SafeUserDir("") && Lx.SafeUserDir(hm + "/.cache") && Lx.SafeUserDir(hm + "/my cache"),
+                              "Linux: a wrong XDG_CACHE_HOME (/, your home, a system folder) is ignored, so cleaning never means everything you own");
+                        string lk2 = Path.Combine(root, "lockme"); Directory.CreateDirectory(lk2);
+                        bool l1 = Locked.Lock(lk2) && Locked.IsLocked(lk2);
+                        string m2; Lx.Run("chmod", "777 " + Lx.Arg(lk2), 5000, out m2);
+                        bool l2 = !Locked.IsLocked(lk2);
+                        string ln2 = Path.Combine(root, "lockme-link"); Lx.Run("ln", "-s " + Lx.Arg(lk2) + " " + Lx.Arg(ln2), 5000, out m2);
+                        check(l1 && l2 && !Locked.IsLocked(ln2) && !Locked.OwnedByAdmins(ln2) && !Locked.IsLocked(Path.Combine(root, "missing")),
+                              "Linux: a folder counts as locked only when it is yours (or root's), not a link, and nobody else can change it");
+                        check(Quarantine.RootFor(0).StartsWith(Paths.Data) && Locked.IsLocked(Quarantine.RootFor(0)),
+                              "Linux: Undo keeps files only in Elixar's private folder (never on a USB drive or a disk's top level)");
+                    }
+                    {
+                        var k1 = new byte[64]; var k2 = new byte[64]; new Random(5).NextBytes(k1); new Random(6).NextBytes(k2);
+                        var en = Encoding.UTF8.GetBytes("Elixar mail account v2"); var secret = Encoding.UTF8.GetBytes("{\"refresh\":\"1//secret-token\"}");
+                        var box = SecretBox.Seal(secret, en, k1); var box2 = SecretBox.Seal(secret, en, k1);
+                        var bent = (byte[])box.Clone(); bent[20] ^= 1;
+                        Func<Func<byte[]>, bool> refused = f => { try { f(); return false; } catch (System.Security.Cryptography.CryptographicException) { return true; } };
+                        check(SecretBox.IsSealed(box) && !Encoding.UTF8.GetString(box).Contains("secret-token") && !box.SequenceEqual(box2) &&
+                              SecretBox.Open(box, en, k1).SequenceEqual(secret) && refused(() => SecretBox.Open(bent, en, k1)) && refused(() => SecretBox.Open(box, en, k2)) &&
+                              refused(() => SecretBox.Open(box, Encoding.UTF8.GetBytes("other"), k1)) && !SecretBox.IsSealed(secret),
+                              "Sign-in file: sealed with AES-256 + HMAC; a changed byte, another key or another purpose is refused");
+                        if (Lx.On)
                         {
-                            toolsOk = true;
-                            storeOk = !win || form.StoreCount > 0;
-                            dashOk = form.DashboardFilled();
-                            appsOk = !win || form.AppsCount > 0;
-                            uiOk = changeOk;
-                            phoneOk = form.PhoneRows > 10;
-                            diskOk = !win || form.DiskRows > 0;
-                            settingsOk = form.SettingsTabReady;
-                            if (!settingsOk) settingsWhy = "  (" + form.SettingsState + ")";
-                            emailOk = form.EmailRows == 6;
-                            closing = true;
-                            form.Close();
+                            SecretBox.KeyOverride = () => k1;
+                            try { check(SecretBox.Unprotect(SecretBox.Protect(secret, en), en).SequenceEqual(secret) && SecretBox.Unprotect(secret, en).SequenceEqual(secret),
+                                        "Linux: the sign-in is encrypted with the keyring key, and an older plain file still opens (and is sealed on the next read)"); }
+                            finally { SecretBox.KeyOverride = null; }
+                            if (SecretBox.KeyringReady) check(SecretBox.Unprotect(SecretBox.Protect(secret, en), en).SequenceEqual(secret), "Linux: this desktop's keyring holds Elixar's key and it works");
+                            else rep.AppendLine("SKIP  Linux keyring: none on this PC (the sign-in file stays readable only by your account)");
                         }
-                    };
-                    form.MeasureDone += () =>
+                    }
+                    string sd = Path.Combine(root, "snaps"); Directory.CreateDirectory(sd);
+                    foreach (var sn in new[] { "firefox_4793.snap", "firefox_4848.snap", "core22_1621.snap", "evil;x_1.snap", "notes.txt", "code_x1.snap" }) File.WriteAllBytes(Path.Combine(sd, sn), new byte[sn.Length]);
+                    var sl = LxSystem.Snaps(sd);
+                    check(sl.Count == 3 && sl[0].Name == "firefox" && sl[0].Versions == 2 && sl[0].Bytes == 34 && sl.Any(x => x.Name == "code") && !sl.Any(x => x.Name.Contains(";")),
+                          "Snap: adds up every version of each app");
+                    check(LxSystem.SnapsLarge(11L << 30, 1L << 40) && LxSystem.SnapsLarge(30L << 30, 256L << 30) && !LxSystem.SnapsLarge(5L << 30, 256L << 30) && !LxSystem.SnapsLarge(0, 0) &&
+                          LxSystem.SnapWarnDue("", DateTime.Today) && !LxSystem.SnapWarnDue(DateTime.Today.AddDays(-3).ToString("yyyy-MM-dd"), DateTime.Today) &&
+                          LxSystem.SnapWarnDue(DateTime.Today.AddDays(-7).ToString("yyyy-MM-dd"), DateTime.Today) &&
+                          new DashSummary { Total = 256L << 30, Measured = true, SnapBytes = 30L << 30 }.SubLines.Any(l => l.StartsWith("Snap apps take")) &&
+                          !new DashSummary { Total = 256L << 30, Measured = true, SnapBytes = 3L << 30 }.SubLines.Any(l => l.StartsWith("Snap apps take")),
+                          "Snap: warns when Snap apps take over 10 GB or a tenth of the disk (on the Dashboard, and at most once a week as a notification)");
+                    string mono = "/usr/bin/mono";
+                    var cu = LxTimers.Units(Automation.CreateCleanArgs("/usr/lib/elixar/Elixar.exe", "Sunday", "20:00"), mono);
+                    var ck = LxTimers.Units(Automation.CreateCheckArgs("/usr/lib/elixar/Elixar.exe", 15, "12:00"), mono);
+                    var lg = LxTimers.Units(Automation.CreateLogonArgs("/usr/lib/elixar/Elixar.exe", 15), mono);
+                    check(cu != null && cu[0].Contains("ExecStart=/usr/bin/mono \"/usr/lib/elixar/Elixar.exe\" --auto-clean\n") && cu[1].Contains("OnCalendar=Sun *-*-* 20:00:00") &&
+                          ck != null && ck[0].Contains("--check-space 15") && ck[1].Contains("OnCalendar=*-*-* 12:00:00") && lg != null && lg[1].Contains("OnStartupSec=3min") && !cu[0].Contains("root"),
+                          "Linux: the weekly clean and space check become systemd timers for your account");
+                    check(LxTimers.Units(Automation.CreateCleanArgs("Elixar.exe", "Sunday", "20:00"), mono) == null &&
+                          LxTimers.Units(Automation.CreateCleanArgs("/tmp/a%h/Elixar.exe", "Sunday", "20:00"), mono) == null &&
+                          LxTimers.Units("/Create /F /TN \"x\" /TR \"\\\"/usr/lib/elixar/Elixar.exe\\\" --auto-clean; rm -rf ~\" /SC DAILY /ST 12:00", mono) == null &&
+                          LxTimers.Units(Automation.CreateCleanArgs("/usr/lib/elixar/Elixar.exe", "Funday", "20:00"), mono) == null,
+                          "Linux: a schedule is written only for Elixar's own commands (no relative paths, systemd specials, extra commands or odd days)");
+                    if (Lx.On)
                     {
-                        scans++;
-                        if (scans == 1) form.Rescan();                       // second scan compares with the first
-                        else { changeOk = form.ChangeColumnFilled(); maybeClose(); }
-                    };
-                    form.DashboardDone += () => { dashDone = true; maybeClose(); };
-                    form.OverviewDone += () =>
-                    {
-                        if (form.OverviewFilled) { overDone = true; overOk = true; }
-                        if (!driveStarted && form.DriveChoices == 3) { driveStarted = true; form.SelectDrive("D"); }
-                        maybeClose();
-                    };
-                    form.DriveViewDone += () =>
-                    {
-                        if (driveDone) return;
-                        int folders = form.DriveFolderRows;
-                        form.SelectDrive("*"); int cards = form.AllDriveCards;
-                        form.SelectDrive("C");
-                        driveOk = folders == 2 && cards == (Sys.Total() > 0 ? 2 : 1) && form.CurrentDrive == "C";   // C: shows when this PC has one
-                        if (!driveOk) driveWhy = "  (folders " + folders + ", cards " + cards + ", now on " + form.CurrentDrive + ")";
-                        driveDone = true; maybeClose();
-                    };
-                    form.AppsDone += () => { appsDone = true; maybeClose(); };
-                    form.StoreDone += () => { storeDone = true; maybeClose(); };
-                    form.UndoDone += () => { undoDone = true; maybeClose(); };
-                    form.UndoDone += () => { if (!phoneDone) form.ShowPhone(); };
-                    form.PhoneDone += () => { phoneDone = true; if (!startDone) form.ShowStartup(); };
-                    form.StartupDone += () => { startDone = true; if (!moveDone) form.ShowMove(); };
-                    form.MoveDone += () => { moveDone = true; form.ShowDiskHealth(); };
-                    form.DiskHealthDone += () => { diskDone = true; maybeClose(); };
-                    form.StoreDone += () => form.ShowUndo();
-                    form.Shown += (o, e) => { form.RefreshApps(); form.ShowStoreTab(); };
-                    var timeout = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
-                    timeout.Tick += (o, e) => { timeout.Stop(); form.Close(); };
-                    timeout.Start();
-                    Application.Run(form);
-                    timeout.Dispose();
-                }
-                catch (Exception ex) { uiErr = ex.GetType().Name + ": " + ex.Message; }
-                check(uiOk, "Window opens, scans, rescans with the Change column filled, and closes" + (uiErr != null ? "  ERROR: " + uiErr : ""));
-                check(dashOk, "Dashboard measures every location and fills the cards");
-                check(overOk, "Dashboard overview fills in: the ring, Free ... safely, the six tiles, quick wins, drives and activity");
-                check(driveOk, "Drives: switching to another drive measures its folders, All drives shows a card per drive, and C: comes back" + driveWhy);
-                MainForm.DrivesOverride = null;
-                check(appsOk, "Apps tab reads and measures installed apps");
-                check(storeOk, "Built-in and Store apps list opens and fills in");
-                check(toolsOk, "Tools tab opens and the Undo list loads");
-                check(phoneOk, "Phone tab finds the (simulated) phone and lists what to clean and its apps");
-                check(diskOk, "Disk health tab opens and lists the drives");
-                check(settingsOk, "Settings tab shows the saved language and theme, ready to switch" + settingsWhy);
-                check(emailOk, "Email tab lists what it can clean in Gmail (off until you allow it)");
-                Adb.Exe = null; Adb.Prefix = "";
+                        string oldCfg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+                        try
+                        {
+                            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", Path.Combine(root, "xdg"));
+                            string o1, o2;
+                            LxTimers.Apply(Automation.CreateCleanArgs("/usr/lib/elixar/Elixar.exe", "Sunday", "20:00"), out o1);
+                            var q = LxTimers.Query(Automation.CleanTask);
+                            bool made = q.Exists && q.Day == "Sunday" && q.Start.HasValue && q.Start.Value.Hour == 20 && q.Arguments == "--auto-clean" && q.Command == "/usr/lib/elixar/Elixar.exe";
+                            LxTimers.Apply(Automation.DeleteArgs(Automation.CleanTask), out o2);
+                            check(made && !LxTimers.Query(Automation.CleanTask).Exists, "Linux: a saved schedule reads back the same (day, time, command) and Off removes it");
+                        }
+                        finally { Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", oldCfg); }
+                        string pd = Path.Combine(root, "private"); Directory.CreateDirectory(pd);
+                        string mode; Lx.Private(pd, true); Lx.Run("stat", "-c %a " + Lx.Arg(pd), 5000, out mode);
+                        check(mode.Trim() == "700", "Linux: Elixar's own folders (sign-ins, logs) can be opened only by you (700)");
+                        check(Lx.SkipDir("/proc", "/") && Lx.SkipDir("/sys", "/") && !Lx.SkipDir("/usr", "/") && !Lx.SkipDir("/", "/"),
+                              "Linux: measuring the system disk never walks into /proc, /sys or other disks");
+                        string t1, r1, t2, r2, t3, r3;
+                        Scanner.Classify("/var/cache/apt/archives/x.deb", out t1, out r1); Scanner.Classify("/usr/lib/x/big.so", out t2, out r2); Scanner.Classify("/home/u/Videos/a.mkv", out t3, out r3);
+                        check(t1 == "safe" && t2 == "critical" && t3 == "review", "Linux: largest files are sorted into Safe / Review / Critical the Linux way");
+                        check(Automation.AutoItems().Count == 0 || Catalog.WindowsOnLinux || Automation.AutoItems().All(i => i.RootScript == null),
+                              "Linux: the weekly clean never runs anything that needs your password");
+
+                        // the Linux window itself
+                        bool wasWin = Catalog.WindowsOnLinux;
+                        Catalog.WindowsOnLinux = false; MainForm.ForceWindowsUi = false;
+                        bool lxOk = false; string lxWhy = "";
+                        try
+                        {
+                            var lf = new MainForm(true);
+                            bool measured = false, over = false;
+                            Action done = () =>
+                            {
+                                if (!measured || !over) return;
+                                var names = lf.TabNames; var items2 = lf.CleanerItemNames;
+                                lxOk = !names.Contains("Apps") && !names.Contains("Phone") && names.Contains("Email") && names.Contains("Automation") && names.Contains("Linux") &&
+                                       lf.NavGreyed.SequenceEqual(new[] { "Apps", "Phone" }) && lf.NavRight == "Settings" && lf.NavEnabled.Contains("Linux") &&
+                                       items2.Contains("Thumbnail cache") && !items2.Contains("Windows Update downloads") && lf.OverviewFilled;
+                                if (!lxOk) lxWhy = "  (tabs: " + string.Join(", ", names) + "; greyed: " + string.Join(", ", lf.NavGreyed) + "; items: " + items2.Count + ")";
+                                lf.Close();
+                            };
+                            lf.MeasureDone += () => { measured = true; done(); };
+                            lf.OverviewDone += () => { if (lf.OverviewFilled) { over = true; done(); } };
+                            var to = new System.Windows.Forms.Timer { Interval = 3 * 60 * 1000 };
+                            to.Tick += (o, e) => { to.Stop(); lxWhy = "  (timed out)"; lf.Close(); };
+                            to.Start();
+                            Application.Run(lf);
+                            to.Dispose();
+                        }
+                        catch (Exception ex) { lxWhy = "  ERROR: " + ex.Message; }
+                        Catalog.WindowsOnLinux = wasWin;
+                        check(lxOk, "Linux: the window shows the Linux tab (Apps and Phone greyed out, Settings on the right), the cleaning list, and the Dashboard fills in" + lxWhy);
+                    }
+                } catch (Exception ex) { check(false, "Linux tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
 
                 // 5. drill-down window on the test folder
                 bool drillOk = false;
@@ -3067,6 +3380,7 @@ namespace CDriveCleaner
             finally
             {
                 try { Fs.Delete(root); } catch { }
+                Catalog.WindowsOnLinux = false; MainForm.ForceWindowsUi = false;
             }
 
             rep.AppendLine();
@@ -3074,7 +3388,7 @@ namespace CDriveCleaner
             string report = rep.ToString();
             // next to the program, written through a checked handle (as administrator, a file there could be a planted link);
             // a copy also goes to Elixar's locked data folder
-            string outPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "selftest-report.txt");
+            string outPath = Win.IsWindows ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "selftest-report.txt") : Paths.FileIn("selftest-report.txt");
             try { SafeFile.WriteText(outPath, report); }
             catch { outPath = Paths.FileIn("selftest-report.txt"); }
             if (Win.IsWindows && Sys.IsAdmin()) try { File.WriteAllText(Paths.FileIn("selftest-report.txt"), report); } catch { }
@@ -3095,7 +3409,8 @@ namespace CDriveCleaner
             Install.HardenDllSearch();
             Theme.Init(Settings.ThemeMode);
             Lang.Init(Settings.Language);
-            if (args.Length > 0 && args[0] == "--fake-adb") return FakeAdb.Run(args.Skip(1).ToArray());
+            // the pretend phone used by the self-test only (never answers outside a self-test run)
+            if (args.Length > 0 && args[0] == "--fake-adb" && Environment.GetEnvironmentVariable("ELIXAR_SELFTEST") == "1") return FakeAdb.Run(args.Skip(1).ToArray());
             if (args.Contains("--selftest"))
             {
                 Sys.TryDpiAware();
@@ -3118,6 +3433,7 @@ namespace CDriveCleaner
                     "This is how the low-space alert looks. " + Fs.Fmt(Sys.Free()) + " is free on C: right now.", ToolTipIcon.Info, false);
                 return 0;
             }
+            if (args.Contains("--mail-daily") || args.Contains("--auto-clean")) Install.HideLauncherWindow();
             if (args.Contains("--mail-daily"))
             {
                 Application.EnableVisualStyles();
@@ -3130,7 +3446,14 @@ namespace CDriveCleaner
             }
 
             bool testUi = args.Contains("--test");
-            bool noElevate = testUi || args.Contains("--no-elevate");
+            bool noElevate = testUi || args.Contains("--no-elevate") || !Win.IsWindows;
+            if (Lx.IsRoot && !testUi)
+            {
+                // a window running as root could be told to do anything; Elixar asks for your password only for its fixed system commands
+                Application.EnableVisualStyles();
+                MessageBox.Show("Please start Elixar without sudo.\n\nIt runs as you and asks for your password only when a system clean needs it.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return 1;
+            }
 
             if (!noElevate && !Sys.IsAdmin())
             {
@@ -3186,7 +3509,7 @@ namespace CDriveCleaner
         {
             string text = ex == null ? "Unknown error" : ex.ToString();
             // as administrator, only into Elixar's locked data folder (a file next to a downloaded Elixar.exe could be a link)
-            string logAt = Sys.IsAdmin() ? Paths.FileIn("cleaner-log.txt") : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cleaner-log.txt");
+            string logAt = Sys.IsAdmin() || !Win.IsWindows ? Paths.FileIn("cleaner-log.txt") : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cleaner-log.txt");   // Linux: your private folder
             try { File.AppendAllText(logAt, DateTime.Now.ToString("s") + " CRASH " + text + Environment.NewLine); } catch { }
             MessageBox.Show("Something went wrong:\n\n" + (ex == null ? text : ex.Message) + "\n\nDetails were saved to " + logAt + ".",
                 "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Error);

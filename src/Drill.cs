@@ -72,7 +72,7 @@ namespace CDriveCleaner
                     var di = new DirectoryInfo(dir);
                     foreach (var f in di.EnumerateFiles()) { try { total += f.Length; } catch { } }
                     foreach (var d in di.EnumerateDirectories())
-                        if ((d.Attributes & FileAttributes.ReparsePoint) == 0) stack.Push(d.FullName);
+                        if ((d.Attributes & FileAttributes.ReparsePoint) == 0 && !Lx.SkipDir(d.FullName, path)) stack.Push(d.FullName);
                 }
                 catch { }
             }
@@ -168,8 +168,8 @@ namespace CDriveCleaner
                 var sel = list.SelectedItems.Count > 0 ? (DrillEntry)list.SelectedItems[0].Tag : null;
                 try
                 {
-                    if (sel != null && !sel.IsGroup) Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + sel.Path + "\"");
-                    else Process.Start(Win.SystemExe("explorer.exe"), "\"" + current + "\"");
+                    if (sel != null && !sel.IsGroup) Shell.Select(sel.Path);
+                    else Shell.Open(current);
                 }
                 catch { }
             };

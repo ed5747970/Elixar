@@ -87,6 +87,7 @@ namespace CDriveCleaner
         public bool AutoKnown, AutoClean, AutoAlert; public string AutoDay = "";
         public string MailEmail; public bool MailReports; public int MailLevel;
         public long UndoBytes; public int UndoCount;
+        public long TrashBytes = -1, AptBytes = -1, SnapBytes = -1;   // Linux tiles and the Snap warning
         public List<DriveRow> Drives = new List<DriveRow>();
         public List<Activity.Entry> Recent = new List<Activity.Entry>();
         public List<CleanItem> TopSafe = new List<CleanItem>();
@@ -117,7 +118,8 @@ namespace CDriveCleaner
         {
             get
             {
-                if (Total <= 0) return "Measuring drive C:...";
+                if (Total <= 0) return Win.IsWindows ? "Measuring drive C:..." : "Measuring your system disk...";
+                if (!Win.IsWindows) return Level == 2 ? "Your system disk is almost full" : Level == 1 ? "Your system disk is getting full" : "Your system disk is in good shape";
                 return Level == 2 ? "C: is almost full" : Level == 1 ? "C: is getting full" : "C: is in good shape";
             }
         }
@@ -131,11 +133,13 @@ namespace CDriveCleaner
                 if (Total <= 0) return l;
                 if (Cleaning) l.Add("Cleaning now...");
                 else if (!Measured) l.Add("Measuring what can be cleaned...");
-                else if (Safe >= (256L << 20)) l.Add(Fs.Fmt(Safe) + " of caches and temp files can be freed safely: Windows and your apps rebuild them by themselves.");
+                else if (Safe >= (256L << 20)) l.Add(Lx.Words(Fs.Fmt(Safe) + " of caches and temp files can be freed safely: Windows and your apps rebuild them by themselves."));
                 else if (Level == 0) l.Add("Nothing needs cleaning right now.");
-                else l.Add("The safe items are already clean. The Details view shows what else fills C:.");
+                else l.Add(Win.IsWindows ? "The safe items are already clean. The Details view shows what else fills C:." : "The safe items are already clean. The Details view shows what else fills the disk.");
                 if (Forecast != null && Forecast.FullOn.HasValue && (Forecast.FullOn.Value - Now).TotalDays < 365)
-                    l.Add("At this pace C: is full around " + Ui.Month(Forecast.FullOn.Value) + ".");
+                    l.Add((Win.IsWindows ? "At this pace C: is full around " : "At this pace your system disk is full around ") + Ui.Month(Forecast.FullOn.Value) + ".");
+                if (SnapBytes > 0 && LxSystem.SnapsLarge(SnapBytes, Total))
+                    l.Add("Snap apps take " + Fs.Fmt(SnapBytes) + ", more than usual: the Linux tab shows which ones.");
                 return l;
             }
         }
@@ -283,6 +287,12 @@ namespace CDriveCleaner
                             g.DrawPath(p, path);
                         }
                         g.DrawLines(p, new[] { P(.4f, .18f), P(.26f, .32f), P(.4f, .46f) });
+                        break;
+                    case "trash":
+                        g.DrawLine(p, P(.18f, .28f), P(.82f, .28f));
+                        g.DrawLines(p, new[] { P(.4f, .28f), P(.42f, .18f), P(.58f, .18f), P(.6f, .28f) });
+                        g.DrawLines(p, new[] { P(.26f, .28f), P(.31f, .84f), P(.69f, .84f), P(.74f, .28f) });
+                        g.DrawLine(p, P(.43f, .42f), P(.44f, .7f)); g.DrawLine(p, P(.57f, .42f), P(.56f, .7f));
                         break;
                     case "drive":
                         using (var path = Round(new RectangleF(x + X * .1f, y + Y * .3f, X * .8f, Y * .4f), X * .08f)) g.DrawPath(p, path);
@@ -679,6 +689,7 @@ namespace CDriveCleaner
         int tileCols;
         public event Action OverviewDone;
         static readonly string[] TileKinds = { "disk", "trend", "clean", "clock", "mail", "undo" };
+        static readonly string[] LinuxTileKinds = { "trash", "trend", "clean", "clock", "mail", "drive" };
 
         Control BuildOverview()
         {
@@ -693,22 +704,23 @@ namespace CDriveCleaner
             {
                 Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s,
                 HeadFont = new Font("Segoe UI Semibold", 16f), BigFont = new Font("Segoe UI Semibold", 15f), BoldFont = new Font("Segoe UI Semibold", 9.5f),
-                SmallFont = new Font("Segoe UI", 8.75f), Font = new Font("Segoe UI", 10f), Headline = Lang.T("Measuring drive C:..."), Primary = Lang.T("Measuring..."), Secondary = Lang.T("Choose what to clean"),
-                BreakTitle = Lang.T("What fills C:")
+                SmallFont = new Font("Segoe UI", 8.75f), Font = new Font("Segoe UI", 10f), Headline = Lang.T(Win.IsWindows ? "Measuring drive C:..." : "Measuring your system disk..."), Primary = Lang.T("Measuring..."), Secondary = Lang.T("Choose what to clean"),
+                BreakTitle = Lang.T(Win.IsWindows ? "What fills C:" : "What fills the disk")
             };
             hero.PrimaryClicked += FreeSafely;
             hero.SecondaryClicked += () => tabs.SelectedTab = pageClean;
 
             tileGrid = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), Padding = new Padding(0) };
             var capFont = new Font("Segoe UI Semibold", 8.25f); var valFont = new Font("Segoe UI Semibold", 12.5f);
-            string[] caps = { "Disk health", "Space trend", "Last clean", "Automation", "Email reports", "Undo" };
+            string[] caps = Win.IsWindows ? new[] { "Disk health", "Space trend", "Last clean", "Automation", "Email reports", "Undo" }
+                                          : new[] { "Trash", "Space trend", "Last clean", "Automation", "Email reports", "Update packages" };
             tiles = new TileCard[6];
             for (int i = 0; i < 6; i++)
             {
                 string cap = Lang.T(caps[i]);
                 tiles[i] = new TileCard
                 {
-                    Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Kind = TileKinds[i], Caption = Lang.Hebrew ? cap : cap.ToUpperInvariant(),
+                    Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Kind = Win.IsWindows ? TileKinds[i] : LinuxTileKinds[i], Caption = Lang.Hebrew ? cap : cap.ToUpperInvariant(),
                     Value = "...", Accent = Theme.Accent, CapFont = capFont, ValueFont = valFont, AccessibleName = cap
                 };
                 int k = i;
@@ -728,8 +740,9 @@ namespace CDriveCleaner
                 TitleFont = titleFont, SmallFont = small
             };
             cardWins = card("Quick wins", "Measuring...", "See everything in the Cleaner");
-            cardDrives = card("Other drives", "No other drives. A second drive or a USB drive gives you room to move big folders off C:.", "Move files off C:");
-            cardActivity = card("Recent activity", "Nothing yet. Cleans, emails and moves to Undo show up here.", "");
+            cardDrives = Win.IsWindows ? card("Other drives", "No other drives. A second drive or a USB drive gives you room to move big folders off C:.", "Move files off C:")
+                                       : card("Other disks", "No other disks. A second disk or a USB drive gives you room for big folders.", "");
+            cardActivity = card("Recent activity", Win.IsWindows ? "Nothing yet. Cleans, emails and moves to Undo show up here." : "Nothing yet. Cleans and emails show up here.", "");
             cardWins.ActionsOn = !testMode;
             cardWins.ActionClicked += r => CleanItems(new List<CleanItem> { (CleanItem)r.Tag });
             cardWins.FooterClicked += () => tabs.SelectedTab = pageClean;
@@ -773,6 +786,12 @@ namespace CDriveCleaner
 
         void TileClicked(int k)
         {
+            if (!Win.IsWindows && (k == 0 || k == 5))
+            {
+                if (k == 0) { try { Lx.Open("trash:///"); } catch { } }
+                else tabs.SelectedTab = pageClean;
+                return;
+            }
             switch (k)
             {
                 case 0: ShowDiskHealth(); break;
@@ -820,6 +839,12 @@ namespace CDriveCleaner
                 var undo = new List<UndoBatch>();
                 try { undo = Quarantine.List(); } catch { }
                 sum.UndoCount = undo.Count; sum.UndoBytes = undo.Sum(b => Math.Max(0, b.Bytes));
+                if (Lx.On)
+                {
+                    sum.TrashBytes = Fs.SizeOf(Path.Combine(Path.Combine(Lx.DataHome, "Trash"), "files"));
+                    sum.AptBytes = Lx.FilesIn("/var/cache/apt/archives", "*.deb");
+                    try { sum.SnapBytes = LxSystem.Snaps(LxSystem.SnapDir).Sum(a => a.Bytes); } catch { }
+                }
                 try
                 {
                     sum.MailEmail = MailAccount.Email;
@@ -869,10 +894,29 @@ namespace CDriveCleaner
             return r.Length > 32 ? r.Substring(0, 32) : r;
         }
 
+        // the other disks you keep files on: /home on its own partition, a second disk, USB drives
+        public static List<DriveRow> LinuxDrives()
+        {
+            var list = new List<DriveRow>();
+            foreach (var m in Lx.DataMounts(Lx.Mounts()))
+            {
+                try
+                {
+                    var di = new DriveInfo(m.Point);
+                    if (di.TotalSize < (1L << 30)) continue;
+                    string name = m.Point == "/home" ? "Home" : CleanLabel(Path.GetFileName(m.Point.TrimEnd('/')));
+                    list.Add(new DriveRow { Letter = m.Point, Label = name.Length > 0 ? name : m.Point, Root = m.Point, Removable = Lx.RemovableMount(m.Point),
+                                            Free = di.AvailableFreeSpace, Total = di.TotalSize });
+                }
+                catch { }
+            }
+            return list;
+        }
+
         static List<DriveRow> OtherDrives(DiskReport rep)
         {
             var list = new List<DriveRow>();
-            if (!Win.IsWindows) return list;
+            if (!Win.IsWindows) return LinuxDrives();
             try
             {
                 foreach (var d in DriveInfo.GetDrives())
@@ -918,7 +962,7 @@ namespace CDriveCleaner
                 hero.Break.Add(Tuple.Create(Lang.T("Safe to clean"), m.Tiers["safe"], Theme.MapFore(SafeColor)));
                 hero.Break.Add(Tuple.Create(Lang.T("Your files"), m.Tiers["review"], Theme.MapFore(ReviewColor)));
                 hero.Break.Add(Tuple.Create(Lang.T("Leftovers and system stores"), m.Tiers["caution"], Theme.MapFore(CautionColor)));
-                hero.Break.Add(Tuple.Create(Lang.T("Windows and apps"), m.Tiers["critical"], Theme.MapFore(CriticalColor)));
+                hero.Break.Add(Tuple.Create(Lang.T(Win.IsWindows ? "Windows and apps" : "System and apps"), m.Tiers["critical"], Theme.MapFore(CriticalColor)));
                 hero.Break.Add(Tuple.Create(Lang.T("Free"), m.Free, Theme.Dark ? Color.FromArgb(150, 150, 170) : Color.FromArgb(160, 168, 182)));
                 hero.BreakTotal = m.Total;
             }
@@ -926,7 +970,8 @@ namespace CDriveCleaner
 
             // tiles
             Action<int, string, string, Color> tile = (i, v, sub, c) => { tiles[i].Value = Lang.T(v); tiles[i].Sub = Lang.T(sub); tiles[i].Accent = c; tiles[i].Invalidate(); };
-            if (!m.DiskChecked) tile(0, "Not checked yet", "Click to check your drives", Theme.Accent);
+            if (!Win.IsWindows) tile(0, m.TrashBytes <= 0 ? "Empty" : Fs.Fmt(m.TrashBytes), m.TrashBytes <= 0 ? "Nothing waiting in the Trash" : "Click to look inside", m.TrashBytes > (1L << 30) ? CautionColor : Theme.Accent);
+            else if (!m.DiskChecked) tile(0, "Not checked yet", "Click to check your drives", Theme.Accent);
             else tile(0, m.Disk == HealthLevel.Failing ? "Back up now!" : m.Disk == HealthLevel.Warning ? "Needs a look" : m.Disk == HealthLevel.Healthy ? "Healthy" : "Unknown",
                       m.DiskCount == 1 ? "1 drive checked" : m.DiskCount + " drives checked",
                       m.Disk == HealthLevel.Failing ? CriticalColor : m.Disk == HealthLevel.Warning ? CautionColor : m.Disk == HealthLevel.Healthy ? SafeColor : Theme.Accent);
@@ -959,7 +1004,8 @@ namespace CDriveCleaner
             else tile(4, m.MailReports ? "On" : "Connected", m.MailEmail, SafeColor);
             if (m.MailEmail != null) tiles[4].Sub = m.MailLevel == 2 ? Lang.T("Connect again in Settings") : m.MailEmail;   // the address is never translated
 
-            if (m.UndoCount == 0) tile(5, "Empty", "Moved items are kept here for 7 days", Theme.Accent);
+            if (!Win.IsWindows) tile(5, m.AptBytes <= 0 ? "Clean" : Fs.Fmt(m.AptBytes), m.AptBytes <= 0 ? "No downloaded update packages" : "Downloaded update packages, safe to clean", m.AptBytes > (256L << 20) ? CautionColor : SafeColor);
+            else if (m.UndoCount == 0) tile(5, "Empty", "Moved items are kept here for 7 days", Theme.Accent);
             else tile(5, Fs.Fmt(m.UndoBytes), (m.UndoCount == 1 ? "1 item" : m.UndoCount + " items") + ", kept for 7 days", Theme.Accent);
 
             // quick wins
@@ -975,7 +1021,7 @@ namespace CDriveCleaner
                 double usedShare = d.Total > 0 ? 1 - d.Free / (double)d.Total : 0;
                 var r = new ListCard.Row
                 {
-                    Text = d.Letter + ":  " + (d.Label.Length > 0 ? d.Label : Lang.T(d.Removable ? "USB drive" : "Local disk")),
+                    Text = Win.IsWindows ? d.Letter + ":  " + (d.Label.Length > 0 ? d.Label : Lang.T(d.Removable ? "USB drive" : "Local disk")) : d.Label + (d.Removable ? "  (USB)" : ""),
                     Right = Lang.T(Fs.Fmt(d.Free) + " free of " + Fs.Fmt(d.Total)),
                     Bar = usedShare, BarColor = usedShare > 0.9 ? CriticalColor : usedShare > 0.8 ? CautionColor : ReviewColor
                 };

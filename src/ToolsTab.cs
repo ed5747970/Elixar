@@ -48,7 +48,8 @@ namespace CDriveCleaner
             pageMove = new TabPage("Move off C:") { BackColor = pageTools.BackColor };
             pageDups = new TabPage("Duplicates") { BackColor = pageTools.BackColor };
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
-            toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageUndo });
+            if (LinuxUi) toolsTabs.TabPages.Add(pageDups);   // the others are Windows' own
+            else toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageUndo });
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();
@@ -64,7 +65,7 @@ namespace CDriveCleaner
         }
 
         public void ShowTools(int inner) { tabs.SelectedTab = pageTools; toolsTabs.SelectedIndex = inner; OnToolsTab(); }
-        public void ShowTools(TabPage p) { ShowTools(toolsTabs.TabPages.IndexOf(p)); }
+        public void ShowTools(TabPage p) { int i = toolsTabs.TabPages.IndexOf(p); if (i >= 0) ShowTools(i); }
         public void ShowUndo() { ShowTools(pageUndo); }
         public void ShowStartup() { ShowTools(pageStartup); }
         public void ShowMove() { ShowTools(pageMove); }
@@ -212,7 +213,7 @@ namespace CDriveCleaner
         {
             try
             {
-                return Sys.RunPowerShell("try { Checkpoint-Computer -Description '" + description.Replace("'", "''") + "' -RestorePointType MODIFY_SETTINGS -ErrorAction Stop -WarningVariable w -WarningAction SilentlyContinue; " +
+                return Sys.RunPowerShell("try { Checkpoint-Computer -Description " + Sys.PsQuote(description) + " -RestorePointType MODIFY_SETTINGS -ErrorAction Stop -WarningVariable w -WarningAction SilentlyContinue; " +
                     "if ($w) { 'Restore point not created: ' + ($w -join ' ') } else { 'Restore point created.' } } catch { 'Restore point not created: ' + $_.Exception.Message }", 5 * 60 * 1000);
             }
             catch (Exception ex) { return "Restore point not created: " + ex.Message; }
@@ -368,7 +369,7 @@ namespace CDriveCleaner
             dupList = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
             dupList.Columns.Add("File", S(560)); dupList.Columns.Add("Size", S(85), HorizontalAlignment.Right); dupList.Columns.Add("Modified", S(95)); dupList.Columns.Add("", S(140));
             dupList.ItemChecked += (o, e) => UpdateDupButton();
-            dupList.DoubleClick += (o, e) => { if (dupList.SelectedItems.Count > 0) try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + ((FileInfo)dupList.SelectedItems[0].Tag).FullName + "\""); } catch { } };
+            dupList.DoubleClick += (o, e) => { if (dupList.SelectedItems.Count > 0) try { Shell.Select(((FileInfo)dupList.SelectedItems[0].Tag).FullName); } catch { } };
 
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, S(6), 0, 0) };
             btnDupFind = MakeButton("Find duplicates"); btnDupFind.Font = new Font("Segoe UI Semibold", 9f);
@@ -490,7 +491,7 @@ namespace CDriveCleaner
             pageUndo.Controls.Add(t);
             undoList.SelectedIndexChanged += (o, e) => UpdateUndoButtons();
             btnUndoRefresh.Click += (o, e) => RefreshUndo();
-            btnUndoOpen.Click += (o, e) => { var b = SelectedUndo(); if (b != null) try { Process.Start(Win.SystemExe("explorer.exe"), "\"" + b.Dir + "\""); } catch { } };
+            btnUndoOpen.Click += (o, e) => { var b = SelectedUndo(); if (b != null) try { Shell.Open(b.Dir); } catch { } };
             btnUndoRestore.Click += (o, e) =>
             {
                 var b = SelectedUndo(); if (b == null || testMode) return;

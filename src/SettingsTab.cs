@@ -49,7 +49,7 @@ namespace CDriveCleaner
 
             // theme, with a small preview of the chosen colours
             var themeRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
-            rbThemeAuto = radio("Follow Windows"); rbThemeLight = radio("Light"); rbThemeDark = radio("Dark");
+            rbThemeAuto = radio(Lx.Words("Follow Windows")); rbThemeLight = radio("Light"); rbThemeDark = radio("Dark");
             themePreview = new Panel { Size = new Size(S(220), S(120)), Margin = new Padding(S(10), 0, 0, 0) };
             themePreview.Paint += (o, e) => PaintThemePreview(e.Graphics, themePreview.ClientRectangle);
             var themeRadios = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
@@ -61,11 +61,13 @@ namespace CDriveCleaner
 
             // this PC: install and updates
             var pcButtons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
-            var btnInstall = MakeButton(Setup.IsRegistered() ? "Repair the installation" : "Install Elixar on this PC");
+            var btnInstall = MakeButton(!Win.IsWindows ? "How to install Elixar" : Setup.IsRegistered() ? "Repair the installation" : "Install Elixar on this PC");
             var btnUpdate = MakeButton("Check for updates");
             pcButtons.Controls.Add(btnInstall); pcButtons.Controls.Add(btnUpdate);
-            var pcInfo = Note("Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it.");
+            var pcInfo = Note(Win.IsWindows ? "Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it."
+                                            : "On Linux, Elixar is installed with its .deb package: it goes in /usr/lib/elixar (only root can change it), appears in your apps menu, and \"sudo apt remove elixar\" removes it.");
             pcInfo.Margin = new Padding(S(2), S(6), 0, 0);
+            pcInfo.Text = Lang.T("This PC runs " + OsInfo.Current.Name + ".") + " " + Lang.T(OsInfo.Current.Support) + "\n\n" + pcInfo.Text;
 
             t.Controls.Add(Title("Settings"), 0, 0);
             t.Controls.Add(Note("Choose the language and how Elixar looks. To apply a change, Elixar restarts for a moment; nothing else changes."), 0, 1);
@@ -86,6 +88,10 @@ namespace CDriveCleaner
             UpdateApplySettings();
 
             btnApplySettings.Click += (o, e) => ApplySettings();
+            if (!Win.IsWindows)
+                btnInstall.Click += (o, e) => Lang.Box(this, "In a terminal, in the folder with the download:\n\n    sudo apt install ./elixar_" + typeof(MainForm).Assembly.GetName().Version.ToString(3) + "_all.deb\n\n" +
+                                                      "apt also installs Mono (what Elixar runs on). Then open Elixar from your apps menu.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            else
             btnInstall.Click += (o, e) =>
             {
                 string err = Setup.InstallHere(null);

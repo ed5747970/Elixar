@@ -95,9 +95,9 @@ namespace CDriveCleaner
 
         public static List<CleanItem> Items()
         {
-            string L = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string R = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string U = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string L = UserDirs.Local;
+            string R = UserDirs.Roaming;
+            string U = UserDirs.Home;
             string PD = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
 
             Func<IEnumerable<string>> discord = () => new[] { "discord", "discordptb", "discordcanary" }.SelectMany(n => ChromiumCaches(Path.Combine(R, n)));

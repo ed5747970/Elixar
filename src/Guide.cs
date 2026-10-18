@@ -23,7 +23,7 @@ namespace CDriveCleaner
         // a fresh, unguessable file each time: nothing planted at that name in advance can be overwritten
         public static string WriteTemp()
         {
-            string path = Path.Combine(Path.GetTempPath(), "Elixar-User-Guide-" + Guid.NewGuid().ToString("N").Substring(0, 12) + ".html");
+            string path = Path.Combine(UserDirs.Temp, "Elixar-User-Guide-" + Guid.NewGuid().ToString("N").Substring(0, 12) + ".html");
             using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
             using (var w = new StreamWriter(fs, new UTF8Encoding(true))) w.Write(Html());
             return path;
@@ -33,8 +33,7 @@ namespace CDriveCleaner
         public static void Open()
         {
             string p = WriteTemp();
-            if (Win.IsWindows) Process.Start(Win.SystemExe("explorer.exe"), "\"" + p + "\"");
-            else Process.Start(p);
+            Shell.Open(p);
         }
 
         public static void SaveCopy(string path)

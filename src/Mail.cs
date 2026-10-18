@@ -107,8 +107,8 @@ namespace CDriveCleaner
         public static bool HasClient { get { return LoadClient() != null; } }
 
         // ---------- the signed-in account ----------
-        static byte[] Protect(byte[] b) { return Win.IsWindows ? ProtectedData.Protect(b, Entropy, DataProtectionScope.CurrentUser) : b; }
-        static byte[] Unprotect(byte[] b) { return Win.IsWindows ? ProtectedData.Unprotect(b, Entropy, DataProtectionScope.CurrentUser) : b; }
+        static byte[] Protect(byte[] b) { return SecretBox.Protect(b, Entropy); }
+        static byte[] Unprotect(byte[] b) { return SecretBox.Unprotect(b, Entropy); }
 
         public static void Save(Account a)
         {
@@ -117,6 +117,7 @@ namespace CDriveCleaner
             var json = new JavaScriptSerializer().Serialize(new Dictionary<string, string> {
                 { "email", a.Email }, { "refresh", a.Refresh }, { "cid", a.ClientId }, { "csec", a.ClientSecret }, { "scopes", a.Scopes }, { "since", a.Since.ToString("o", CultureInfo.InvariantCulture) } });
             File.WriteAllBytes(f, Protect(Encoding.UTF8.GetBytes(json)));
+            if (Lx.On) Lx.Private(f, false);
         }
 
         public static Account Load()
@@ -125,7 +126,10 @@ namespace CDriveCleaner
             {
                 string f = AccountFile;
                 if (f == null || !File.Exists(f)) return null;
-                var o = Json(Encoding.UTF8.GetString(Unprotect(File.ReadAllBytes(f))));
+                var raw = File.ReadAllBytes(f);
+                var plain = Unprotect(raw);
+                var o = Json(Encoding.UTF8.GetString(plain));
+                if (Lx.On && !SecretBox.IsSealed(raw)) SecretBox.Upgrade(f, plain, Entropy);
                 var a = new Account { Email = Str(o, "email"), Refresh = Str(o, "refresh"), ClientId = Str(o, "cid"), ClientSecret = Str(o, "csec"), Scopes = Str(o, "scopes") };
                 DateTime.TryParse(Str(o, "since"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out a.Since);
                 return a.Email.Length > 0 && a.Refresh.Length > 0 ? a : null;
@@ -193,7 +197,7 @@ namespace CDriveCleaner
 
         internal static Dictionary<string, object> PostForm(string url, Dictionary<string, string> form)
         {
-            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
+            Sys.SecureTls();   // TLS 1.2
             string body = string.Join("&", form.Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
             var req = (HttpWebRequest)WebRequest.Create(url);
             req.Method = "POST"; req.ContentType = "application/x-www-form-urlencoded"; req.UserAgent = "Elixar/" + Updates.Current; req.Timeout = 30000;
@@ -299,8 +303,7 @@ namespace CDriveCleaner
         internal static void OpenBrowser(string url)
         {
             if (BrowserOverride != null) { BrowserOverride(url); return; }
-            if (Win.IsWindows) System.Diagnostics.Process.Start(Win.SystemExe("explorer.exe"), "\"" + url + "\"");
-            else System.Diagnostics.Process.Start("xdg-open", url);
+            Shell.Open(url);
         }
 
         // ---------- a short-lived key for sending ----------
@@ -410,7 +413,7 @@ namespace CDriveCleaner
                 if (token == null) { GoogleAuth.LastError = err; if (err != GoogleAuth.SignedOutText) MailStatus.Failed(err, false); return err; }
                 try
                 {
-                    ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                    Sys.SecureTls();
                     var req = (HttpWebRequest)WebRequest.Create("https://gmail.googleapis.com/gmail/v1/users/me/messages/send");
                     req.Method = "POST"; req.ContentType = "application/json"; req.Timeout = 60000; req.UserAgent = "Elixar/" + Updates.Current;
                     req.Headers[HttpRequestHeader.Authorization] = "Bearer " + token;

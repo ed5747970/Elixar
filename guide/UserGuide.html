@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.1.0</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.0</p></div>
 </div></header>
 <main class="wrap">
 
@@ -86,6 +86,9 @@
 <p>The Dashboard opens first. It tells you at a glance how your drives are doing and what you can do about it. Looking never deletes anything; every clean asks first.</p>
 <h3>Choosing a drive</h3>
 <p>The switch at the top left lists <strong>C: Windows</strong>, every other drive in the PC (and USB drives), and <strong>All drives</strong>. Refresh (F5), Explore and Folder map work on the drive you picked.</p>
+<p>Under the switch, Elixar shows which physical disk the drive is on and this PC's name, for example <strong>Disk 0 of ELISAR-PC</strong>. The number is the one Windows' Disk Management shows (it starts at 0); two drives on the same disk show the same number. In All drives, every card has its own line.</p>
+<h3>The tabs</h3>
+<p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> on the right (the gear). A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
 <h3>C: Overview</h3>
 <ul>
   <li><strong>The ring:</strong> how full C: is, the free space in the middle, and one plain sentence: in good shape, getting full (under 20% or 25 GB free) or almost full (under 10% or 8 GB). It also warns when the space trend says C: fills up within a year.</li>
@@ -262,6 +265,20 @@
   <tr><td>An email server that never stops answering; a stalled connection during sign-in</td><td>Replies are capped at 64 MB; sign-in ignores the bad connection and waits for the real one</td></tr>
   <tr><td>Your email address in the log every account on this PC can read; a USB drive name with hidden text-direction tricks</td><td>Addresses are shortened (e***@gmail.com); drive names are shown as plain text</td></tr>
 </table>
+<h3>What 2.2 added</h3>
+<p>All of these are ways a program running with normal rights could have used Elixar's administrator rights. They are closed now.</p>
+<table>
+  <tr><th>Risk</th><th>Protection</th></tr>
+  <tr><td>Variables any program can set for your account (like COR_PROFILER) make the weekly clean and email schedules load someone else's code with administrator rights, silently</td><td>Those schedules start through a fixed launcher in Program Files that clears them first, then starts Elixar. Schedules saved by older versions are moved to it automatically</td></tr>
+  <tr><td>%ProgramFiles% is redefined, so the protected copy is installed, and started, in a folder that program controls</td><td>Program Files is read from Windows' own record, which only administrators can change</td></tr>
+  <tr><td>%TEMP% or AppData is pointed at a Windows folder (like C:\Windows\Installer), so &ldquo;Your temp files&rdquo; empties it</td><td>Your folders are used only when they are inside your real profile, as Windows records it</td></tr>
+  <tr><td>Links, .html files and Windows Settings pages open with the program your account chose, which any program can change; started from Elixar it would get administrator rights</td><td>They open with your normal rights, through the desktop</td></tr>
+  <tr><td>A PowerShell module planted in Documents runs instead of Windows' own</td><td>Elixar's PowerShell uses only Windows' modules</td></tr>
+  <tr><td>A fake DLL next to a downloaded Elixar.exe is loaded</td><td>DLLs load only from System32</td></tr>
+  <tr><td>A fake &ldquo;ping&rdquo; in the current folder runs during uninstall</td><td>Full paths, started in System32</td></tr>
+  <tr><td>The mail server renumbers a folder after the check, so other emails are moved</td><td>Elixar checks the numbering first and moves nothing if it changed</td></tr>
+  <tr><td>Old SSL 3 / TLS 1.0 connections; a Store app name with curly quotes</td><td>TLS 1.2 or newer only; package names are checked and quoted safely</td></tr>
+</table>
 <h3>The blue &ldquo;Windows protected your PC&rdquo; box</h3>
 <p>Windows shows it for downloaded programs that aren't signed with a paid certificate. Click More info &rsaquo; Run anyway once, then open the <strong>Settings</strong> tab and click <strong>Install Elixar on this PC</strong>. From then on, start Elixar from the Start menu: the installed copy in Program Files carries no &ldquo;downloaded&rdquo; mark, so the blue box doesn't come back, and signed updates go straight into it. Windows still asks for administrator rights (the usual Yes/No prompt) each time.</p>
 <h3>What 1.9.1 added</h3>
@@ -301,6 +318,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-18</td><td>2.2.0</td><td>&ldquo;Disk 0 of your PC&rdquo; on the Dashboard and on every drive card; tabs with Settings on the right (other-system tabs greyed); 11 Windows security fixes (see Security)</td></tr>
   <tr><td>2026-10-18</td><td>2.1.0</td><td>New Dashboard: a ring for how full C: is, &ldquo;Free &hellip; safely&rdquo;, six status tiles, quick wins, other drives and recent activity; a drive switcher (C:, any other drive, All drives); Overview and Details; 14 security, privacy and stability fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>2.0.0</td><td>Email account in Settings for Gmail, Outlook/Hotmail (Microsoft sign-in) and any other email (Yahoo, iCloud, AOL... with an app password). Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email, with a reminder if Google signs Elixar out. Optional Email cleaning (Email tab): old ads, social notifications, mailing lists, spam and large old emails moved to Gmail's Trash, off until you turn it on</td></tr>
   <tr><td>2026-10-17</td><td>1.9.1</td><td>No more SmartScreen box once installed; 7 security fixes (see Security)</td></tr>

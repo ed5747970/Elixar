@@ -98,7 +98,7 @@ namespace CDriveCleaner
             string tmp = Path.Combine(work, "elixar-platform-tools-" + Guid.NewGuid().ToString("N"));
             try
             {
-                ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;   // TLS 1.2
+                Sys.SecureTls();   // TLS 1.2
                 if (log != null) log("Downloading Android tools from Google...");
                 using (var wc = new WebClient()) wc.DownloadFile(ToolsUrl, zip);
                 System.IO.Compression.ZipFile.ExtractToDirectory(zip, tmp);

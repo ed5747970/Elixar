@@ -54,8 +54,8 @@ namespace CDriveCleaner
             var r2 = Row(); r2.Controls.AddRange(new Control[] { Cap("Incoming (IMAP, port 993)"), txtOtherImap, Cap("Outgoing (SMTP, port 587)"), txtOtherSmtp });
             otherHelp = new Label { AutoSize = true, MaximumSize = new Size(S(900), 0), ForeColor = Color.DimGray, UseMnemonic = false, Margin = new Padding(S(2), S(4), 0, 0) };
             otherWarn = new Label { AutoSize = true, MaximumSize = new Size(S(900), 0), ForeColor = CautionColor, Margin = new Padding(S(2), S(4), 0, 0),
-                                    Text = "An app password lets a program open your whole mailbox (that's how email programs work). Elixar keeps it encrypted on this PC in a folder only administrators can open, " +
-                                           "uses it only for what you turn on here, and always connects securely. You can delete the app password on your provider's site any time." };
+                                    Text = Lx.Words("An app password lets a program open your whole mailbox (that's how email programs work). Elixar keeps it encrypted on this PC in a folder only administrators can open, " +
+                                           "uses it only for what you turn on here, and always connects securely. You can delete the app password on your provider's site any time.") };
             btnOtherConnect = MakeButton("Connect"); btnOtherConnect.Font = new Font("Segoe UI Semibold", 9f); btnOtherConnect.Margin = new Padding(S(2), S(6), 0, 0);
             pnlOther.Controls.AddRange(new Control[] { r1, r2, otherHelp, otherWarn, btnOtherConnect });
 
@@ -74,7 +74,7 @@ namespace CDriveCleaner
             var p = MailPrefs.Load();
             pnlReports = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(S(2), S(10), 0, 0) };
             chkMailClean = new CheckBox { AutoSize = true, Checked = p.CleanReport, Text = "Weekly auto-clean report: what was cleaned, how much it freed, and what is left for you to decide" };
-            chkMailAlerts = new CheckBox { AutoSize = true, Checked = p.Alerts, Text = "Alerts: C: almost full (your limit in Automation, or 15%), or a drive that may fail" };
+            chkMailAlerts = new CheckBox { AutoSize = true, Checked = p.Alerts, Text = Lx.Words("Alerts: C: almost full (your limit in Automation, or 15%), or a drive that may fail") };
             var sumRow = Row();
             chkMailSummary = new CheckBox { AutoSize = true, Checked = p.Summary, Text = "Weekly summary every", Margin = new Padding(S(3), S(5), S(4), 0) };
             cmbMailDay = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(110) };
@@ -153,10 +153,10 @@ namespace CDriveCleaner
             mailCleanState.ForeColor = Theme.MapFore(cleaning ? SafeColor : Color.DimGray);
             btnMailCleanOn.Text = Lang.T(cleaning ? "Turn off Email cleaning..." : "Turn on Email cleaning...");
             btnMailCleanOn.Enabled = signed && !busy && !testMode;
-            mailNote.Text = Lang.T((signed ? kind : ChosenKind) != "other"
+            mailNote.Text = Lang.T(Lx.Words((signed ? kind : ChosenKind) != "other"
                 ? (cleaning ? "Emails go to you only, list categories and sizes (never your file names), and never contain a link. With Email cleaning on, Elixar can also see your emails' senders, dates and sizes and move emails to the trash, only from the Email tab and only after you confirm. Your sign-in is encrypted on this PC in a folder only administrators can open."
                             : "With Google or Microsoft, Elixar can only send email to you, never read your inbox, until you turn on Email cleaning. Emails list categories and sizes (never your file names) and never contain a link: to delete anything, open Elixar. Your sign-in is encrypted on this PC in a folder only administrators can open.")
-                : "Emails go to you only, list categories and sizes (never your file names), and never contain a link. Your app password is encrypted on this PC in a folder only administrators can open, and Elixar looks at your mailbox only when Email cleaning is on.");
+                : "Emails go to you only, list categories and sizes (never your file names), and never contain a link. Your app password is encrypted on this PC in a folder only administrators can open, and Elixar looks at your mailbox only when Email cleaning is on."));
             UpdateEmailUi();
         }
 
@@ -333,7 +333,7 @@ namespace CDriveCleaner
                                      Text = Lang.T(MicrosoftAuth.ClientId != null ? "A Microsoft app ID is already set up. You can replace it." : "No Microsoft app ID set up yet.") };
             f.Controls.Add(row); f.Controls.Add(status);
             Controls.Add(f); CancelButton = close;
-            open.Click += (o, e) => { try { Process.Start(Win.SystemExe("explorer.exe"), "\"https://entra.microsoft.com/\""); } catch { } };
+            open.Click += (o, e) => { try { Shell.Open("https://entra.microsoft.com/"); } catch { } };
             save.Click += (o, e) =>
             {
                 string err = MicrosoftAuth.SaveClientId(id.Text);
@@ -378,7 +378,7 @@ namespace CDriveCleaner
             row.Controls.AddRange(new Control[] { btnFile, btnOpen, btnClose });
             f.Controls.Add(status); f.Controls.Add(row);
             Controls.Add(f); CancelButton = btnClose;
-            btnOpen.Click += (o, e) => { try { System.Diagnostics.Process.Start(Win.SystemExe("explorer.exe"), "\"https://console.cloud.google.com/\""); } catch { } };
+            btnOpen.Click += (o, e) => { try { Shell.Open("https://console.cloud.google.com/"); } catch { } };
             btnFile.Click += (o, e) =>
             {
                 using (var d = new OpenFileDialog { Filter = "Google client file (*.json)|*.json", Title = Lang.T("Choose the file you downloaded from Google") })

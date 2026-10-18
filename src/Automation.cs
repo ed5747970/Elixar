@@ -66,16 +66,23 @@ namespace CDriveCleaner
             return "/Create /F /TN " + Quote(LogonTask) + " /TR " + Quote("\"" + exe + "\" --check-space " + percent) + " /SC ONLOGON /DELAY 0003:00";
         }
 
+        // a task with administrator rights: on Windows, through the launcher that clears risky environment variables
+        public static string ElevatedAction(string exe, string arg)
+        {
+            if (Win.IsWindows && Install.IsProtectedExe(exe)) return "\"" + Install.CmdExe + "\" " + Install.LauncherArgs(arg);
+            return "\"" + exe + "\" " + arg;
+        }
+
         public static string CreateCleanArgs(string exe, string day, string hhmm)
         {
-            return "/Create /F /TN " + Quote(CleanTask) + " /TR " + Quote("\"" + exe + "\" --auto-clean") +
+            return "/Create /F /TN " + Quote(CleanTask) + " /TR " + Quote(ElevatedAction(exe, "--auto-clean")) +
                    " /SC WEEKLY /D " + day.Substring(0, 3).ToUpperInvariant() + " /ST " + hhmm + " /RL HIGHEST";
         }
 
         // runs as administrator: the Google sign-in is kept in a folder only administrators can open
         public static string CreateMailArgs(string exe, string hhmm)
         {
-            return "/Create /F /TN " + Quote(MailTask) + " /TR " + Quote("\"" + exe + "\" --mail-daily") + " /SC DAILY /ST " + hhmm + " /RL HIGHEST";
+            return "/Create /F /TN " + Quote(MailTask) + " /TR " + Quote(ElevatedAction(exe, "--mail-daily")) + " /SC DAILY /ST " + hhmm + " /RL HIGHEST";
         }
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
@@ -136,6 +143,7 @@ namespace CDriveCleaner
         public static int RunSchtasks(string args, out string output)
         {
             output = "";
+            if (Lx.On) return LxTimers.Apply(args, out output);
             try
             {
                 var psi = new ProcessStartInfo(Win.SystemExe("schtasks.exe"), args)
@@ -157,14 +165,35 @@ namespace CDriveCleaner
 
         public static TaskState Query(string task)
         {
+            if (Lx.On) return LxTimers.Query(task);
             string xml;
             if (RunSchtasks("/Query /XML /TN " + Quote(task), out xml) != 0) return new TaskState();
             try { return ParseTaskXml(xml); } catch { return new TaskState { Exists = true }; }
         }
 
+        // Schedules with administrator rights saved by Elixar 2.1 or older start Elixar.exe directly. They are moved to the
+        // launcher (same day and time) the next time Elixar runs as administrator.
+        public static List<string> UpgradeElevatedTasks()
+        {
+            var done = new List<string>();
+            if (!Win.IsWindows || !Sys.IsAdmin()) return done;
+            var clean = Query(CleanTask); var mail = Query(MailTask);
+            bool cleanOld = clean.Exists && !Install.IsSafeElevatedTask(clean.Command, clean.Arguments, "--auto-clean");
+            bool mailOld = mail.Exists && !Install.IsSafeElevatedTask(mail.Command, mail.Arguments, "--mail-daily");
+            if (!cleanOld && !mailOld) return done;
+            if (Install.Ensure() != null) return done;
+            string o;
+            if (cleanOld && clean.Start.HasValue && Days.Contains(clean.Day) &&
+                RunSchtasks(CreateCleanArgs(Install.Exe, clean.Day, clean.Start.Value.ToString("HH:mm", CultureInfo.InvariantCulture)), out o) == 0) done.Add("weekly clean");
+            if (mailOld && mail.Start.HasValue &&
+                RunSchtasks(CreateMailArgs(Install.Exe, mail.Start.Value.ToString("HH:mm", CultureInfo.InvariantCulture)), out o) == 0) done.Add("email reports");
+            return done;
+        }
+
         // ---------- what the scheduled runs do ----------
         public static void Notify(string title, string text, ToolTipIcon kind, bool openOnClick)
         {
+            if (Lx.On) { Lx.Notify(Lang.T(title), Lang.T(text.Replace(" Click to open Elixar.", "")), kind != ToolTipIcon.Info); return; }
             using (var icon = new NotifyIcon())
             {
                 try { icon.Icon = Brand.Load(16) ?? SystemIcons.Information; } catch { icon.Icon = SystemIcons.Information; }
@@ -175,7 +204,7 @@ namespace CDriveCleaner
                 timer.Tick += (o, e) => quit();
                 icon.BalloonTipClicked += (o, e) =>
                 {
-                    if (openOnClick) { try { Process.Start(new ProcessStartInfo(Application.ExecutablePath) { UseShellExecute = true }); } catch { } }
+                    if (openOnClick) { try { Process.Start(new ProcessStartInfo(Application.ExecutablePath) { UseShellExecute = false }); } catch { } }   // started directly: never through a file-type handler someone could redefine
                     quit();
                 };
                 icon.BalloonTipClosed += (o, e) => quit();
@@ -190,17 +219,32 @@ namespace CDriveCleaner
         {
             long total = Sys.Total(), free = Sys.Free();
             SpaceHistory.Record(free, total);   // one reading a day for the space trend
-            CheckDisks();
+            if (Win.IsWindows) CheckDisks(); else CheckSnaps(total);
             if (!ShouldWarn(free, total, percent))
             {
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");
                 return 0;
             }
             Log("Space check: only " + Fs.Fmt(free) + " free. Showing the alert.");
-            Notify("Drive C: is almost full",
+            Notify(Win.IsWindows ? "Drive C: is almost full" : "Your system disk is almost full",
                 "Only " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / total) + "%). Click to open Elixar.",
                 ToolTipIcon.Warning, true);
             return 0;
+        }
+
+        // Linux: Snap apps taking far more than usual (at most one reminder a week)
+        static void CheckSnaps(long total)
+        {
+            try
+            {
+                long b = LxSystem.Snaps(LxSystem.SnapDir).Sum(a => a.Bytes);
+                if (!LxSystem.SnapsLarge(b, total)) return;
+                Log("Snap apps take " + Fs.Fmt(b) + ".");
+                if (!LxSystem.SnapWarnDue(Settings.Get("SnapAlert", ""), DateTime.Today)) return;
+                Settings.Set("SnapAlert", DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+                Notify("Snap apps take a lot of space", "Snap apps take " + Fs.Fmt(b) + " on your system disk. The Linux tab in Elixar shows which ones.", ToolTipIcon.Warning, true);
+            }
+            catch (Exception e) { Log("Snap check failed: " + e.Message); }
         }
 
         // read only; runs with the same rights as the space check
@@ -224,12 +268,13 @@ namespace CDriveCleaner
         public static List<CleanItem> AutoItems()
         {
             // only the Safe items that are ticked by default; never Caution, Review, DISM or browser caches
-            return Catalog.Build().Where(i => i.Tier == Tier.Safe && i.DefaultOn).ToList();
+            // (Linux: only what runs as you; the system parts need your password, so they're never done unattended)
+            return Catalog.Build().Where(i => i.Tier == Tier.Safe && i.DefaultOn && i.RootScript == null).ToList();
         }
 
         public static int AutoClean(bool notify)
         {
-            if (!Sys.IsAdmin()) { Log("Weekly clean skipped: it needs administrator rights."); return 1; }
+            if (Win.IsWindows && !Sys.IsAdmin()) { Log("Weekly clean skipped: it needs administrator rights."); return 1; }
             Log("Weekly clean started.");
             long start = Sys.Free();
             var results = new List<MailReports.CleanResult>();
@@ -287,14 +332,15 @@ namespace CDriveCleaner
             var intro = new Label
             {
                 AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(900), 0), Margin = new Padding(S(1), 0, 0, S(12)),
-                Text = "These run through Windows Task Scheduler, even when this program is closed. If you move the program folder, open this tab and click Save again."
+                Text = Win.IsWindows ? "These run through Windows Task Scheduler, even when this program is closed. If you move the program folder, open this tab and click Save again."
+                                     : "These run as systemd timers for your account, even when Elixar is closed. They never run as root, so the system items (which need your password) are left for when you clean yourself."
             };
 
             // --- alert
             var gAlert = new GroupBox { Text = "Low-space alert", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Anchor = AnchorStyles.Left | AnchorStyles.Top, Padding = new Padding(S(12), S(8), S(12), S(10)), Margin = new Padding(0, 0, 0, S(12)), MinimumSize = new Size(S(760), 0) };
             var fa = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             var r1 = Row();
-            chkAlert = new CheckBox { AutoSize = true, Text = "Warn me when C: has less than", Margin = new Padding(0, S(4), S(4), 0) };
+            chkAlert = new CheckBox { AutoSize = true, Text = Win.IsWindows ? "Warn me when C: has less than" : "Warn me when the system disk has less than", Margin = new Padding(0, S(4), S(4), 0) };
             numPercent = new NumericUpDown { Minimum = 5, Maximum = 50, Value = 15, Width = S(56) };
             r1.Controls.AddRange(new Control[] { chkAlert, numPercent, Lbl("% free") });
             var r2 = Row();
@@ -319,7 +365,8 @@ namespace CDriveCleaner
             {
                 AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(22), S(6), 0, 0),
                 Text = "Cleans: " + string.Join(", ", Automation.AutoItems().Select(i => i.Name)) +
-                       ".\nNever: Caution items, Recycle Bin, browser caches or DISM. Open apps are skipped, never closed. A notification shows what was freed."
+                       (Win.IsWindows ? ".\nNever: Caution items, Recycle Bin, browser caches or DISM. Open apps are skipped, never closed. A notification shows what was freed."
+                                      : ".\nNever: the Trash, browser caches or anything that needs your password. Open apps are skipped, never closed. A notification shows what was freed.")
             };
             lblCleanState = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(22), S(6), 0, 0), Text = "Checking..." };
             fc.Controls.AddRange(new Control[] { r3, lblAutoItems, lblCleanState });
@@ -404,7 +451,8 @@ namespace CDriveCleaner
                     lblAlertState.ForeColor = CautionColor;
                 }
                 else if (old) { lblAlertState.Text += "  Old C Drive Cleaner schedules are still there; Save removes them."; }
-                var unsafeTasks = new[] { check, logon, clean }.Where(x => x.Exists && !Install.IsProtectedExe(x.Command)).ToList();
+                var unsafeTasks = new[] { check, logon }.Where(x => x.Exists && !Install.IsProtectedExe(x.Command)).ToList();
+                if (clean.Exists && !Install.IsSafeElevatedTask(clean.Command, clean.Arguments, "--auto-clean")) unsafeTasks.Add(clean);
                 if (unsafeTasks.Count > 0)
                 {
                     lblAlertState.Text += "  Not protected: a schedule starts Elixar from a folder other programs can change. Click Save to secure it.";

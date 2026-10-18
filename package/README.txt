@@ -1,7 +1,19 @@
-ELIXAR  (version 2.1.0)
+ELIXAR  (version 2.2.0)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2
+- Dashboard: shows which disk each drive is on and this PC's name, for
+  example "Disk 0 of ELISAR-PC" (the number Windows' Disk Management uses).
+- Tabs along the top with Settings on the right.
+- Security: 11 fixes so programs with normal rights can't use Elixar's
+  administrator rights (schedules start through a protected launcher;
+  Program Files, Temp and AppData are taken from Windows' own records;
+  links open without admin rights; PowerShell and DLLs only from Windows;
+  TLS 1.2+ only; email moves check the mailbox first). See the user guide.
+- After updating: open Elixar once (as usual). It moves your weekly clean and
+  email schedules to the protected launcher by itself.
 
 NEW IN 2.1
 - New Dashboard: a ring shows how full C: is, with one plain sentence and a

@@ -46,7 +46,7 @@ namespace CDriveCleaner
             btnStartOpen.Click += (o, e) =>
             {
                 var sel = StartSelected().FirstOrDefault(x => !x.Missing);
-                if (sel != null) try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + sel.File + "\""); } catch { }
+                if (sel != null) try { Shell.Select(sel.File); } catch { }
             };
             btnStartRefresh.Click += (o, e) => RefreshStartup();
             UpdateStartButtons();
