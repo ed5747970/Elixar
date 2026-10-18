@@ -66,6 +66,13 @@ namespace CDriveCleaner
         }
 
         public static DialogResult Box(IWin32Window owner, string text, string caption, MessageBoxButtons b) { return Box(owner, text, caption, b, MessageBoxIcon.None); }
+
+        // a warning with Yes / No where No is the button Enter presses
+        public static DialogResult BoxNo(IWin32Window owner, string text, string caption)
+        {
+            var opt = Hebrew ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0;
+            return MessageBox.Show(owner, T(text), T(caption), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2, opt);
+        }
         public static DialogResult Box(IWin32Window owner, string text, string caption) { return Box(owner, text, caption, MessageBoxButtons.OK, MessageBoxIcon.None); }
 
         // MessageBox with the right direction and the text translated where known

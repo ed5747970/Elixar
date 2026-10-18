@@ -82,8 +82,41 @@ namespace CDriveCleaner
         // Command line that runs an uninstall string exactly as Windows does.
         public static ProcessStartInfo UninstallCommand(string uninstallString)
         {
-            // cmd /s /c "..." keeps every quote inside the original string
-            return new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/s /c \"" + uninstallString + "\"") { UseShellExecute = false, CreateNoWindow = true };
+            // cmd /s /c "..." keeps every quote inside the original string; it starts in System32, so a bare name like
+            // "MsiExec.exe" can never be picked up from whatever folder Elixar was started in
+            var psi = new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/s /c \"" + uninstallString + "\"") { UseShellExecute = false, CreateNoWindow = true };
+            try { string sys = Environment.GetFolderPath(Environment.SpecialFolder.System); if (!string.IsNullOrEmpty(sys)) psi.WorkingDirectory = sys; } catch { }
+            return psi;
+        }
+
+        static readonly System.Text.RegularExpressions.Regex ProgramPath = new System.Text.RegularExpressions.Regex(
+            @"[A-Za-z]:\\[^""<>|*?\r\n]*?\.(exe|dll|msi|bat|cmd|com|ps1|vbs|js)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        // the program files an uninstall command runs
+        public static List<string> ProgramsIn(string uninstallString)
+        {
+            string s = uninstallString ?? "";
+            try { s = Environment.ExpandEnvironmentVariables(s); } catch { }
+            return ProgramPath.Matches(s).Cast<System.Text.RegularExpressions.Match>().Select(m => m.Value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        // Windows' folder and Program Files: only administrators can change what is in them
+        public static bool InAdminFolder(string path)
+        {
+            string full;
+            try { full = Path.GetFullPath(path); } catch { return false; }
+            var roots = new List<string>();
+            foreach (var r in new[] { Environment.GetFolderPath(Environment.SpecialFolder.Windows), Environment.GetEnvironmentVariable("ProgramW6432"),
+                                      Environment.GetEnvironmentVariable("ProgramFiles"), Environment.GetEnvironmentVariable("ProgramFiles(x86)") })
+                if (!string.IsNullOrEmpty(r)) roots.Add(r.TrimEnd('\\') + "\\");
+            return roots.Any(r => full.StartsWith(r, StringComparison.OrdinalIgnoreCase)) && !full.Contains("..");
+        }
+
+        // uninstaller files that sit where other programs can change them and carry no valid signature:
+        // running those as administrator could hand administrator rights to whatever replaced them
+        public static List<string> RiskyPrograms(string uninstallString, Func<string, bool> signed)
+        {
+            return ProgramsIn(uninstallString).Where(p => !InAdminFolder(p) && !signed(p)).ToList();
         }
 
         // A location is only measured when it is a real app folder on C:, never a drive root or a shared system folder.
@@ -357,7 +390,19 @@ namespace CDriveCleaner
                         Process.Start(cmd);
                     }
                 }
-                else Process.Start(cmd);
+                else
+                {
+                    var risky = Win.IsWindows ? AppsData.RiskyPrograms(a.Uninstall, Trust.HasValidSignature) : new List<string>();
+                    if (risky.Count > 0)
+                    {
+                        Log("Uninstaller for " + a.Name + " is unsigned and outside Program Files: " + string.Join(", ", risky));
+                        if (Lang.BoxNo(this, "The uninstaller of " + a.Name + " is not signed, and it sits in a folder other programs can change:\n\n" + string.Join("\n", risky) +
+                                "\n\nElixar runs with administrator rights, so running it from here would skip Windows' own permission prompt. " +
+                                "Safer: uninstall it from Windows' Installed apps (the button on this tab), which asks you first.\n\nRun it from Elixar anyway?",
+                                "Elixar") != DialogResult.Yes) return;
+                    }
+                    Process.Start(cmd);
+                }
                 Log("Started the uninstaller for " + a.Name + (a.PerUser ? " (with your normal rights)." : "."));
                 appsStatus.Text = "Uninstaller for " + a.Name + " started. When it has finished, click Refresh.";
             }

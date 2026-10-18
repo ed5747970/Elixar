@@ -280,6 +280,8 @@ namespace CDriveCleaner
                 else if (k == "SizeOnDisk" && size == 0) long.TryParse(v, out size);
             }
             if (name == null || dir == null) return null;
+            // the folder name comes from a file any program can change: one plain name, nothing that climbs out of the library
+            if (dir.Length == 0 || dir.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 || dir.Trim().Trim('.').Length == 0 || dir.Contains("..")) return null;
             return new SteamGame { Name = name, Library = library, Folder = Path.Combine(Path.Combine(Path.Combine(library, "steamapps"), "common"), dir), Bytes = size };
         }
 
@@ -323,7 +325,7 @@ namespace CDriveCleaner
             string pf = Environment.GetEnvironmentVariable("ProgramW6432") ?? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             string std = Path.Combine(pf ?? "", @"Docker\Docker\resources\bin\docker.exe");
             if (!File.Exists(std)) return null;
-            if (Win.IsWindows && !Trust.SignedBy(std, "Docker")) return null;
+            if (Win.IsWindows && !Trust.SignedBy(std, Trust.DockerInc)) return null;
             return std;
         }
 

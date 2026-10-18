@@ -43,6 +43,7 @@ namespace CDriveCleaner
 
         public static void Log(string m)
         {
+            m = Redact.Emails(m);
             try { File.AppendAllText(LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  [auto] " + m + Environment.NewLine); } catch { }
         }
 

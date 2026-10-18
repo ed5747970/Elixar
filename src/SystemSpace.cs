@@ -149,6 +149,8 @@ namespace CDriveCleaner
                 // diskpart runs as administrator: its script must be in a folder no other program can change
                 string work = Paths.Work;
                 if (work == null) { log("  Skipped " + d + ": could not prepare a protected folder for diskpart."); continue; }
+                // diskpart runs as administrator on this file: only when no link leads it to a different disk image
+                if (!SafeDelete.RealPathMatches(d)) { log("  Skipped " + d + ": a link leads somewhere else."); continue; }
                 string script = Path.Combine(work, "elixar-compact-" + Guid.NewGuid().ToString("N") + ".txt");
                 File.WriteAllText(script, DiskpartScript(d));
                 int code = Run("diskpart.exe", "/s \"" + script + "\"", 60 * 60 * 1000, out o);
@@ -268,10 +270,14 @@ namespace CDriveCleaner
         {
             try
             {
-                // as administrator: only when no link leads it somewhere else (like Windows' own folders)
-                if (Protect.IsProtected(path) || !SafeDelete.RealPathMatches(path)) return false;
-                Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                return true;
+                // as administrator: only when no link leads it somewhere else (like Windows' own folders), and with every folder
+                // above it held in place, so none can be swapped for a link between the check and the move
+                using (var hold = SafeDelete.HoldParents(path))
+                {
+                    if (hold == null || Protect.IsProtected(path) || !SafeDelete.RealPathMatches(path)) return false;
+                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    return true;
+                }
             }
             catch { return false; }
         }

@@ -25,8 +25,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("2.0.0.0")]
-[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyVersion("2.1.0.0")]
+[assembly: AssemblyFileVersion("2.1.0.0")]
 
 namespace CDriveCleaner
 {
@@ -534,12 +534,18 @@ namespace CDriveCleaner
 
         public static List<BigFile> LargestFiles(string root, long minBytes, int top, Action<string> status)
         {
+            return LargestFiles(root, minBytes, top, status, CancellationToken.None);
+        }
+
+        public static List<BigFile> LargestFiles(string root, long minBytes, int top, Action<string> status, CancellationToken ct)
+        {
             var big = new List<BigFile>();
             var stack = new Stack<string>();
             stack.Push(root);
             int dirs = 0;
             while (stack.Count > 0)
             {
+                ct.ThrowIfCancellationRequested();
                 string dir = stack.Pop();
                 if (++dirs % 2000 == 0 && status != null) status(dir);
                 try
@@ -752,19 +758,26 @@ namespace CDriveCleaner
             var g = e.Graphics;
             g.Clear(BackColor);
             var r = new Rectangle(0, 0, Width - 1, BarHeight);
-            using (var b = new SolidBrush(Color.FromArgb(232, 236, 242))) g.FillRectangle(b, r);
-            if (Total > 0)
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            using (var path = PaintedCard.Round(r, Math.Max(4, BarHeight / 3f)))
             {
-                float x = r.X;
-                foreach (var sg in Segments)
+                using (var b = new SolidBrush(Theme.Dark ? Color.FromArgb(62, 62, 76) : Color.FromArgb(232, 236, 242))) g.FillPath(b, path);
+                var clip = g.Clip;
+                g.SetClip(path);
+                if (Total > 0)
                 {
-                    float w = (float)(r.Width * (double)sg.Bytes / Total);
-                    if (w <= 0) continue;
-                    using (var b = new SolidBrush(sg.Color)) g.FillRectangle(b, x, r.Y, w, r.Height);
-                    x += w;
+                    float x = r.X;
+                    foreach (var sg in Segments)
+                    {
+                        float w = (float)(r.Width * (double)sg.Bytes / Total);
+                        if (w <= 0) continue;
+                        using (var b = new SolidBrush(sg.Color)) g.FillRectangle(b, RightToLeft == RightToLeft.Yes ? r.Right - x - w : x, r.Y, w, r.Height);
+                        x += w;
+                    }
                 }
+                g.Clip = clip;
+                using (var p = new Pen(Theme.Grid)) g.DrawPath(p, path);
             }
-            using (var p = new Pen(Color.FromArgb(200, 206, 215))) g.DrawRectangle(p, r);
 
             int lx = 0, ly = r.Bottom + 8, box = Math.Max(10, Font.Height - 4);
             foreach (var sg in Segments)
@@ -887,21 +900,28 @@ namespace CDriveCleaner
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
-            g.Clear(BackColor);
-            using (var p = new Pen(Color.FromArgb(214, 220, 228))) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
-            int stripe = Math.Max(4, Height / 22);
-            using (var b = new SolidBrush(Accent)) g.FillRectangle(b, 0, 0, Width, stripe);
+            g.Clear(Parent != null ? Parent.BackColor : Theme.Back);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             int pad = Math.Max(10, Font.Height - 2);
+            using (var path = PaintedCard.Round(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), pad * 0.8f))
+            {
+                using (var b = new SolidBrush(Theme.Panel)) g.FillPath(b, path);
+                using (var p = new Pen(Theme.Grid)) g.DrawPath(p, path);
+            }
             var tf = TitleFont ?? Font;
             var bf = BigFont ?? Font;
-            int y = stripe + pad / 2 + 2;
-            var flags = TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis;
-            TextRenderer.DrawText(g, Title, tf, new Rectangle(pad, y, Width - 2 * pad, tf.Height + 2), Accent, flags);
-            y += tf.Height + 2;
-            TextRenderer.DrawText(g, Big, bf, new Rectangle(pad, y, Width - 2 * pad, bf.Height + 2), ForeColor, flags);
+            bool rtl = RightToLeft == RightToLeft.Yes;
+            Color acc = Theme.MapFore(Accent);
+            int y = pad, dot = Math.Max(8, tf.Height / 2);
+            var dr = new Rectangle(pad, y + (tf.Height - dot) / 2, dot, dot);
+            if (rtl) dr.X = Width - dr.Right;
+            using (var b = new SolidBrush(acc)) g.FillEllipse(b, dr);
+            var flags = TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | (rtl ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left);
+            TextRenderer.DrawText(g, Title, tf, new Rectangle(rtl ? pad : pad + dot + 6, y, Width - 2 * pad - dot - 6, tf.Height + 2), acc, flags);
+            y += tf.Height + 4;
+            TextRenderer.DrawText(g, Big, bf, new Rectangle(pad, y, Width - 2 * pad, bf.Height + 2), Theme.Ink, flags);
             y += bf.Height + 2;
-            TextRenderer.DrawText(g, Sub, Font, new Rectangle(pad, y, Width - 2 * pad, Height - y - 4), Color.FromArgb(90, 100, 115),
-                TextFormatFlags.Left | TextFormatFlags.NoPadding | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, Sub, Font, new Rectangle(pad, y, Width - 2 * pad, Height - y - 4), Theme.Quiet, flags | TextFormatFlags.WordBreak);
         }
     }
 
@@ -977,8 +997,8 @@ namespace CDriveCleaner
         readonly Dictionary<string, ListViewGroup> dashGroups = new Dictionary<string, ListViewGroup>();
         readonly Dictionary<string, ListViewGroup> fileGroups = new Dictionary<string, ListViewGroup>();
         ListView dashList, filesList;
-        Label dashHeader, dashStatus, filesStatus;
-        Button btnDashRefresh, btnToCleaner, btnFindFiles;
+        Label dashHeader, dashStatus, dashNote, filesStatus;
+        Button btnDashRefresh, btnFindFiles;
         List<DashLoc> dashLocs;
         bool dashBusy, filesBusy;
         static readonly Color CriticalColor = Color.FromArgb(199, 54, 47);
@@ -1163,6 +1183,7 @@ namespace CDriveCleaner
                 if (tabs.SelectedTab == pageApps && !appsLoaded) { appsLoaded = true; if (appsTabs.SelectedTab == pageStore) RefreshStoreApps(); else RefreshApps(); }
                 if (tabs.SelectedTab == pageAuto && !autoLoaded) { autoLoaded = true; LoadAutomationState(); }
                 if (tabs.SelectedTab == pageEmail) UpdateEmailUi();
+                if (tabs.SelectedTab == pageDash && ready && (DateTime.Now - lastOverview).TotalSeconds > 20) RefreshOverview();
                 if (tabs.SelectedTab == pageTools) OnToolsTab();
                 if (tabs.SelectedTab == pagePhone) OnPhoneTab();
             };
@@ -1205,7 +1226,7 @@ namespace CDriveCleaner
                 if (e.KeyCode == Keys.F1) { e.Handled = true; OpenGuide(); return; }
                 if (e.KeyCode != Keys.F5) return;
                 e.Handled = true;
-                if (tabs.SelectedTab == pageDash) RefreshDashboard();
+                if (tabs.SelectedTab == pageDash) RefreshCurrentDrive();
                 else if (tabs.SelectedTab == pageApps) { if (appsTabs.SelectedTab == pageStore) RefreshStoreApps(); else RefreshApps(); }
                 else if (tabs.SelectedTab == pageAuto) LoadAutomationState();
                 else if (tabs.SelectedTab == pagePhone) DetectPhone();
@@ -1233,6 +1254,7 @@ namespace CDriveCleaner
             {
                 Log("Elixar " + (Sys.IsAdmin() ? "(running as administrator)" : "(NOT running as administrator - some items will be skipped)"));
                 Log(lastScan == null ? "First scan..." : "Scanning and comparing with the scan from " + ScanSnapshot.FmtWhen(lastScan.Time) + "...");
+                RefreshOverview();
                 StartMeasure(() =>
                 {
                     Log("Ready. Tick what you want removed and click \"Clean selected\". Nothing is deleted until you confirm.");
@@ -1342,6 +1364,7 @@ namespace CDriveCleaner
 
         public void Log(string m)
         {
+            m = Redact.Emails(m);
             string line = DateTime.Now.ToString("HH:mm:ss") + "  " + m;
             lock (logLock)
             {
@@ -1435,46 +1458,40 @@ namespace CDriveCleaner
 
         void BuildDashboard()
         {
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(S(12), S(10), S(12), S(10)) };
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(S(7), S(10), S(7), S(6)) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 0 header
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 1 status
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, S(84)));   // 2 drive bar
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, S(124)));  // 3 cards
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 4 section title
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 58));       // 5 locations
-            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 6 files header
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 42));       // 7 files
+            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));      // 1 overview or details
 
-            // header
-            var head = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 5, RowCount = 1, Margin = new Padding(0) };
+            // header: title and status, Overview | Details, and a few tools
+            var head = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 6, RowCount = 1, Margin = new Padding(S(5), 0, S(5), S(6)) };
             head.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            dashHeader = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), Text = "Drive C:", Margin = new Padding(0, S(2), 0, 0) };
-            btnDashRefresh = MakeButton("Refresh (F5)");
-            btnToCleaner = MakeButton("Open Cleaner  >");
-            head.Controls.Add(dashHeader, 0, 0);
-            var btnExplore = MakeButton("Explore C:\\");
-            head.Controls.Add(btnExplore, 1, 0);
-            head.Controls.Add(btnDashRefresh, 2, 0);
-            head.Controls.Add(btnToCleaner, 3, 0);
-            var btnDashApps = MakeButton("Remove apps...");
-            head.Controls.Add(btnDashApps, 4, 0);
-            var btnTrend = MakeButton("Space trend");
-            var btnMap = MakeButton("Folder map");
-            btnDashDisk = MakeButton("Disk health");
-            head.ColumnCount = 8; head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize)); head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            head.Controls.Add(btnTrend, 5, 0); head.Controls.Add(btnMap, 6, 0); head.Controls.Add(btnDashDisk, 7, 0);
-            btnDashDisk.Click += (o, e) => ShowDiskHealth();
-            btnTrend.Click += (o, e) => { using (var tf = new TrendForm(s, SpaceHistory.Read())) { tf.Shown += (o2, e2) => { Theme.Apply(tf); Lang.Apply(tf); }; tf.ShowDialog(this); } };
-            btnMap.Click += (o, e) => { var mf = new TreemapForm(Win.IsWindows ? @"C:\" : "/", s); mf.Shown += (o2, e2) => { Theme.Apply(mf); Lang.Apply(mf); }; mf.Show(this); };
+            for (int i = 0; i < 5; i++) head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            var titles = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
+            dashHeader = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = "Drive C:", Margin = new Padding(0) };
+            dashStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "Waiting for the first scan...", Margin = new Padding(S(2), 0, 0, 0) };
+            titles.Controls.Add(BuildDrivePicker()); titles.Controls.Add(dashStatus);
+            dashView = new Segmented { Options = new[] { Lang.T("Overview"), Lang.T("Details") }, Scale_ = s, Font = new Font("Segoe UI", 9.5f), Margin = new Padding(0, S(9), S(14), 0) };
+            dashView.FitWidth();
+            Func<string, Button> tool = text =>
+            {
+                var b = MakeButton(text);
+                b.FlatStyle = FlatStyle.Flat; b.BackColor = Color.White; b.FlatAppearance.BorderColor = Color.FromArgb(214, 219, 228);
+                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 241, 255);
+                b.Margin = new Padding(S(3), S(9), S(3), 0);
+                return b;
+            };
+            btnDashRefresh = tool("Refresh (F5)");
+            var btnExplore = tool("Explore");
+            var btnMap = tool("Folder map");
+            var btnDashApps = tool("Remove apps...");
+            head.Controls.Add(titles, 0, 0); head.Controls.Add(dashView, 1, 0); head.Controls.Add(btnDashRefresh, 2, 0);
+            head.Controls.Add(btnExplore, 3, 0); head.Controls.Add(btnMap, 4, 0); head.Controls.Add(btnDashApps, 5, 0);
+            btnMap.Click += (o, e) => OpenMap(CurRoot());
             btnDashApps.Click += (o, e) => ShowStoreTab();
-            btnExplore.Click += (o, e) => OpenDrill(Environment.OSVersion.Platform == PlatformID.Win32NT ? @"C:\" : "/");
+            btnExplore.Click += (o, e) => OpenDrill(CurRoot());
 
-            dashStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "Waiting for the first scan...", Margin = new Padding(S(1), 0, 0, S(8)) };
+            dashNote = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "", Margin = new Padding(S(1), 0, 0, S(6)) };
 
             driveBar = new DriveBar { Dock = DockStyle.Fill, BarHeight = S(26), BackColor = pageDash.BackColor, Margin = new Padding(0, 0, 0, S(4)) };
 
@@ -1578,17 +1595,36 @@ namespace CDriveCleaner
             filesList.ContextMenuStrip = menu;
             filesList.DoubleClick += (o, e) => ShowSelectedFile();
 
-            root.Controls.Add(head, 0, 0);
-            root.Controls.Add(dashStatus, 0, 1);
-            root.Controls.Add(driveBar, 0, 2);
-            root.Controls.Add(cardRow, 0, 3);
-            root.Controls.Add(sec, 0, 4);
-            root.Controls.Add(dashList, 0, 5);
-            root.Controls.Add(fhead, 0, 6);
-            root.Controls.Add(filesList, 0, 7);
-            pageDash.Controls.Add(root);
+            // Details: the drive bar, the four levels, every location and the largest files
+            var det = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Margin = new Padding(0), Padding = new Padding(S(5), 0, S(5), 0) };
+            det.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            det.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 0 note
+            det.RowStyles.Add(new RowStyle(SizeType.Absolute, S(84)));   // 1 drive bar
+            det.RowStyles.Add(new RowStyle(SizeType.Absolute, S(124)));  // 2 cards
+            det.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 3 section title
+            det.RowStyles.Add(new RowStyle(SizeType.Percent, 58));       // 4 locations
+            det.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 5 files header
+            det.RowStyles.Add(new RowStyle(SizeType.Percent, 42));       // 6 files
+            det.Controls.Add(dashNote, 0, 0);
+            det.Controls.Add(driveBar, 0, 1);
+            det.Controls.Add(cardRow, 0, 2);
+            det.Controls.Add(sec, 0, 3);
+            det.Controls.Add(dashList, 0, 4);
+            det.Controls.Add(fhead, 0, 5);
+            det.Controls.Add(filesList, 0, 6);
+            dashDetails = det;
 
-            btnDashRefresh.Click += (o, e) => RefreshDashboard();
+            dashHost = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+            dashHost.Controls.Add(dashDetails);
+            dashHost.Controls.Add(BuildOverview());
+            BuildDriveViews();
+            root.Controls.Add(head, 0, 0);
+            root.Controls.Add(dashHost, 0, 1);
+            pageDash.Controls.Add(root);
+            dashView.Changed += () => ShowDashView(dashView.Selected);
+            ShowDashView(!testMode && Settings.Get("DashView", "overview") == "details" ? 1 : 0);
+
+            btnDashRefresh.Click += (o, e) => RefreshCurrentDrive();
             dashList.DoubleClick += (o, e) =>
             {
                 if (dashList.SelectedItems.Count == 0) return;
@@ -1596,7 +1632,6 @@ namespace CDriveCleaner
                 if (Directory.Exists(d.Path)) OpenDrill(d.Path);
                 else if (File.Exists(d.Path)) { try { Process.Start(Win.SystemExe("explorer.exe"), "/select,\"" + d.Path + "\""); } catch { } }
             };
-            btnToCleaner.Click += (o, e) => tabs.SelectedTab = pageClean;
             btnFindFiles.Click += (o, e) => FindLargestFiles();
         }
 
@@ -1696,13 +1731,12 @@ namespace CDriveCleaner
             driveBar.Segments.Add(new DriveBar.Seg { Label = "Free", Bytes = free, Color = FreeColor, Outline = true });
             driveBar.Invalidate();
 
-            dashHeader.Text = total > 0
-                ? "Drive C:   " + Fs.Fmt(free) + " free of " + Fs.Fmt(total) + "  (" + Math.Round(free * 100.0 / total) + "% free)"
-                : "Drive C:";
+            dashHeader.Text = Lang.T("Drive C:");
             string tookText = took.TotalSeconds < 1 ? "under 1 s" : ((int)Math.Round(took.TotalSeconds)) + " s";
-            dashStatus.Text = "Updated " + DateTime.Now.ToString("HH:mm:ss") + " (took " + tookText + ")." +
-                (Sys.IsAdmin() ? "" : "  Not running as administrator: some Windows folders may show smaller than they are.") +
-                "  WinSxS looks bigger than it is because many of its files are shared with System32.";
+            dashStatus.Text = Lang.T("Updated " + DateTime.Now.ToString("HH:mm") + " (took " + tookText + ").");
+            dashNote.Text = Lang.T(total > 0 ? Fs.Fmt(free) + " free of " + Fs.Fmt(total) + "." : "") + (Sys.IsAdmin() ? "" : "  " + Lang.T("Not running as administrator: some Windows folders may show smaller than they are.")) +
+                "  " + Lang.T("WinSxS looks bigger than it is because many of its files are shared with System32.");
+            RefreshOverview();
             Log("Dashboard updated: critical " + Fs.Fmt(totals["critical"]) + ", caution " + Fs.Fmt(totals["caution"]) +
                 ", review " + Fs.Fmt(totals["review"]) + ", safe " + Fs.Fmt(totals["safe"]) + ".");
         }
@@ -1798,6 +1832,13 @@ namespace CDriveCleaner
                 Lang.Box(this, "Tick at least one item to clean.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
+            CleanItems(sel);
+        }
+
+        // the one way Elixar cleans from the window: the Cleaner tab and the Dashboard both come here, and it always asks first
+        void CleanItems(List<CleanItem> sel)
+        {
+            if (testMode || cleaningNow || !ready || sel.Count == 0) return;
 
             long est = sel.Where(i => !i.SizeUnknown).Sum(i => i.Size);
             var lines = sel.Select(i => "  - " + i.Name + "  (" + (i.SizeUnknown ? "varies" : Fs.Fmt(i.Size)) + ")");
@@ -1830,6 +1871,8 @@ namespace CDriveCleaner
 
             bool restore = chkRestore.Checked;
             SetBusy(true);
+            cleaningNow = true;
+            RefreshOverview();
             progress.Maximum = toRun.Count;
             progress.Value = 0;
 
@@ -1867,6 +1910,8 @@ namespace CDriveCleaner
             {
                 long total = t.IsFaulted ? 0 : t.Result;
                 if (t.IsFaulted) Log("Cleaning stopped with an error: " + t.Exception.GetBaseException().Message);
+                cleaningNow = false;
+                Activity.Add("clean", "Cleaned " + (toRun.Count == 1 ? toRun[0].Name : toRun.Count + " items") + ", freed " + Fs.Fmt(total), total);
                 SetBusy(false);
                 StartMeasure(() =>
                 {
@@ -2647,7 +2692,7 @@ namespace CDriveCleaner
                         string work = Paths.Work;
                         check(!Sys.IsAdmin() || (work != null && Locked.IsLocked(work)), "Security: files an administrator writes and then uses (like diskpart's script) go in a locked folder" + (Sys.IsAdmin() ? "" : " (not admin: not tried)"));
                         string dk = Docker.Exe();
-                        check(dk == null || (dk.StartsWith(Environment.GetEnvironmentVariable("ProgramW6432") ?? "C:\\Program Files", StringComparison.OrdinalIgnoreCase) && Trust.SignedBy(dk, "Docker")),
+                        check(dk == null || (dk.StartsWith(Environment.GetEnvironmentVariable("ProgramW6432") ?? "C:\\Program Files", StringComparison.OrdinalIgnoreCase) && Trust.SignedBy(dk, Trust.DockerInc)),
                               "Security: Docker is only run from Program Files and signed by Docker" + (dk == null ? " (not installed)" : ""));
                         string me = Install.Current;
                         check(SafeFile.HasDownloadMark(me) || !SafeFile.HasDownloadMark(me), "Download mark on this copy: " + (SafeFile.HasDownloadMark(me) ? "yes (Windows asks before running it; the installed copy has none)" : "none") +
@@ -2803,17 +2848,133 @@ namespace CDriveCleaner
                           "Other email (SMTP): the report email is built with its chart inside, to your own address only");
                 } catch (Exception ex) { check(false, "Other email tests stopped: " + ex.GetType().Name + ": " + ex.Message); Imap.OpenOverride = null; GoogleAuth.OverrideDir = null; }
 
+                // 3t. the Dashboard overview: what it says, what "Free ... safely" picks, and the activity record
+                try
+                {
+                    long G = 1L << 30;
+                    Func<long, long, DashSummary> mk = (free, total) => new DashSummary { Free = free, Total = total, Measured = true };
+                    check(mk(120 * G, 476 * G).Level == 0 && mk(61 * G, 476 * G).Level == 1 && mk(30 * G, 476 * G).Level == 2 && mk(7 * G, 1000 * G).Level == 2 && mk(30 * G, 120 * G).Level == 0,
+                          "Dashboard: says fine / getting full / almost full at the right amount of free space");
+                    check(mk(61 * G, 476 * G).Headline == "C: is getting full" && new DashSummary().Headline == "Measuring drive C:...", "Dashboard: the headline matches the level");
+                    var ms = mk(61 * G, 476 * G); ms.Safe = 34 * G;
+                    var notYet = mk(61 * G, 476 * G); notYet.Measured = false; notYet.Safe = 34 * G;
+                    var busy = mk(61 * G, 476 * G); busy.Safe = 34 * G; busy.Cleaning = true;
+                    var none = mk(61 * G, 476 * G);
+                    check(ms.PrimaryEnabled && ms.PrimaryText == "Free " + Fs.Fmt(34 * G) + " safely" && !notYet.PrimaryEnabled && !busy.PrimaryEnabled && !none.PrimaryEnabled && none.PrimaryText == "Nothing to clean now",
+                          "Dashboard: \"Free ... safely\" is offered only when measured, not cleaning, and there is something safe to free");
+                    var soon = mk(61 * G, 476 * G); soon.Forecast = new SpaceHistory.Forecast { FullOn = DateTime.Today.AddDays(200) };
+                    var far = mk(61 * G, 476 * G); far.Forecast = new SpaceHistory.Forecast { FullOn = DateTime.Today.AddDays(900) };
+                    check(soon.SubLines.Any(l => l.StartsWith("At this pace C: is full around")) && !far.SubLines.Any(l => l.StartsWith("At this pace")),
+                          "Dashboard: warns when C: fills within a year, stays quiet otherwise");
+                    var pickFrom = new List<CleanItem>
+                    {
+                        new CleanItem { Name = "a", Tier = Tier.Safe, DefaultOn = true, Size = 5 * G },
+                        new CleanItem { Name = "b", Tier = Tier.Safe, DefaultOn = true, Size = 9 * G },
+                        new CleanItem { Name = "c", Tier = Tier.Safe, DefaultOn = false, Size = 20 * G },
+                        new CleanItem { Name = "d", Tier = Tier.Review, DefaultOn = true, Size = 30 * G },
+                        new CleanItem { Name = "e", Tier = Tier.Safe, DefaultOn = true, Privacy = true, Size = 3 * G },
+                        new CleanItem { Name = "f", Tier = Tier.Safe, DefaultOn = true, SizeUnknown = true },
+                        new CleanItem { Name = "g", Tier = Tier.Caution, DefaultOn = true, Size = 40 * G }
+                    };
+                    var picked = DashSummary.SafePick(pickFrom);
+                    var weekly = new HashSet<string>(Automation.AutoItems().Select(i => i.Name));
+                    var realPick = DashSummary.SafePick(Catalog.Build().Select(i => { i.Size = 1 * G; return i; }));
+                    check(string.Join(",", picked.Select(i => i.Name)) == "b,a" && realPick.Count > 0 && realPick.All(i => weekly.Contains(i.Name)),
+                          "Dashboard: \"Free ... safely\" picks only Safe items ticked by default (the weekly clean's set), never Review, Caution or privacy");
+                    check(Ui.Ago(DateTime.Now, DateTime.Now) == "Today" && Ui.Ago(DateTime.Now.AddDays(-1), DateTime.Now) == "Yesterday" && Ui.Ago(DateTime.Now.AddDays(-3), DateTime.Now) == "3 days ago",
+                          "Dashboard: says when things happened in plain words");
+                    Activity.OverrideFile = Path.Combine(root, "activity.txt");
+                    for (int i = 0; i < 70; i++) Activity.Add("clean", "Cleaned item " + i + "\twith\na tab", i);
+                    var act = Activity.Read();
+                    var recent = Activity.Recent(4, act, new List<Tuple<DateTime, long>> { Tuple.Create(DateTime.Now.AddMinutes(5), 3 * G) },
+                                                 new List<UndoBatch> { new UndoBatch { Time = DateTime.Now.AddMinutes(10), Label = "Old item", Bytes = G } }, DateTime.Now.AddMinutes(1), "Weekly summary");
+                    check(act.Count == 60 && act.Last().Bytes == 69 && !act.Any(a => a.Text.Contains("\t") || a.Text.Contains("\n")) && recent.Count == 4 &&
+                          recent[0].Kind == "undo" && recent[1].Kind == "auto" && recent[2].Kind == "mail" && recent[3].Kind == "clean",
+                          "Dashboard: the activity record keeps the newest 60 lines, one per line, and merges weekly cleans, Undo and emails newest first");
+                    Activity.OverrideFile = null;
+                    bool wasHe = Lang.Hebrew;
+                    try
+                    {
+                        Lang.Hebrew = true;
+                        check(Lang.T("Free " + Fs.Fmt(34 * G) + " safely") == "פינוי " + Fs.Fmt(34 * G) + " בבטחה" && Lang.T("Moved to Undo: Startup shortcuts (2) (12 KB)") == "הועבר לביטול: Startup shortcuts (2) (12 KB)" &&
+                              Lang.T("C: is getting full") == "C: מתמלא" && Lang.T("Every Sunday") == "כל יום ראשון",
+                              "Dashboard: the new texts are in Hebrew too");
+                    }
+                    finally { Lang.Hebrew = wasHe; }
+                } catch (Exception ex) { check(false, "Dashboard overview tests stopped: " + ex.GetType().Name + ": " + ex.Message); Activity.OverrideFile = null; }
+
+                // 3u. the weaknesses found in the October 2026 security review stay closed
+                try
+                {
+                    check(Trust.IsPublisher("Google LLC", Trust.Google) && Trust.IsPublisher("Google Inc.", Trust.Google) && !Trust.IsPublisher("Not Google LLC", Trust.Google) &&
+                          !Trust.IsPublisher("Googly Tools Ltd", Trust.Google) && !Trust.IsPublisher("", Trust.Google) && Trust.IsPublisher("Docker, Inc.", Trust.DockerInc) && Trust.IsPublisher("Docker Inc", Trust.DockerInc),
+                          "Security: \"signed by Google / Docker\" means exactly that publisher, not any name containing the word");
+                    var risky = AppsData.RiskyPrograms("\"C:\\Users\\me\\AppData\\Local\\Tool\\unins000.exe\" /SILENT", p => false);
+                    var dll = AppsData.RiskyPrograms("rundll32.exe C:\\Users\\Public\\x\\setup.dll,Uninstall", p => false);
+                    var msi = AppsData.RiskyPrograms("MsiExec.exe /X{12345678-1234-1234-1234-123456789012}", p => false);
+                    var signedOk = AppsData.RiskyPrograms("\"C:\\Users\\me\\AppData\\Local\\Tool\\unins000.exe\"", p => true);
+                    string pfx = Environment.GetEnvironmentVariable("ProgramFiles");
+                    bool pfOk = pfx == null || AppsData.RiskyPrograms("\"" + pfx + "\\Some App\\uninstall.exe\" /S", p => false).Count == 0;
+                    check(risky.Count == 1 && dll.Count == 1 && msi.Count == 0 && signedOk.Count == 0 && pfOk,
+                          "Security: an unsigned uninstaller in a folder other programs can change is flagged before it runs as administrator");
+                    var ucmd = AppsData.UninstallCommand("MsiExec.exe /X{1}");
+                    check(!win || string.Equals(ucmd.WorkingDirectory, Environment.GetFolderPath(Environment.SpecialFolder.System), StringComparison.OrdinalIgnoreCase),
+                          "Security: uninstall commands start in System32, so a bare program name can't be picked up from another folder");
+                    check(Mover.ParseManifest("\"AppState\" { \"name\" \"Evil\" \"installdir\" \"..\\\\..\\\\..\\\\Windows\" }", "D:\\SteamLibrary") == null &&
+                          Mover.ParseManifest("\"AppState\" { \"name\" \"Evil\" \"installdir\" \"C:\\\\Windows\" }", "D:\\SteamLibrary") == null &&
+                          Mover.ParseManifest("\"AppState\" { \"name\" \"Good\" \"installdir\" \"Good Game\" }", "D:\\SteamLibrary") != null,
+                          "Security: a Steam game folder can't point outside its library");
+                    check(Redact.Emails("Email reports: connected elisar.test@gmail.com (imap.mail.yahoo.com).") == "Email reports: connected e***@gmail.com (imap.mail.yahoo.com)." &&
+                          Redact.Emails("no address here") == "no address here",
+                          "Privacy: email addresses are shortened before they reach the log every account can read");
+                    string lbl = MainForm.CleanLabel("Photos\u202Egpj.exe\r\n\t" + new string('x', 60));
+                    check(lbl.IndexOf('\u202E') < 0 && lbl.IndexOf('\n') < 0 && lbl.Length <= 32, "Security: a USB drive's name can't hide text direction tricks or control characters");
+                    Func<string, string> imapFlood = repeat =>
+                    {
+                        Imap.OpenOverride = (h, p) => new FloodStream(repeat);
+                        try { using (Imap.Open(new OtherMail.Settings_ { Email = "a@b.c", Password = "x", Imap = "fake" })) { } return "no error"; }
+                        catch (IOException e) { return e.Message; }
+                        catch (Exception e) { return e.GetType().Name; }
+                        finally { Imap.OpenOverride = null; }
+                    };
+                    string flood = imapFlood("* 1 EXISTS " + new string('x', 1000) + "\r\n"), huge = imapFlood("* 1 FETCH {99999999999}\r\n");
+                    check(flood == "reply too big" && huge == "reply too big", "Security: an email server that never stops answering, or claims an impossible size, is cut off (" + flood + " / " + huge + ")");
+                    if (win)
+                    {
+                        string hp = Path.Combine(root, "hold"), hf = Path.Combine(hp, "inner", "f.txt");
+                        Directory.CreateDirectory(Path.GetDirectoryName(hf)); File.WriteAllText(hf, "x");
+                        bool blocked = false, freed = false;
+                        using (var hold = SafeDelete.HoldParents(hf))
+                        {
+                            try { Directory.Move(Path.Combine(hp, "inner"), Path.Combine(hp, "swapped")); } catch (IOException) { blocked = true; } catch (UnauthorizedAccessException) { blocked = true; }
+                            if (hold == null) blocked = false;
+                        }
+                        try { Directory.Move(Path.Combine(hp, "inner"), Path.Combine(hp, "swapped")); freed = true; } catch { }
+                        check(blocked && freed, "Security: while a duplicate goes to the Recycle Bin, the folders above it can't be swapped for a link");
+                    }
+                } catch (Exception ex) { check(false, "Security review tests stopped: " + ex.GetType().Name + ": " + ex.Message); Imap.OpenOverride = null; }
+
+                // a pretend second drive for the drive switcher (a folder in the test area)
+                string fakeD = Path.Combine(root, "drive-d");
+                Directory.CreateDirectory(Path.Combine(fakeD, "Games")); Directory.CreateDirectory(Path.Combine(fakeD, "Photos"));
+                File.WriteAllBytes(Path.Combine(fakeD, "Games", "big.bin"), new byte[300000]); File.WriteAllBytes(Path.Combine(fakeD, "Photos", "a.jpg"), new byte[100000]);
+                MainForm.DrivesOverride = () => new List<DriveRow> { new DriveRow { Letter = "D", Label = "Test", Root = fakeD, Free = 100L << 30, Total = 200L << 30 } };
+                check(DashSummary.LevelOf(100L << 30, 200L << 30) == 0 && DashSummary.LevelOf(30L << 30, 200L << 30) == 1 && DashSummary.LevelOf(5L << 30, 2000L << 30) == 2,
+                      "Drives: every drive gets the same fine / getting full / almost full rule");
+
                 // 4. the window, with cleaning switched off
-                bool uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false, emailOk = false;
+                string settingsWhy = "", driveWhy = ""; bool driveOk = false, overOk = false, uiOk = false, dashOk = false, appsOk = false, storeOk = false, toolsOk = false, phoneOk = false, diskOk = false, settingsOk = false, emailOk = false;
                 string uiErr = null;
                 try
                 {
                     var form = new MainForm(true);
                     int scans = 0;
-                    bool changeOk = false, dashDone = false, appsDone = false, storeDone = false, undoDone = false, phoneDone = false, startDone = false, moveDone = false, diskDone = false;
+                    bool changeOk = false, overDone = false, driveStarted = false, driveDone = false, dashDone = false, appsDone = false, storeDone = false, undoDone = false, phoneDone = false, startDone = false, moveDone = false, diskDone = false;
+                    bool closing = false;
                     Action maybeClose = () =>
                     {
-                        if (scans >= 2 && dashDone && appsDone && storeDone && undoDone && phoneDone && startDone && moveDone && diskDone)
+                        if (closing) return;
+                        if (scans >= 2 && dashDone && appsDone && storeDone && undoDone && phoneDone && startDone && moveDone && diskDone && overDone && driveDone)
                         {
                             toolsOk = true;
                             storeOk = !win || form.StoreCount > 0;
@@ -2823,7 +2984,9 @@ namespace CDriveCleaner
                             phoneOk = form.PhoneRows > 10;
                             diskOk = !win || form.DiskRows > 0;
                             settingsOk = form.SettingsTabReady;
+                            if (!settingsOk) settingsWhy = "  (" + form.SettingsState + ")";
                             emailOk = form.EmailRows == 6;
+                            closing = true;
                             form.Close();
                         }
                     };
@@ -2834,6 +2997,22 @@ namespace CDriveCleaner
                         else { changeOk = form.ChangeColumnFilled(); maybeClose(); }
                     };
                     form.DashboardDone += () => { dashDone = true; maybeClose(); };
+                    form.OverviewDone += () =>
+                    {
+                        if (form.OverviewFilled) { overDone = true; overOk = true; }
+                        if (!driveStarted && form.DriveChoices == 3) { driveStarted = true; form.SelectDrive("D"); }
+                        maybeClose();
+                    };
+                    form.DriveViewDone += () =>
+                    {
+                        if (driveDone) return;
+                        int folders = form.DriveFolderRows;
+                        form.SelectDrive("*"); int cards = form.AllDriveCards;
+                        form.SelectDrive("C");
+                        driveOk = folders == 2 && cards == (Sys.Total() > 0 ? 2 : 1) && form.CurrentDrive == "C";   // C: shows when this PC has one
+                        if (!driveOk) driveWhy = "  (folders " + folders + ", cards " + cards + ", now on " + form.CurrentDrive + ")";
+                        driveDone = true; maybeClose();
+                    };
                     form.AppsDone += () => { appsDone = true; maybeClose(); };
                     form.StoreDone += () => { storeDone = true; maybeClose(); };
                     form.UndoDone += () => { undoDone = true; maybeClose(); };
@@ -2853,12 +3032,15 @@ namespace CDriveCleaner
                 catch (Exception ex) { uiErr = ex.GetType().Name + ": " + ex.Message; }
                 check(uiOk, "Window opens, scans, rescans with the Change column filled, and closes" + (uiErr != null ? "  ERROR: " + uiErr : ""));
                 check(dashOk, "Dashboard measures every location and fills the cards");
+                check(overOk, "Dashboard overview fills in: the ring, Free ... safely, the six tiles, quick wins, drives and activity");
+                check(driveOk, "Drives: switching to another drive measures its folders, All drives shows a card per drive, and C: comes back" + driveWhy);
+                MainForm.DrivesOverride = null;
                 check(appsOk, "Apps tab reads and measures installed apps");
                 check(storeOk, "Built-in and Store apps list opens and fills in");
                 check(toolsOk, "Tools tab opens and the Undo list loads");
                 check(phoneOk, "Phone tab finds the (simulated) phone and lists what to clean and its apps");
                 check(diskOk, "Disk health tab opens and lists the drives");
-                check(settingsOk, "Settings tab shows the saved language and theme, ready to switch");
+                check(settingsOk, "Settings tab shows the saved language and theme, ready to switch" + settingsWhy);
                 check(emailOk, "Email tab lists what it can clean in Gmail (off until you allow it)");
                 Adb.Exe = null; Adb.Prefix = "";
 

@@ -61,7 +61,7 @@ namespace CDriveCleaner
         {
             var lines = new List<string>();
             foreach (var f in OverrideFile != null ? new[] { OverrideFile } : new[] { AdminFile, UserFile })
-                try { if (File.Exists(f)) lines.AddRange(File.ReadAllLines(f)); } catch { }
+                try { if (File.Exists(f) && new FileInfo(f).Length < (4L << 20)) lines.AddRange(File.ReadAllLines(f)); } catch { }   // one line a day: never megabytes
             return Parse(lines);
         }
 

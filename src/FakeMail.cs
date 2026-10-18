@@ -117,4 +117,33 @@ namespace CDriveCleaner
 
         public void Dispose() { try { listener.Stop(); } catch { } }
     }
+
+    // tests only: an email server that never stops answering (or answers with an impossible size)
+    public class FloodStream : System.IO.Stream
+    {
+        readonly byte[] hello = System.Text.Encoding.ASCII.GetBytes("* OK hello\r\n");
+        readonly byte[] line;
+        long pos;
+        public FloodStream(string repeat) { line = System.Text.Encoding.ASCII.GetBytes(repeat); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int n = 0;
+            while (n < count)
+            {
+                buffer[offset + n] = pos < hello.Length ? hello[pos] : line[(pos - hello.Length) % line.Length];
+                pos++; n++;
+            }
+            return n;
+        }
+        public override int ReadByte() { int b = pos < hello.Length ? hello[pos] : line[(pos - hello.Length) % line.Length]; pos++; return b; }
+        public override void Write(byte[] buffer, int offset, int count) { }
+        public override void Flush() { }
+        public override bool CanRead { get { return true; } }
+        public override bool CanWrite { get { return true; } }
+        public override bool CanSeek { get { return false; } }
+        public override long Length { get { throw new System.NotSupportedException(); } }
+        public override long Position { get { return pos; } set { throw new System.NotSupportedException(); } }
+        public override long Seek(long o, System.IO.SeekOrigin r) { throw new System.NotSupportedException(); }
+        public override void SetLength(long v) { throw new System.NotSupportedException(); }
+    }
 }

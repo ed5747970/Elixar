@@ -234,22 +234,27 @@ namespace CDriveCleaner
                     if (cancel.IsCancellationRequested) return "Sign-in was cancelled.";
                     if (DateTime.Now > until) return "Sign-in timed out. Try again.";
                     if (!listener.Pending()) { Thread.Sleep(150); continue; }
-                    using (var client = listener.AcceptTcpClient())
+                    try
                     {
-                        client.ReceiveTimeout = 5000; client.SendTimeout = 5000;
-                        var stream = client.GetStream();
-                        string line = ReadLine(stream);
-                        var q = ParseQuery(line);
-                        string page;
-                        string gotState;
-                        if (!q.TryGetValue("state", out gotState) || gotState != state) page = Page("This page isn't for Elixar's sign-in.", false);   // a stray request (e.g. favicon)
-                        else if (q.ContainsKey("error")) { err = q["error"] == "access_denied" ? "You didn't allow Elixar to send email." : "Google said: " + q["error"]; page = Page("Sign-in didn't finish. You can close this tab.", false); }
-                        else if (q.ContainsKey("code")) { code = q["code"]; page = Page("Google sign-in done. You can close this tab and go back to Elixar.", true); }
-                        else page = Page("Nothing to do here.", false);
-                        var resp = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
-                                                          Encoding.UTF8.GetByteCount(page) + "\r\n\r\n" + page);
-                        try { stream.Write(resp, 0, resp.Length); } catch { }
+                        using (var client = listener.AcceptTcpClient())
+                        {
+                            client.ReceiveTimeout = 5000; client.SendTimeout = 5000;
+                            var stream = client.GetStream();
+                            string line = ReadLine(stream);
+                            var q = ParseQuery(line);
+                            string page;
+                            string gotState;
+                            if (!q.TryGetValue("state", out gotState) || gotState != state) page = Page("This page isn't for Elixar's sign-in.", false);   // a stray request (e.g. favicon)
+                            else if (q.ContainsKey("error")) { err = q["error"] == "access_denied" ? "You didn't allow Elixar to send email." : "Google said: " + q["error"]; page = Page("Sign-in didn't finish. You can close this tab.", false); }
+                            else if (q.ContainsKey("code")) { code = q["code"]; page = Page("Google sign-in done. You can close this tab and go back to Elixar.", true); }
+                            else page = Page("Nothing to do here.", false);
+                            var resp = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
+                                                              Encoding.UTF8.GetByteCount(page) + "\r\n\r\n" + page);
+                            try { stream.Write(resp, 0, resp.Length); } catch { }
+                        }
                     }
+                    catch (IOException) { }        // a connection that stalls or breaks: wait for the next one
+                    catch (System.Net.Sockets.SocketException) { }
                 }
                 if (err != null) return err;
                 if (status != null) status("Finishing sign-in...");

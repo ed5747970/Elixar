@@ -45,7 +45,7 @@ namespace CDriveCleaner
             {
                 string p = Path.Combine(dir, f);
                 if (!File.Exists(p)) { if (f == "adb.exe") return false; continue; }
-                if (!Trust.SignedBy(p, "Google")) return false;
+                if (!Trust.SignedBy(p, Trust.Google)) return false;
             }
             return true;
         }

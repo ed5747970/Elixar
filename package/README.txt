@@ -1,7 +1,18 @@
-ELIXAR  (version 2.0.0)
+ELIXAR  (version 2.1.0)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.1
+- New Dashboard: a ring shows how full C: is, with one plain sentence and a
+  "Free ... safely" button (safe caches and temp files only; it asks first).
+  Six tiles: Disk health, Space trend, Last clean, Automation, Email reports,
+  Undo. Plus quick wins, other drives and recent activity.
+- Drive switcher: C:, any other drive (how full it is, its biggest folders
+  and largest files) or All drives side by side. Overview / Details for C:.
+- Security: 14 fixes from a full review (uninstallers in folders other
+  programs can change, exact publisher check, duplicates, email servers,
+  email addresses kept out of the shared log...). See the user guide.
 
 NEW IN 2.0
 - Email account (Settings): connect Gmail or Outlook/Hotmail with their own

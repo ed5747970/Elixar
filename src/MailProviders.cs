@@ -121,20 +121,25 @@ namespace CDriveCleaner
                     if (DateTime.Now > until) return "Sign-in timed out. Try again.";
                     TcpListener ready = listener.Pending() ? listener : v6 != null && v6.Pending() ? v6 : null;
                     if (ready == null) { Thread.Sleep(150); continue; }
-                    using (var client = ready.AcceptTcpClient())
+                    try
                     {
-                        client.ReceiveTimeout = 5000; client.SendTimeout = 5000;
-                        var stream = client.GetStream();
-                        var q = GoogleAuth.ParseQuery(GoogleAuth.ReadLine(stream));
-                        string got, page;
-                        if (!q.TryGetValue("state", out got) || got != state) page = GoogleAuth.Page("This page isn't for Elixar's sign-in.", false);
-                        else if (q.ContainsKey("error")) { err = q["error"] == "access_denied" ? "You didn't allow Elixar's permissions." : "Microsoft said: " + q["error"]; page = GoogleAuth.Page("Sign-in didn't finish. You can close this tab.", false); }
-                        else if (q.ContainsKey("code")) { code = q["code"]; page = GoogleAuth.Page("Microsoft sign-in done. You can close this tab and go back to Elixar.", true); }
-                        else page = GoogleAuth.Page("Nothing to do here.", false);
-                        var resp = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
-                                                          Encoding.UTF8.GetByteCount(page) + "\r\n\r\n" + page);
-                        try { stream.Write(resp, 0, resp.Length); } catch { }
+                        using (var client = ready.AcceptTcpClient())
+                        {
+                            client.ReceiveTimeout = 5000; client.SendTimeout = 5000;
+                            var stream = client.GetStream();
+                            var q = GoogleAuth.ParseQuery(GoogleAuth.ReadLine(stream));
+                            string got, page;
+                            if (!q.TryGetValue("state", out got) || got != state) page = GoogleAuth.Page("This page isn't for Elixar's sign-in.", false);
+                            else if (q.ContainsKey("error")) { err = q["error"] == "access_denied" ? "You didn't allow Elixar's permissions." : "Microsoft said: " + q["error"]; page = GoogleAuth.Page("Sign-in didn't finish. You can close this tab.", false); }
+                            else if (q.ContainsKey("code")) { code = q["code"]; page = GoogleAuth.Page("Microsoft sign-in done. You can close this tab and go back to Elixar.", true); }
+                            else page = GoogleAuth.Page("Nothing to do here.", false);
+                            var resp = Encoding.UTF8.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
+                                                              Encoding.UTF8.GetByteCount(page) + "\r\n\r\n" + page);
+                            try { stream.Write(resp, 0, resp.Length); } catch { }
+                        }
                     }
+                    catch (IOException) { }        // a connection that stalls or breaks: wait for the next one
+                    catch (System.Net.Sockets.SocketException) { }
                 }
                 if (err != null) return err;
                 if (status != null) status("Finishing sign-in...");
@@ -593,14 +598,19 @@ namespace CDriveCleaner
             var bytes = Encoding.UTF8.GetBytes(t + " " + cmd + "\r\n");
             io.Write(bytes, 0, bytes.Length); io.Flush();
             var lines = new List<string>();
+            long total = 0;   // a server that never stops answering can't fill the memory
             while (true)
             {
                 string line = ReadLine();
+                total += line.Length;
+                if (total > 64L << 20) throw new IOException("reply too big");
                 var lit = Regex.Match(line, @"\{(\d+)\}$");
                 while (lit.Success)
                 {
-                    int n = int.Parse(lit.Groups[1].Value, CultureInfo.InvariantCulture);
-                    if (n > 4 << 20) throw new IOException("reply too big");
+                    int n;
+                    if (!int.TryParse(lit.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out n) || n > 4 << 20) throw new IOException("reply too big");
+                    total += n;
+                    if (total > 64L << 20) throw new IOException("reply too big");
                     var buf = new byte[n]; int got = 0;
                     while (got < n) { int r = io.Read(buf, got, n - got); if (r <= 0) throw new IOException("the connection closed"); got += r; }
                     line = line + "\n" + Encoding.UTF8.GetString(buf) + ReadLine();

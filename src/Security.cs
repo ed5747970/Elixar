@@ -96,9 +96,15 @@ namespace CDriveCleaner
             finally { Marshal.FreeHGlobal(pFile); }
         }
 
+        // the signer's name (CN), read properly even when it contains a comma ("Docker, Inc.")
         public static string Signer(string file)
         {
-            try { return CN(System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(file).Subject); }
+            try
+            {
+                var c = new System.Security.Cryptography.X509Certificates.X509Certificate2(System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(file));
+                string n = c.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, false);
+                return string.IsNullOrEmpty(n) ? CN(c.Subject) : n.Trim();
+            }
             catch { return ""; }
         }
 
@@ -112,11 +118,22 @@ namespace CDriveCleaner
             return (subject ?? "").Trim();
         }
 
-        // signed by the named company and the signature is valid
-        public static bool SignedBy(string file, string company)
+        // the signature is valid and the signer is exactly one of these publishers
+        // (not just a name that contains the word: "Not Google Ltd" or "Googly Tools" don't count)
+        public static bool SignedBy(string file, params string[] publishers)
         {
-            return HasValidSignature(file) && Signer(file).IndexOf(company, StringComparison.OrdinalIgnoreCase) >= 0;
+            return HasValidSignature(file) && IsPublisher(Signer(file), publishers);
         }
+
+        public static bool IsPublisher(string signer, params string[] publishers)
+        {
+            Func<string, string> norm = x => (x ?? "").Trim().TrimEnd('.').Replace(",", "").ToLowerInvariant();
+            string s = norm(signer);
+            return s.Length > 0 && publishers.Any(p => norm(p) == s);
+        }
+
+        public static readonly string[] Google = { "Google LLC", "Google Inc" };
+        public static readonly string[] DockerInc = { "Docker Inc", "Docker, Inc." };
 
         // Windows checks many files at once (also catalog-signed Windows files): path -> (status, signer)
         public const string SigScript =
@@ -403,6 +420,37 @@ namespace CDriveCleaner
                     return !h.IsInvalid && parent != null && Same(Final(h), parent.TrimEnd('\\') + "\\" + Path.GetFileName(full));
             }
             catch { return false; }
+        }
+
+        // Keeps every folder above path from being renamed, moved or swapped for a link until disposed:
+        // each one is opened without allowing delete or rename. Returns null when that isn't possible (or a link is in the way).
+        public static IDisposable HoldParents(string path)
+        {
+            var held = new Held();
+            if (!Win.IsWindows) return held;
+            try
+            {
+                var chain = new List<string>();
+                for (string d = Path.GetDirectoryName(Path.GetFullPath(path)); !string.IsNullOrEmpty(d); d = Path.GetDirectoryName(d)) chain.Add(d);
+                chain.Reverse();
+                foreach (var d in chain)
+                {
+                    var h = CreateFileW(Long(d), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING,
+                                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
+                    FILE_BASIC_INFO info;
+                    if (h.IsInvalid || !GetFileInformationByHandleEx(h, 0, out info, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO))) || (info.FileAttributes & ATTR_REPARSE) != 0)
+                    { h.Dispose(); held.Dispose(); return null; }
+                    held.Handles.Add(h);
+                }
+                return held;
+            }
+            catch { held.Dispose(); return null; }
+        }
+
+        sealed class Held : IDisposable
+        {
+            public readonly List<SafeFileHandle> Handles = new List<SafeFileHandle>();
+            public void Dispose() { foreach (var h in Handles) try { h.Dispose(); } catch { } Handles.Clear(); }
         }
 
         public static int Blocked;   // how many items were skipped because their real location changed (for the log and self-test)

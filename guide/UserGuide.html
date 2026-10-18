@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.0.0</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.1.0</p></div>
 </div></header>
 <main class="wrap">
 
@@ -83,11 +83,20 @@
 </ol>
 
 <h2 id="dashboard">Dashboard</h2>
-<p>The Dashboard opens first and shows what fills C:, grouped from Critical to Safe. It never deletes anything.</p>
+<p>The Dashboard opens first. It tells you at a glance how your drives are doing and what you can do about it. Looking never deletes anything; every clean asks first.</p>
+<h3>Choosing a drive</h3>
+<p>The switch at the top left lists <strong>C: Windows</strong>, every other drive in the PC (and USB drives), and <strong>All drives</strong>. Refresh (F5), Explore and Folder map work on the drive you picked.</p>
+<h3>C: Overview</h3>
 <ul>
-  <li><strong>Drive bar:</strong> C: split into Critical, Caution, Review, Safe, other used and free space.</li>
-  <li><strong>Four cards:</strong> how many GB sit in each level and what to do about it.</li>
+  <li><strong>The ring:</strong> how full C: is, the free space in the middle, and one plain sentence: in good shape, getting full (under 20% or 25 GB free) or almost full (under 10% or 8 GB). It also warns when the space trend says C: fills up within a year.</li>
+  <li><strong>Free &hellip; safely:</strong> cleans only the Safe items that are ticked by default (the same set the weekly clean uses): caches and temp files that Windows and your apps rebuild by themselves. It lists them and asks before deleting. They are deleted, not kept in Undo.</li>
+  <li><strong>What fills C::</strong> safe to clean, your files, leftovers and system stores, Windows and apps, and free space.</li>
+  <li><strong>Six tiles</strong> (click one to open it): Disk health, Space trend (with a small chart), Last clean, Automation, Email reports and Undo.</li>
+  <li><strong>Quick wins:</strong> the five biggest safe items, each with its own Clean button (it asks first).</li>
+  <li><strong>Other drives</strong> and <strong>Recent activity</strong> (cleans, weekly cleans, emails sent and moves to Undo).</li>
 </ul>
+<h3>C: Details</h3>
+<p>Click <strong>Details</strong> next to Overview for the full lists:</p>
 <table>
   <tr><th>Level</th><th>Meaning</th><th>What to do</th></tr>
   <tr><td class="danger" style="color:var(--danger);font-weight:600">Critical</td><td>Windows, Program Files, the page file</td><td>Never delete by hand; uninstall apps in the Apps tab</td></tr>
@@ -98,11 +107,15 @@
 <ul>
   <li><strong>Everything on C:</strong> every known location, biggest first, with its share of used space. A folder inside another listed folder is never counted twice.</li>
   <li><strong>Find largest files:</strong> scans the whole drive (2 to 5 minutes, read-only) and lists files over 50 MB from Critical to Safe. Double-click a file to show it in its folder; right-click &rsaquo; Uninstall when it belongs to an app.</li>
-  <li><strong>Folder drill-down:</strong> double-click a folder row or click &ldquo;Explore C:\&rdquo; to see what is inside, biggest first. Backspace goes up. This also explains &ldquo;Other used&rdquo;.</li>
-  <li><strong>F5 or Refresh</strong> measures again; it also refreshes after every clean.</li>
-  <li><strong>Space trend:</strong> free space over time and a forecast like &ldquo;C: loses 5 GB a month, full around October 2027&rdquo;. Elixar records one reading a day (each scan and the daily low-space check), so the chart fills in over a few days.</li>
-  <li><strong>Disk health:</strong> the button turns orange (&ldquo;Disk health: check&rdquo;) or red (&ldquo;back up now!&rdquo;) when a drive needs attention. Click it to see why.</li>
-  <li><strong>Folder map:</strong> boxes sized by the space they use and coloured by level (red critical, orange caution, blue review, green safe). Click a folder to go inside; Backspace goes back.</li>
+  <li><strong>Folder drill-down:</strong> double-click a folder row or click Explore to see what is inside, biggest first. Backspace goes up.</li>
+</ul>
+<h3>Another drive</h3>
+<p>Pick D:, E: and so on to see how full it is, what fills it, its <strong>biggest folders</strong> (Open shows what is inside) and, when you ask, its <strong>largest files</strong> (this reads the whole drive, so it only runs when you click it; Show opens the file's folder). If Disk health says a drive may fail, Elixar doesn't read through it on its own: back up first.</p>
+<h3>All drives</h3>
+<p>Every drive side by side, with its free space, kind and health, and which one has the most room. When C: is getting full and another drive has room, it offers <strong>Move files off C:</strong>. Click a drive's card to open it.</p>
+<ul>
+  <li><strong>Space trend:</strong> free space over time and a forecast like &ldquo;C: loses 5 GB a month, full around October 2027&rdquo;. Elixar records one reading a day, so the chart fills in over a few days.</li>
+  <li><strong>Folder map:</strong> boxes sized by the space they use and coloured by level. Click a folder to go inside; Backspace goes back.</li>
 </ul>
 
 <h2 id="cleaner">Cleaner</h2>
@@ -238,6 +251,17 @@
   <tr><td>Swapped Android tools or uninstall commands run as admin</td><td>Google's signature is checked before the Android tools run; your account's uninstallers run without admin rights</td></tr>
 </table>
 <p>To check your copy, click &ldquo;Verify this copy&rdquo; in the footer: it shows Elixar's SHA-256 fingerprint to compare with SHA256.txt, and the state of the protected copy and the Undo folder. Elixar is not an antivirus.</p>
+<h3>What 2.1 added</h3>
+<table>
+  <tr><th>Risk</th><th>Protection</th></tr>
+  <tr><td>An app's uninstaller sits in a folder other programs can change (like AppData) and isn't signed; run from Elixar it would get administrator rights without Windows' prompt</td><td>Elixar shows the file and warns first (No is the default) and suggests Windows' Installed apps, which asks you</td></tr>
+  <tr><td>A bare name like &ldquo;MsiExec.exe&rdquo; in an uninstall command is picked up from the folder Elixar was started in</td><td>Uninstall commands always start in System32</td></tr>
+  <tr><td>A program signed by a look-alike company (&ldquo;Not Google Ltd&rdquo;) passes as Google's or Docker's</td><td>The publisher must match exactly</td></tr>
+  <tr><td>A folder is swapped for a link while a duplicate goes to the Recycle Bin</td><td>Every folder above the file is held in place until it has moved</td></tr>
+  <tr><td>A link leads diskpart to a different disk image; a Steam file points a game outside its library</td><td>Both are refused</td></tr>
+  <tr><td>An email server that never stops answering; a stalled connection during sign-in</td><td>Replies are capped at 64 MB; sign-in ignores the bad connection and waits for the real one</td></tr>
+  <tr><td>Your email address in the log every account on this PC can read; a USB drive name with hidden text-direction tricks</td><td>Addresses are shortened (e***@gmail.com); drive names are shown as plain text</td></tr>
+</table>
 <h3>The blue &ldquo;Windows protected your PC&rdquo; box</h3>
 <p>Windows shows it for downloaded programs that aren't signed with a paid certificate. Click More info &rsaquo; Run anyway once, then open the <strong>Settings</strong> tab and click <strong>Install Elixar on this PC</strong>. From then on, start Elixar from the Start menu: the installed copy in Program Files carries no &ldquo;downloaded&rdquo; mark, so the blue box doesn't come back, and signed updates go straight into it. Windows still asks for administrator rights (the usual Yes/No prompt) each time.</p>
 <h3>What 1.9.1 added</h3>
@@ -277,6 +301,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-18</td><td>2.1.0</td><td>New Dashboard: a ring for how full C: is, &ldquo;Free &hellip; safely&rdquo;, six status tiles, quick wins, other drives and recent activity; a drive switcher (C:, any other drive, All drives); Overview and Details; 14 security, privacy and stability fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>2.0.0</td><td>Email account in Settings for Gmail, Outlook/Hotmail (Microsoft sign-in) and any other email (Yahoo, iCloud, AOL... with an app password). Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email, with a reminder if Google signs Elixar out. Optional Email cleaning (Email tab): old ads, social notifications, mailing lists, spam and large old emails moved to Gmail's Trash, off until you turn it on</td></tr>
   <tr><td>2026-10-17</td><td>1.9.1</td><td>No more SmartScreen box once installed; 7 security fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>1.9.0</td><td>Disk health (read only, with daily alerts); Settings tab to switch English/Hebrew and light/dark; Windows tools always started by full path</td></tr>

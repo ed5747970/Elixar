@@ -28,6 +28,8 @@ namespace CDriveCleaner
             }
         }
 
+        public string SettingsState { get { return "tab " + (pageSettings != null && tabs.TabPages.Contains(pageSettings)) + ", chosen " + ChosenLanguage + "/" + ChosenTheme + ", saved " + Settings.Language + "/" + Settings.ThemeMode + ", apply " + (btnApplySettings.Enabled ? "on" : "off"); } }
+
         public void ShowSettings() { tabs.SelectedTab = pageSettings; }
 
         void BuildSettingsTab()

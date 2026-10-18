@@ -115,16 +115,12 @@ namespace CDriveCleaner
             diskDetail.Text = string.Join(Environment.NewLine, lines);
         }
 
-        // ---- the Dashboard button turns orange or red when a drive needs attention ----
-        Button btnDashDisk; DiskReport lastDiskReport;
+        // ---- the Dashboard's Disk health tile follows the last check ----
+        DiskReport lastDiskReport;
 
         void UpdateDashDiskButton(DiskReport rep)
         {
-            if (btnDashDisk == null || rep == null) return;
-            var w = rep.Error == null ? rep.Worst : HealthLevel.Unknown;
-            btnDashDisk.Text = Lang.T(w == HealthLevel.Failing ? "Disk health: back up now!" : w == HealthLevel.Warning ? "Disk health: check" : "Disk health");
-            btnDashDisk.ForeColor = w >= HealthLevel.Warning ? (Theme.Dark ? Theme.MapFore(LevelColor(w)) : Color.White) : (Theme.Dark ? Theme.Ink : SystemColors.ControlText);
-            if (w >= HealthLevel.Warning) { btnDashDisk.FlatStyle = FlatStyle.Flat; btnDashDisk.BackColor = Theme.Dark ? btnDashDisk.BackColor : LevelColor(w); }
+            if (rep != null) RefreshOverview();
         }
 
         // a quiet check in the background when Elixar opens

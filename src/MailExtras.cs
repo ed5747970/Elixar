@@ -15,6 +15,7 @@ namespace CDriveCleaner
     public static class MailStatus
     {
         public static DateTime LastSent, LastFail, LastNotified;
+        static readonly object gate = new object();   // the Dashboard reads this in the background while the window may write it
         public static string LastWhat = "", LastError = "";
         public static bool SignedOut;
 
@@ -23,7 +24,9 @@ namespace CDriveCleaner
         static DateTime P(string s) { DateTime t; return DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out t) ? t : DateTime.MinValue; }
         static string Clean(string s) { return (s ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim(); }
 
-        public static void Load()
+        public static void Load() { lock (gate) LoadLocked(); }
+
+        static void LoadLocked()
         {
             LastSent = LastFail = LastNotified = DateTime.MinValue; LastWhat = LastError = ""; SignedOut = false;
             try
@@ -54,15 +57,20 @@ namespace CDriveCleaner
             catch { }
         }
 
-        public static void Sent(string what) { Load(); LastSent = DateTime.Now; LastWhat = what; SignedOut = false; Save(); }
-        public static void Failed(string error, bool signedOut) { Load(); LastFail = DateTime.Now; LastError = error; if (signedOut) SignedOut = true; Save(); }
-        public static void Reset() { try { string f = File_; if (f != null && File.Exists(f)) File.Delete(f); } catch { } Load(); }
-        public static void Notified() { Load(); LastNotified = DateTime.Now; Save(); }
+        public static void Sent(string what) { lock (gate) { LoadLocked(); LastSent = DateTime.Now; LastWhat = what; SignedOut = false; Save(); } }
+        public static void Failed(string error, bool signedOut) { lock (gate) { LoadLocked(); LastFail = DateTime.Now; LastError = error; if (signedOut) SignedOut = true; Save(); } }
+        public static void Reset() { lock (gate) { try { string f = File_; if (f != null && File.Exists(f)) File.Delete(f); } catch { } LoadLocked(); } }
+        public static void Notified() { lock (gate) { LoadLocked(); LastNotified = DateTime.Now; Save(); } }
 
         // the line shown in Settings; level: 0 fine, 1 a problem, 2 signed out
         public static string Line(out int level)
         {
-            Load();
+            lock (gate) return LineLocked(out level);
+        }
+
+        static string LineLocked(out int level)
+        {
+            LoadLocked();
             level = 0;
             Func<DateTime, string> when = t => t.ToString("ddd d MMM HH:mm", CultureInfo.InvariantCulture);
             if (SignedOut) { level = 2; return "Your email signed Elixar out on " + when(LastFail) + ". Emails have stopped: connect again above."; }
@@ -73,6 +81,13 @@ namespace CDriveCleaner
 
         // the daily check notifies at most once a day while the sign-in is broken
         public static bool ShouldNotify(DateTime today) { return SignedOut && LastNotified.Date != today.Date; }
+    }
+
+    // Elixar's log sits in a folder every account on this PC can read: email addresses are shortened before they get there
+    public static class Redact
+    {
+        static readonly System.Text.RegularExpressions.Regex Address = new System.Text.RegularExpressions.Regex(@"([A-Za-z0-9])[A-Za-z0-9._%+\-]*@([A-Za-z0-9\-]+)((?:\.[A-Za-z0-9\-]+)+)");
+        public static string Emails(string s) { return string.IsNullOrEmpty(s) || s.IndexOf('@') < 0 ? s : Address.Replace(s, "$1***@$2$3"); }
     }
 
     // a small chart of free space on C:, drawn on this PC, for the weekly summary email
