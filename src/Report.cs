@@ -64,6 +64,15 @@ namespace CDriveCleaner
                 b.Append("</table>");
             }
 
+            if (sum != null && sum.Watch != null && sum.Watch.Count > 0)
+            {
+                b.Append("<h2>" + H(Lang.T("Folders to watch")) + "</h2><table>");
+                foreach (var w in sum.Watch.Take(8))
+                    b.Append("<tr><td>" + H(Lang.T(w.Name)) + "</td><td class=\"n\">" + H(Lang.T("+" + Fs.Fmt(Math.Max(0, w.PerMonth)) + " a month")) + "</td><td>" +
+                             H(Lang.T("Check it " + Growth.EveryText(w.EveryDays))) + "</td></tr>");
+                b.Append("</table>");
+            }
+
             if (sum != null && sum.LastClean.HasValue)
                 b.Append("<h2>" + H(Lang.T("Last clean")) + "</h2><p>" + H(sum.LastClean.Value.ToString("yyyy-MM-dd HH:mm")) + " &middot; " + H(Lang.T("Freed " + Fs.Fmt(sum.LastCleanBytes))) + "</p>");
             b.Append("<p class=\"q\" style=\"margin-top:26px\">" + H(Lang.T("Made by Elixar on this PC. It lists sizes and folder names only, never your file names or email address.")) + "</p></main></body></html>");

@@ -89,6 +89,8 @@ namespace CDriveCleaner
         public string MailEmail; public bool MailReports; public int MailLevel;
         public long UndoBytes; public int UndoCount;
         public long TrashBytes = -1, AptBytes = -1, SnapBytes = -1, OneDriveFree = -1;
+        public List<Growth.Watch> Watch = new List<Growth.Watch>();   // folders that keep growing
+        public bool WatchHistory;                                       // two weeks of readings so far
         public List<Growth.Change> Grew = new List<Growth.Change>();   // what grew this week   // Linux tiles and the Snap warning
         public List<DriveRow> Drives = new List<DriveRow>();
         public List<Activity.Entry> Recent = new List<Activity.Entry>();
@@ -283,6 +285,15 @@ namespace CDriveCleaner
                     case "mail":
                         using (var path = Round(new RectangleF(x + X * .12f, y + Y * .24f, X * .76f, Y * .52f), X * .07f)) g.DrawPath(p, path);
                         g.DrawLines(p, new[] { P(.16f, .3f), P(.5f, .54f), P(.84f, .3f) });
+                        break;
+                    case "watch":   // an eye: the folders Elixar keeps watching
+                        using (var path = new GraphicsPath())
+                        {
+                            path.AddBezier(P(.1f, .5f), P(.3f, .2f), P(.7f, .2f), P(.9f, .5f));
+                            path.AddBezier(P(.9f, .5f), P(.7f, .8f), P(.3f, .8f), P(.1f, .5f));
+                            g.DrawPath(p, path);
+                        }
+                        g.DrawEllipse(p, x + X * .38f, y + Y * .38f, X * .24f, Y * .24f);
                         break;
                     case "undo":
                         using (var path = new GraphicsPath())
@@ -733,7 +744,7 @@ namespace CDriveCleaner
         DateTime lastOverview = DateTime.MinValue;
         int tileCols;
         public event Action OverviewDone;
-        static readonly string[] TileKinds = { "disk", "trend", "clean", "clock", "mail", "undo" };
+        static readonly string[] TileKinds = { "disk", "trend", "clean", "clock", "mail", "undo", "watch" };
         static readonly string[] LinuxTileKinds = { "trash", "trend", "clean", "clock", "mail", "drive" };
 
         Control BuildOverview()
@@ -757,10 +768,10 @@ namespace CDriveCleaner
 
             tileGrid = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), Padding = new Padding(0) };
             var capFont = new Font("Segoe UI Semibold", 8.25f); var valFont = new Font("Segoe UI Semibold", 12.5f);
-            string[] caps = !LinuxUi ? new[] { "Disk health", "Space trend", "Last clean", "Auto-delete", "Email reports", "Undo" }
+            string[] caps = !LinuxUi ? new[] { "Disk health", "Space trend", "Last clean", "Auto-delete", "Email reports", "Undo", "Watch" }
                                           : new[] { "Trash", "Space trend", "Last clean", "Automation", "Email reports", "Update packages" };
-            tiles = new TileCard[6];
-            for (int i = 0; i < 6; i++)
+            tiles = new TileCard[caps.Length];
+            for (int i = 0; i < tiles.Length; i++)
             {
                 string cap = Lang.T(caps[i]);
                 tiles[i] = new TileCard
@@ -773,7 +784,7 @@ namespace CDriveCleaner
             }
             tiles[3].HasSwitch = !LinuxUi;
             tiles[3].SwitchClicked += () => SetAutoDelete(!tiles[3].SwitchOn);
-            LayoutTiles(6);
+            LayoutTiles(tiles.Length);
 
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0) };
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
@@ -797,25 +808,32 @@ namespace CDriveCleaner
             bottom.Controls.Add(cardWins, 0, 0); bottom.Controls.Add(cardDrives, 1, 0); bottom.Controls.Add(cardActivity, 2, 0);
 
             t.Controls.Add(hero, 0, 0); t.Controls.Add(tileGrid, 0, 1); t.Controls.Add(bottom, 0, 2);
-            t.Resize += (o, e) => LayoutTiles(t.ClientSize.Width >= S(1000) ? 6 : 3);
+            t.Resize += (o, e) => LayoutTiles(tiles.Length == 7 ? (t.ClientSize.Width >= S(1250) ? 7 : 4) : (t.ClientSize.Width >= S(1000) ? 6 : 3));
             FormClosing += (o, e) => { if (!e.Cancel) formClosing = true; };
             dashOverview = t;
             return t;
         }
 
-        // six tiles in a row on a wide window, two rows of three on a narrow one
+        // all tiles in one row on a wide window; on a narrower one two rows (3 + 3, or 4 + 3 with seven tiles,
+        // laid on a 12-column grid so both rows are filled edge to edge)
         void LayoutTiles(int cols)
         {
             if (cols == tileCols || tileGrid == null) return;
             tileCols = cols;
-            int rows = 6 / cols;
+            int n = tiles.Length, rows = (n + cols - 1) / cols;
             tileGrid.SuspendLayout();
             tileGrid.Controls.Clear();
             tileGrid.ColumnStyles.Clear(); tileGrid.RowStyles.Clear();
-            tileGrid.ColumnCount = cols; tileGrid.RowCount = rows;
-            for (int c = 0; c < cols; c++) tileGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / cols));
+            int grid = rows == 1 ? n : 12;
+            tileGrid.ColumnCount = grid; tileGrid.RowCount = rows;
+            for (int c = 0; c < grid; c++) tileGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / grid));
             for (int r = 0; r < rows; r++) tileGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rows));
-            for (int i = 0; i < 6; i++) tileGrid.Controls.Add(tiles[i], i % cols, i / cols);
+            int at = 0;
+            for (int r = 0; r < rows; r++)
+            {
+                int inRow = Math.Min(cols, n - at), span = grid / Math.Max(1, inRow);
+                for (int k = 0; k < inRow; k++, at++) { tileGrid.Controls.Add(tiles[at], k * span, r); tileGrid.SetColumnSpan(tiles[at], span); }
+            }
             tileGrid.ResumeLayout();
             if (dashOverview != null)
             {
@@ -847,6 +865,9 @@ namespace CDriveCleaner
                 case 3: tabs.SelectedTab = pageAuto; break;
                 case 4: ShowSettings(); break;
                 case 5: ShowUndo(); break;
+                case 6:
+                    WatchForm.ShowFor(this, testMode, dashLocs, p => { if (System.IO.Directory.Exists(p)) OpenDrill(p); else ShowInFolder(p); }, RefreshOverview);
+                    break;
             }
         }
 
@@ -887,7 +908,11 @@ namespace CDriveCleaner
                 try { undo = Quarantine.List(); } catch { }
                 sum.UndoCount = undo.Count; sum.UndoBytes = undo.Sum(b => Math.Max(0, b.Bytes));
                 if (!LinuxUi) try { var tp = TidyPrefs.Load(); sum.TidyOn = tp.AnyDaily; sum.TidyLow = tp.LowClean; sum.TidyDays = tp.BinDays; } catch { }
-                if (Win.IsWindows || Growth.OverrideFile != null) try { sum.Grew = Growth.Grew(DateTime.Today, 7, 256L << 20); } catch { }
+                if (Win.IsWindows || Growth.OverrideFile != null)
+                {
+                    try { sum.Grew = Growth.Grew(DateTime.Today, 7, 256L << 20); } catch { }
+                    try { sum.Watch = Growth.Watchlist(DateTime.Today); sum.WatchHistory = Growth.HasHistory(DateTime.Today); } catch { }
+                }
                 if (odAccounts.Count > 0 && !LinuxUi) try { sum.OneDriveFree = OneDrive.QuickFreeable(); } catch { }
                 if (Lx.On)
                 {
@@ -1060,6 +1085,23 @@ namespace CDriveCleaner
             if (LinuxUi) tile(5, m.AptBytes <= 0 ? "Clean" : Fs.Fmt(m.AptBytes), m.AptBytes <= 0 ? "No downloaded update packages" : "Downloaded update packages, safe to clean", m.AptBytes > (256L << 20) ? CautionColor : SafeColor);
             else if (m.UndoCount == 0) tile(5, "Empty", "Removed items wait here before they are deleted for good", Theme.Accent);
             else tile(5, Fs.Fmt(m.UndoBytes), (m.UndoCount == 1 ? "1 item" : m.UndoCount + " items") + ", Tools > Undo puts them back", Theme.Accent);
+
+            // folders to watch: the one that most needs a look
+            if (tiles.Length > 6)
+            {
+                var w = m.Watch ?? new List<Growth.Watch>();
+                var top = w.FirstOrDefault();
+                if (!m.WatchHistory) tile(6, "Collecting data", "Folders that keep growing show up after two weeks", Theme.Accent);
+                else if (top == null) tile(6, "All steady", "No folder keeps growing", SafeColor);
+                else
+                {
+                    tile(6, top.Name, "", top.Due ? CautionColor : Theme.Accent);
+                    int more = w.Count - 1;
+                    tiles[6].Sub = Lang.T("+" + Fs.Fmt(Math.Max(0, top.PerMonth)) + " a month") + ". " + Lang.T(top.Due ? "Check it " + Growth.EveryText(top.EveryDays) : "Checked") +
+                                   (more > 0 ? " · " + Lang.T("+" + more + " more") : "");
+                    tiles[6].Invalidate();
+                }
+            }
 
             // quick wins
             long max = m.TopSafe.Count > 0 ? Math.Max(1, m.TopSafe.Max(i => i.Size)) : 1;

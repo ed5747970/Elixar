@@ -212,8 +212,23 @@ namespace CDriveCleaner
             try { d.Image(TrendChart.Png(SpaceHistory.Read(), DateTime.Today, 56), L("Free space on C: over the last 8 weeks", "השטח הפנוי ב-C: ב-8 השבועות האחרונים")); } catch { }
             if (lastClean != null) d.P(lastClean);
             WhatToDelete(d, items);
+            WatchLines(d);
             DiskLines(d, disks);
             return d;
+        }
+
+        // the folders that keep growing, with how often to look at them (Dashboard > Watch)
+        static void WatchLines(Doc d)
+        {
+            if (!Win.IsWindows && Growth.OverrideFile == null) return;
+            List<Growth.Watch> w;
+            try { w = Growth.Watchlist(DateTime.Today); } catch { return; }
+            if (w.Count == 0) return;
+            d.Heading(L("Keep an eye on", "במעקב"));
+            d.P(L("These folders keep growing. Look at them as often as shown, in Elixar > Dashboard > Watch.", "התיקיות האלה ממשיכות לגדול. בדקו אותן בתדירות שמוצגת, ב-Elixar > לוח בקרה > במעקב."));
+            d.Table(w.Take(5).Select(x => new[] { Lang.T(x.Name), "+" + Fs.Fmt(Math.Max(0, x.PerMonth)) + L(" a month", " בחודש"),
+                                                  x.Due ? L("look now (" + Growth.EveryText(x.EveryDays) + ")", "לבדוק עכשיו (" + Lang.T(Growth.EveryText(x.EveryDays)) + ")")
+                                                        : L("next look " + x.NextCheck.ToString("d MMM"), "הבדיקה הבאה " + x.NextCheck.ToString("d.M")) }));
         }
 
         public class CleanResult { public string Name; public long Freed; public string Skipped; }

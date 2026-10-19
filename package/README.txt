@@ -1,17 +1,19 @@
-ELIXAR  (version 1.2.32)
+ELIXAR  (version 1.2.31)
 The cure for a cluttered PC
 Made by Elisar
 =======================
 
-NEW IN 1.2.32
-- New slogan: "The cure for a cluttered PC" (Elixar does far more than the
-  C: drive now).
-- Dashboard header tidied: the drives and the tools sit on one line, the
-  status line fits on one line, and Overview | Details moved next to it.
-  The Auto-delete switch no longer covers the tile's title.
-
-NEW IN 1.2.31 (golden image)
-- Tools > Sysprep now also checks what would be copied to every PC:
+NEW IN 1.2.31
+- Dashboard > Watch: the folders that always grow or grow fast, how much a
+  month, what to do, and how often to look at them (every week, 2 weeks or
+  month). "I checked it" keeps a folder quiet until its next look is due.
+  The weekly email and the report list them too. Sizes only, never names.
+- New slogan: "The cure for a cluttered PC".
+- Dashboard header tidied: drives and tools on one line, the status line
+  never wraps, Overview | Details next to it. The Auto-delete switch no
+  longer covers the tile's title.
+- Golden image: Tools > Sysprep now also checks what would be copied to
+  every PC:
   saved passwords (automatic sign-in, Wi-Fi, Credential Manager, browsers),
   old answer files Windows would use instead of yours, SSH keys and cloud
   sign-ins, and Elixar's own email sign-in. It only checks whether they are

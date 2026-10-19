@@ -1602,6 +1602,37 @@ namespace CDriveCleaner
                                   "What grew: compares this week with last week (sizes only) and says what grew the most");
                         }
                         finally { Growth.OverrideFile = null; }
+                        // ---- folders to watch: eight weeks of readings ----
+                        Growth.OverrideFile = Path.Combine(root, "growth-watch.txt"); Growth.OverrideCheckedFile = Path.Combine(root, "watch-checked.txt");
+                        try
+                        {
+                            DateTime today = DateTime.Today, start = today.AddDays(-56);
+                            bool early = false;
+                            for (int d = 0; d <= 56; d += 2)
+                            {
+                                long gb = 1L << 30, mb = 1L << 20;
+                                var day = start.AddDays(d);
+                                Growth.Record(new[] {
+                                    new DashLoc { Id = "downloads", Name = "Downloads folder", Own = 4 * gb + d * 90 * mb, Bytes = 1 },                // ~2.6 GB a month, every week
+                                    new DashLoc { Id = "videos", Name = "Videos folder", Own = 10 * gb + d * 220 * mb, Bytes = 1 },                   // ~6.4 GB a month
+                                    new DashLoc { Id = "wudl", Name = "Windows Update downloads", Own = (d % 14) * 200 * mb, Bytes = 1 },               // grows, then cleaned
+                                    new DashLoc { Id = "usertemp", Name = "Your temp files", Own = 300 * mb + (d % 3) * mb, Bytes = 1 } }, day);    // flat
+                                if (d == 6) early = Growth.HasHistory(day) == false && Growth.Watchlist(day).Count == 0;
+                            }
+                            var wl = Growth.Watchlist(today);
+                            bool ok = early && Growth.HasHistory(today) && wl.Count == 2 && wl[0].Id == "videos" && wl[1].Id == "downloads" &&
+                                      wl[0].Fast && wl[0].EveryDays == 7 && wl[1].Steady && wl[1].EveryDays == 14 && wl.All(x => x.Due) &&
+                                      Math.Abs(wl[1].PerMonth - 30 * 90L * (1L << 20)) < (100L << 20);
+                            Growth.MarkChecked("videos", today);
+                            var wl2 = Growth.Watchlist(today);
+                            ok &= wl2.Count == 2 && wl2[0].Id == "downloads" && !wl2[1].Due && wl2[1].NextCheck == today.AddDays(7) && wl2[1].Checked == today;
+                            ok &= Growth.Watchlist(today.AddDays(8)).First(x => x.Id == "videos").Due;
+                            var sumW = new DashSummary { Measured = true, Watch = wl2, WatchHistory = true };
+                            string repW = Report.Build(sumW, new List<DriveRow>(), new List<CleanItem>(), null, null);
+                            ok &= repW.Contains("Downloads folder") && repW.Contains("every 2 weeks");
+                            check(ok, "Folders to watch: finds the folders that always grow or grow fast (not ones cleaned now and then), says how often to look, and stays quiet until the next look");
+                        }
+                        finally { Growth.OverrideFile = null; Growth.OverrideCheckedFile = null; }
                         string tl = MainForm.TrayLine(29L << 30, 252L << 30);
                         check(tl.StartsWith("Elixar - C: ") && tl.Contains("free") && tl.Length <= 63 && MainForm.TrayLine(long.MaxValue / 2, 1).Length <= 63, "Tray: shows the free space on C: in at most 63 characters (" + tl + ")");
                         check(Automation.SmartReminderDue("", "", DateTime.Today) && !Automation.SmartReminderDue(DateTime.Today.AddDays(-3).ToString("yyyy-MM-dd"), "", DateTime.Today) &&
