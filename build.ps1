@@ -27,7 +27,7 @@ $refs = "System.dll","System.Core.dll","System.Drawing.dll","System.Windows.Form
         "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll","System.Security.dll" | ForEach-Object { "/r:$_" }
 $src = Get-ChildItem (Join-Path $root "src\*.cs") | ForEach-Object { $_.FullName }
 $exe = Join-Path $outDir "Elixar.exe"
-& $csc /nologo /target:winexe /optimize+ "/out:$exe" "/win32icon:$root\app.ico" `
+& $csc /nologo /target:winexe /optimize+ "/out:$exe" "/win32icon:$root\app.ico" "/win32manifest:$root\app.manifest" `
     "/resource:$root\app.ico,Elixar.app.ico" "/resource:$root\brand.png,Elixar.brand.png" `
     "/resource:$root\guide\UserGuide.html,Elixar.guide.html" "/resource:$cfg,Elixar.update-config.txt" $refs $src
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }

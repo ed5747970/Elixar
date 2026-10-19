@@ -34,7 +34,7 @@ jobs:
           $pkg = "pkg\Elixar"
           New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
           Copy-Item out\Elixar.exe, package\README.txt, "package\Run self-test (safe).bat", guide\UserGuide.html $pkg
-          Copy-Item -Recurse src, guide, tools, package, app.ico, brand.png, build.ps1, README.md "$pkg\source"
+          Copy-Item -Recurse src, guide, tools, package, app.ico, app.manifest, brand.png, build.ps1, README.md "$pkg\source"
           $exeHash = (Get-FileHash out\Elixar.exe -Algorithm SHA256).Hash
           [IO.File]::WriteAllText("$pkg\SHA256.txt", "Elixar $v - made by Elisar`r`nSHA-256 of Elixar.exe:`r`n$exeHash`r`n")
           Compress-Archive -Path $pkg -DestinationPath Elixar.zip -Force

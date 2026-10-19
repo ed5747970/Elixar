@@ -83,8 +83,9 @@ namespace CDriveCleaner
         public static ProcessStartInfo UninstallCommand(string uninstallString)
         {
             // cmd /s /c "..." keeps every quote inside the original string; it starts in System32, so a bare name like
-            // "MsiExec.exe" can never be picked up from whatever folder Elixar was started in
-            var psi = new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/s /c \"" + uninstallString + "\"") { UseShellExecute = false, CreateNoWindow = true };
+            // "MsiExec.exe" can never be picked up from whatever folder Elixar was started in. /d: cmd skips the "AutoRun"
+            // commands any program can set for your account, which would otherwise run with administrator rights.
+            var psi = new ProcessStartInfo(Win.SystemExe("cmd.exe"), "/d /s /c \"" + uninstallString + "\"") { UseShellExecute = false, CreateNoWindow = true };
             try { string sys = Environment.GetFolderPath(Environment.SpecialFolder.System); if (!string.IsNullOrEmpty(sys)) psi.WorkingDirectory = sys; } catch { }
             return psi;
         }

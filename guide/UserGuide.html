@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.2</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.3</p></div>
 </div></header>
 <main class="wrap">
 
@@ -281,6 +281,17 @@
   <tr><td>An email server that never stops answering; a stalled connection during sign-in</td><td>Replies are capped at 64 MB; sign-in ignores the bad connection and waits for the real one</td></tr>
   <tr><td>Your email address in the log every account on this PC can read; a USB drive name with hidden text-direction tricks</td><td>Addresses are shortened (e***@gmail.com); drive names are shown as plain text</td></tr>
 </table>
+<h3>What 2.2.3 added</h3>
+<p>A deeper check of the whole app found more ways a program running with your normal rights could have used Elixar's administrator rights. They are closed now.</p>
+<table>
+  <tr><th>Risk</th><th>Protection</th></tr>
+  <tr><td>An &ldquo;AutoRun&rdquo; command any program can set for cmd.exe ran with administrator rights when Elixar started an app's uninstaller</td><td>cmd.exe is always started with /d, which skips AutoRun</td></tr>
+  <tr><td>An Elixar.exe.config file or Elixar.exe.local folder put next to a downloaded Elixar.exe makes .NET or Windows load someone else's code</td><td>Elixar refuses to start while one is there, and Elixar.exe now carries a Windows manifest, so a .local folder is ignored</td></tr>
+  <tr><td>.NET &ldquo;profiler&rdquo; settings (COR_PROFILER and similar) set for your account load a DLL into Elixar when you start it</td><td>Before asking for administrator rights, Elixar finds them and offers to remove them; started as administrator with them already in place, it closes</td></tr>
+  <tr><td>Program Files, Path or ComSpec redefined for your account point the programs Elixar starts (uninstallers, PowerShell, Windows tools) somewhere else</td><td>As administrator, Elixar puts back Windows' own values for every program it starts</td></tr>
+  <tr><td>Docker reads its settings and plugins from your account's folders, so running it as administrator handed those rights on</td><td>Docker's prune runs with your normal rights</td></tr>
+  <tr><td>A fake update server sends an endless download</td><td>Update files bigger than a release can be are refused (the signature check was already in place)</td></tr>
+</table>
 <h3>What 2.2.2 added</h3>
 <table>
   <tr><th>Risk</th><th>Protection</th></tr>
@@ -334,6 +345,8 @@
 <table>
   <tr><th>You see</th><th>Do this</th></tr>
   <tr><td>&ldquo;Windows protected your PC&rdquo;</td><td>Click More info &rsaquo; Run anyway once (check SHA256.txt if unsure), then install Elixar from the Settings tab and use the Start menu entry</td></tr>
+  <tr><td>&ldquo;Elixar did not start, because something was put next to Elixar.exe&rdquo;</td><td>Delete the file it names (Elixar.exe.config, .local or .manifest), or download Elixar again into a new folder. Elixar never uses these files</td></tr>
+  <tr><td>&ldquo;These settings for your Windows account make every .NET program load extra code&rdquo;</td><td>Click Yes to remove them, unless you know a developer tool you use needs them</td></tr>
   <tr><td>A self-test check failed</td><td>Send selftest-report.txt (in the Elixar folder) for a fix</td></tr>
   <tr><td>Driver list empty in the self-test</td><td>Normal without admin rights; Windows lists drivers only to administrators</td></tr>
   <tr><td>Automation says &ldquo;Not protected&rdquo;</td><td>Open Automation and click Save</td></tr>
@@ -344,6 +357,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>2.2.3</td><td>Deeper security check: cmd AutoRun, files put next to Elixar.exe, .NET profiler settings, redefined Program Files/Path, Docker with your normal rights, update size limits (see Security)</td></tr>
   <tr><td>2026-10-19</td><td>2.2.2</td><td>OneDrive tab (only when OneDrive is signed in): make files you don't use online-only; Smart scan finds similar photos and empty folders and can compress rarely used files; Leftovers of removed apps (Tools); what grew this week; Export report (print to PDF); icon next to the clock; a monthly Smart scan reminder for other drives; 6 security protections (see Security)</td></tr>
   <tr><td>2026-10-19</td><td>2.2.1</td><td>Your other drives: Smart scan (duplicates with your choice of which copy stays, big files not used for 6+ months), Clean D: (Recycle Bin, disk-check leftovers, Steam caches), duplicates on any or all drives, low-space alerts for every internal drive; data drives and drives with their own Windows are told apart</td></tr>
   <tr><td>2026-10-18</td><td>2.2.0</td><td>&ldquo;Disk 0 of your PC&rdquo; on the Dashboard and on every drive card; tabs with Settings on the right (other-system tabs greyed); 11 Windows security fixes (see Security)</td></tr>

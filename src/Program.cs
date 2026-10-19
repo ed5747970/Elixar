@@ -26,6 +26,22 @@ namespace CDriveCleaner
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
+            bool scheduled = args.Contains("--auto-clean") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb");
+            if (Win.IsWindows)
+            {
+                // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
+                var planted = EnvGuard.PlantedFiles(Application.ExecutablePath);
+                if (planted.Count > 0)
+                {
+                    if (!scheduled)
+                        MessageBox.Show("Elixar did not start, because something was put next to Elixar.exe:\n\n" + string.Join("\n", planted) +
+                            "\n\nElixar never uses these, and Windows would obey them: they could make Elixar run someone else's code with administrator rights. " +
+                            "Delete them, or download Elixar again into a new folder.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return 1;
+                }
+            }
+            // running as administrator: the programs Elixar starts get Windows' own Program Files, Path and ComSpec, and no .NET switches
+            var droppedEnv = Win.IsWindows && Sys.IsAdmin() ? EnvGuard.Sanitize() : new List<string>();
             Theme.Init(Settings.ThemeMode);
             Lang.Init(Settings.Language);
             // the pretend phone used by the self-test only (never answers outside a self-test run)
@@ -76,6 +92,15 @@ namespace CDriveCleaner
 
             if (!noElevate && !Sys.IsAdmin())
             {
+                // before asking for administrator rights: .NET switches set for your account would load code into Elixar
+                var inAccount = EnvGuard.InAccount();
+                if (inAccount.Count > 0)
+                {
+                    if (MessageBox.Show("Before Elixar asks for administrator rights:\n\nThese settings for your Windows account make every .NET program load extra code:\n\n" +
+                            string.Join("\n", inAccount) + "\n\nWith administrator rights, that code would get them too. Developer tools sometimes add these settings, and so does malware.\n\n" +
+                            "Remove them and continue? (No closes Elixar.)", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return 0;
+                    EnvGuard.RemoveFromAccount(inAccount);
+                }
                 try
                 {
                     // the protected copy is preferred when it is the same version or newer: only administrators can change it,
@@ -98,6 +123,18 @@ namespace CDriveCleaner
                         "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 return 0;
+            }
+
+            if (Win.IsWindows && !testUi && droppedEnv.Count > 0)
+            {
+                // started as administrator with .NET switches already in place: their code may be running inside Elixar
+                var inAccount = EnvGuard.InAccount();
+                if (MessageBox.Show("Elixar was started with settings that make .NET load extra code:\n\n" + string.Join("\n", droppedEnv) +
+                        "\n\nThat code may already be running inside Elixar with administrator rights, so Elixar closes now." +
+                        (inAccount.Count > 0 ? "\n\nRemove these settings from your Windows account? Then start Elixar again." : "\n\nCheck how Elixar was started, then start it again normally."),
+                        "Elixar", inAccount.Count > 0 ? MessageBoxButtons.YesNo : MessageBoxButtons.OK, MessageBoxIcon.Warning) == DialogResult.Yes)
+                    EnvGuard.RemoveFromAccount(inAccount);
+                return 1;
             }
 
             int au = Array.IndexOf(args, "--apply-update");

@@ -329,6 +329,37 @@ namespace CDriveCleaner
             return std;
         }
 
+        // Docker reads its settings, sign-in helpers and plugins from folders in your account that any program you run can
+        // change (%USERPROFILE%\.docker). Run as administrator, it would hand those administrator rights. So Elixar runs
+        // Docker's prune with your normal rights, just as typing it in a command window would.
+        public static string Prune(string exe)
+        {
+            if (!Win.IsWindows || !Sys.IsAdmin()) return Sys.Run(exe, "system prune -f", 30 * 60 * 1000);
+            string outFile = Path.Combine(UserDirs.Temp, "elixar-docker-" + Guid.NewGuid().ToString("N") + ".txt");
+            int code;
+            Unelevated.Start(Install.CmdExe, PruneArgs(exe, outFile), 30 * 60 * 1000, out code);
+            string text = ReadOwnOutput(outFile);
+            try { SafeDelete.Delete(outFile); } catch { }
+            return text;
+        }
+        public static string PruneArgs(string exe, string outFile) { return "/d /c \"\"" + exe + "\" system prune -f > \"" + outFile + "\" 2>&1\""; }
+
+        // the text the unelevated Docker wrote: only a plain file with one name (never a link to another file), at most 64 KB
+        static string ReadOwnOutput(string file)
+        {
+            try
+            {
+                if (!File.Exists(file) || !SafeDelete.RealPathMatches(file) || SmartScan.Links(file) != 1) return "";
+                using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    var buf = new byte[Math.Min(fs.Length, 65536)];
+                    int n = fs.Read(buf, 0, buf.Length);
+                    return System.Text.Encoding.UTF8.GetString(buf, 0, n);
+                }
+            }
+            catch { return ""; }
+        }
+
         // "Total reclaimed space: 1.2GB" -> bytes
         public static long ParseReclaimed(string output)
         {

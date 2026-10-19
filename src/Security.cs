@@ -616,8 +616,15 @@ namespace CDriveCleaner
         static extern bool CreateProcessWithTokenW(IntPtr token, uint logonFlags, string app, StringBuilder cmd, uint flags, IntPtr env, string dir, ref STARTUPINFO si, out PROCESS_INFORMATION pi);
 
         // starts app with the rights of the signed-in user's desktop (Explorer), not as administrator
-        public static Process Start(string app, string arguments)
+        public static Process Start(string app, string arguments) { int code; return Start(app, arguments, 0, out code); }
+
+        [DllImport("kernel32.dll", SetLastError = true)] static extern uint WaitForSingleObject(IntPtr h, uint ms);
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetExitCodeProcess(IntPtr h, out int code);
+
+        // waitMs > 0: waits that long for it to finish; exitCode is -1 if it didn't finish in time
+        public static Process Start(string app, string arguments, int waitMs, out int exitCode)
         {
+            exitCode = -1;
             IntPtr proc = IntPtr.Zero, tok = IntPtr.Zero, dup = IntPtr.Zero;
             try
             {
@@ -634,6 +641,7 @@ namespace CDriveCleaner
                 CloseHandle(pi.hThread);
                 Process p = null;
                 try { p = Process.GetProcessById(pi.dwProcessId); } catch { }
+                if (waitMs > 0 && WaitForSingleObject(pi.hProcess, (uint)waitMs) == 0) { int c; if (GetExitCodeProcess(pi.hProcess, out c)) exitCode = c; }
                 CloseHandle(pi.hProcess);
                 return p;
             }
@@ -838,6 +846,11 @@ namespace CDriveCleaner
         [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetSearchPathMode(uint flags);
         const uint LoadFromSystem32 = 0x800, SafeSearchPermanent = 0x8001;
         public static bool DllSearchHardened;   // for the self-test
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr GetModuleHandleW(string name);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindResourceW(IntPtr module, IntPtr name, IntPtr type);
+        // the running Elixar.exe has its Windows manifest (resource type 24, id 1)
+        public static bool HasManifest() { try { return FindResourceW(GetModuleHandleW(null), new IntPtr(1), new IntPtr(24)) != IntPtr.Zero; } catch { return false; } }
 
         // Windows looks for a DLL in the program's own folder first. For a copy in Downloads, any program could put a fake
         // DLL there, and Elixar runs as administrator. From here on, DLLs come only from System32; the current folder is

@@ -10,6 +10,9 @@ namespace CDriveCleaner
 {
     public static class Setup
     {
+        // waits a moment for Elixar to close, then removes its folder; /d skips cmd's AutoRun commands
+        public static string RemoveFolderArgs(string ping, string dir) { return "/d /c \"\"" + ping + "\" -n 4 127.0.0.1 >nul & rmdir /s /q \"" + dir + "\"\""; }
+
         public const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Elixar";
 
         public static string StartMenuLink
@@ -76,10 +79,11 @@ namespace CDriveCleaner
             // the running file can't delete itself: Windows removes the folder a moment after Elixar closes
             try
             {
-                // full paths and System32 as the working folder: a "ping" in the current folder would otherwise run as administrator
+                // full paths and System32 as the working folder: a "ping" in the current folder would otherwise run as administrator;
+                // /d: cmd skips the AutoRun commands any program can set for your account
                 string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
                 string cmd = Path.Combine(sys, "cmd.exe"), ping = Path.Combine(sys, "PING.EXE");
-                Process.Start(new ProcessStartInfo(cmd, "/c \"\"" + ping + "\" -n 4 127.0.0.1 >nul & rmdir /s /q \"" + Install.Dir + "\"\"") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sys });
+                Process.Start(new ProcessStartInfo(cmd, RemoveFolderArgs(ping, Install.Dir)) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sys });
             }
             catch { }
             if (!quiet) System.Windows.Forms.MessageBox.Show("Elixar was removed.", "Elixar");

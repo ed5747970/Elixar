@@ -188,7 +188,7 @@ namespace CDriveCleaner
                     {
                         string exe = Docker.Exe();
                         if (exe == null) { log("  Docker is not installed."); return; }
-                        string o = Sys.Run(exe, "system prune -f", 30 * 60 * 1000);
+                        string o = Docker.Prune(exe);   // with your normal rights
                         log("  Docker: " + (Docker.ParseReclaimed(o) > 0 ? "reclaimed " + Fs.Fmt(Docker.ParseReclaimed(o)) : o.Trim().Split('\n').LastOrDefault()));
                     } },
                 new CleanItem { Name = "NVIDIA app update downloads", Tier = Tier.Caution, Where = nvOta,

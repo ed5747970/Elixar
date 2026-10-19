@@ -1,7 +1,19 @@
-ELIXAR  (version 2.2.2)
+ELIXAR  (version 2.2.3)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2.3 (security)
+- Uninstallers start through cmd.exe /d: an "AutoRun" command any program can
+  set for your account no longer runs with administrator rights.
+- Elixar refuses to start if an Elixar.exe.config, .local or .manifest was put
+  next to it (Windows or .NET would obey them). Elixar.exe now has a manifest.
+- .NET "profiler" settings for your account (COR_PROFILER and similar) are
+  found before Elixar asks for administrator rights, and you can remove them.
+- As administrator, programs Elixar starts get Windows' own Program Files,
+  Path and ComSpec, even if they were changed for your account.
+- Docker's prune runs with your normal rights.
+- Update downloads have a size limit (the signature check is unchanged).
 
 NEW IN 2.2.2
 - OneDrive tab: appears only when OneDrive is signed in on this PC with your

@@ -112,6 +112,36 @@ namespace CDriveCleaner
             return wc;
         }
 
+        public const int MaxSmall = 64 * 1024;            // the signed manifest and its signature
+        public const long MaxZip = 200L * 1024 * 1024;    // a release is about 1 MB
+
+        // downloads at most max bytes; a bigger answer is refused (it can't be a genuine Elixar release)
+        public static long Download(string url, Stream to, long max)
+        {
+            Sys.SecureTls();
+            var rq = (HttpWebRequest)WebRequest.Create(url);
+            rq.UserAgent = "Elixar/" + Current; rq.Timeout = 60000; rq.ReadWriteTimeout = 60000; rq.MaximumAutomaticRedirections = 5;
+            using (var rs = rq.GetResponse())
+            {
+                if (rs.ContentLength > max) throw new IOException("The download is bigger than an Elixar release can be.");
+                return CopyLimited(rs.GetResponseStream(), to, max);
+            }
+        }
+
+        public static long CopyLimited(Stream from, Stream to, long max)
+        {
+            var buf = new byte[81920]; long total = 0; int n;
+            while ((n = from.Read(buf, 0, buf.Length)) > 0)
+            {
+                total += n;
+                if (total > max) throw new IOException("The download is bigger than an Elixar release can be.");
+                to.Write(buf, 0, n);
+            }
+            return total;
+        }
+
+        static byte[] Small(string url) { using (var ms = new MemoryStream()) { Download(url, ms, MaxSmall); return ms.ToArray(); } }
+
         static bool FromGitHub(string url)
         {
             Uri u;
@@ -146,7 +176,7 @@ namespace CDriveCleaner
                 if (!Locked.Lock(Path.Combine(Paths.Data, "update"))) { error = "Could not prepare a protected folder for the update."; return null; }
                 Directory.CreateDirectory(dir);
                 byte[] manifest, sig;
-                using (var wc = Client()) { manifest = wc.DownloadData(r.ManifestUrl); sig = wc.DownloadData(r.SigUrl); }
+                manifest = Small(r.ManifestUrl); sig = Small(r.SigUrl);
                 byte[] sigBytes;
                 try { sigBytes = Convert.FromBase64String(Encoding.ASCII.GetString(sig).Trim()); } catch { sigBytes = sig; }
                 if (!VerifySignature(manifest, sigBytes, PublicKey)) { error = "The update is not signed by Elisar's key, so Elixar did not install it."; return null; }
@@ -154,7 +184,7 @@ namespace CDriveCleaner
                 if (m.Version == null || m.Version <= Current) { error = "No newer version."; return null; }
                 if (log != null) log("Downloading Elixar " + m.Version + "...");
                 string zip = Path.Combine(dir, "Elixar.zip");
-                using (var wc = Client()) wc.DownloadFile(r.ZipUrl, zip);
+                using (var fs = new FileStream(zip, FileMode.CreateNew, FileAccess.Write)) Download(r.ZipUrl, fs, MaxZip);
                 if (Trust.Sha256(zip) != m.ZipSha256) { error = "The download does not match its signed fingerprint."; return null; }
                 string extract = Path.Combine(dir, "x");
                 System.IO.Compression.ZipFile.ExtractToDirectory(zip, extract);

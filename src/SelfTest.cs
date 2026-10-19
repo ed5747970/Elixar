@@ -165,8 +165,9 @@ namespace CDriveCleaner
                           AppsData.FromValues(V(new object[] { "DisplayName", "KB123 update", "UninstallString", "x", "ParentKeyName", "Office" }), "k") == null &&
                           AppsData.FromValues(V(new object[] { "DisplayName", "No uninstaller" }), "k") == null,
                           "Apps: hides system parts, updates and entries without an uninstaller");
-                    check(AppsData.UninstallCommand("\"C:\\Program Files\\App\\uninst.exe\" /S").Arguments == "/s /c \"\"C:\\Program Files\\App\\uninst.exe\" /S\"",
-                          "Apps: uninstall command keeps its quotes");
+                    check(AppsData.UninstallCommand("\"C:\\Program Files\\App\\uninst.exe\" /S").Arguments == "/d /s /c \"\"C:\\Program Files\\App\\uninst.exe\" /S\"" &&
+                          Setup.RemoveFolderArgs(@"C:\Windows\System32\PING.EXE", @"C:\Program Files\Elixar").StartsWith("/d /c "),
+                          "Apps: uninstall command keeps its quotes, and cmd skips the AutoRun commands any program can set for your account");
                     check(!AppsData.SafeToMeasure(@"C:\") && !AppsData.SafeToMeasure(@"C:\Program Files") && !AppsData.SafeToMeasure(@"C:\Windows\System32") &&
                           AppsData.SafeToMeasure(@"C:\Program Files\Steam") && !AppsData.SafeToMeasure(@"D:\Games"),
                           "Apps: only measures real app folders on C:");
@@ -1019,6 +1020,48 @@ namespace CDriveCleaner
                     var ucmd = AppsData.UninstallCommand("MsiExec.exe /X{1}");
                     check(!win || string.Equals(ucmd.WorkingDirectory, Environment.GetFolderPath(Environment.SpecialFolder.System), StringComparison.OrdinalIgnoreCase),
                           "Security: uninstall commands start in System32, so a bare program name can't be picked up from another folder");
+                    // ---- 2.2.3: things put next to Elixar.exe, and your account's environment variables ----
+                    {
+                        string pexe = Path.Combine(root, "planted", "Elixar.exe"); Directory.CreateDirectory(Path.GetDirectoryName(pexe)); File.WriteAllText(pexe, "x");
+                        bool none = EnvGuard.PlantedFiles(pexe).Count == 0;
+                        File.WriteAllText(pexe + ".config", "<configuration/>"); Directory.CreateDirectory(pexe + ".local");
+                        var pl = EnvGuard.PlantedFiles(pexe);
+                        check(none && pl.Count == 2 && pl.Any(x => x.EndsWith(".config")) && pl.Any(x => x.EndsWith(".local")) && EnvGuard.PlantedFiles(Application.ExecutablePath).Count == 0,
+                              "Security: a .config file or .local folder put next to Elixar.exe is found (Elixar then refuses to start)");
+                        check(EnvGuard.Risky("COR_PROFILER") && EnvGuard.Risky("cor_enable_profiling") && EnvGuard.Risky("COMPlus_AppDomainManagerAsm") && EnvGuard.Risky("APPDOMAIN_MANAGER_TYPE") &&
+                              !EnvGuard.Risky("PATH") && !EnvGuard.Risky("PSModulePath") && !EnvGuard.Risky("TEMP") && !EnvGuard.Risky("CORE_COUNT"),
+                              "Security: knows the settings that make .NET load extra code (profiler, AppDomain manager)");
+                        if (win)
+                        {
+                            Environment.SetEnvironmentVariable("COR_PROFILER", "{11111111-2222-3333-4444-555555555555}");
+                            Environment.SetEnvironmentVariable("ComSpec", @"C:\Users\Public\cmd.exe");
+                            var dropped = EnvGuard.Sanitize();
+                            string sysd = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                            check(dropped.Contains("COR_PROFILER") && Environment.GetEnvironmentVariable("COR_PROFILER") == null &&
+                                  string.Equals(Environment.GetEnvironmentVariable("ComSpec"), Path.Combine(sysd, "cmd.exe"), StringComparison.OrdinalIgnoreCase) &&
+                                  string.Equals(Environment.GetEnvironmentVariable("ProgramFiles"), Win.ProgramFiles, StringComparison.OrdinalIgnoreCase) &&
+                                  (Environment.GetEnvironmentVariable("Path") ?? "").IndexOf(sysd, StringComparison.OrdinalIgnoreCase) >= 0,
+                                  "Security: as administrator, programs Elixar starts get Windows' own ComSpec, Program Files and Path, and no .NET profiler");
+                            const string tv = "COR_ELIXAR_SELFTEST";
+                            try
+                            {
+                                using (var ek = Microsoft.Win32.Registry.CurrentUser.CreateSubKey("Environment")) ek.SetValue(tv, "1");
+                                var acc = EnvGuard.InAccount();
+                                bool seen = acc.Contains(@"Environment\" + tv);
+                                EnvGuard.RemoveFromAccount(acc.Where(x => x.EndsWith(tv)));
+                                bool gone; using (var ek = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment")) gone = ek == null || ek.GetValue(tv) == null;
+                                check(seen && gone, "Security: finds a .NET profiler setting in your account and removes it before asking for administrator rights");
+                            }
+                            finally { try { using (var ek = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment", true)) if (ek != null) ek.DeleteValue(tv, false); } catch { } }
+                            check(Install.HasManifest(), "Security: Elixar.exe carries a Windows manifest, so an Elixar.exe.local folder is ignored");
+                        }
+                        check(Docker.PruneArgs(@"C:\Program Files\Docker\Docker\resources\bin\docker.exe", @"C:\Users\me\AppData\Local\Temp\o.txt").StartsWith("/d /c \"\"C:\\Program Files\\Docker"),
+                              "Security: Docker's prune runs with your normal rights through cmd /d (it reads settings and plugins from your account)");
+                        bool capped = false;
+                        try { Updates.CopyLimited(new MemoryStream(new byte[Updates.MaxSmall + 1]), Stream.Null, Updates.MaxSmall); } catch (IOException) { capped = true; }
+                        check(capped && Updates.CopyLimited(new MemoryStream(new byte[1000]), Stream.Null, Updates.MaxSmall) == 1000,
+                              "Security: update downloads bigger than a release can be are refused");
+                    }
                     check(Mover.ParseManifest("\"AppState\" { \"name\" \"Evil\" \"installdir\" \"..\\\\..\\\\..\\\\Windows\" }", "D:\\SteamLibrary") == null &&
                           Mover.ParseManifest("\"AppState\" { \"name\" \"Evil\" \"installdir\" \"C:\\\\Windows\" }", "D:\\SteamLibrary") == null &&
                           Mover.ParseManifest("\"AppState\" { \"name\" \"Good\" \"installdir\" \"Good Game\" }", "D:\\SteamLibrary") != null,
