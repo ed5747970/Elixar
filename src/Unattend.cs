@@ -25,6 +25,8 @@ namespace CDriveCleaner
         public bool HideEula = true, HideOem = true, HideOnline = true, HideWireless = false, SkipPrivacy = true;
         public bool CreateAccount, AutoLogon;
         public string AccountName = "", AccountPassword = "";
+        public bool EnableAdmin;                  // turn the built-in Administrator on again after Sysprep (it turns it off)
+        public string AdminPassword = "";        // its password (UserAccounts/AdministratorPassword)
         public bool CopyProfile, PersistDrivers = true, SkipRearm;
         public List<string> FirstLogon = new List<string>();
         public bool DeleteAfter = true;
@@ -71,6 +73,16 @@ namespace CDriveCleaner
         {
             try { string t = Encoding.Unicode.GetString(Convert.FromBase64String(value ?? "")); return t.EndsWith(suffix) ? t.Substring(0, t.Length - suffix.Length) : t; }
             catch { return value ?? ""; }
+        }
+
+        // turns the built-in Administrator on at the first sign-in. It is found by its ID (the SID ending in -500), not by its
+        // name, so this works in every Windows language and after the account was renamed. Microsoft: Sysprep's generalize
+        // turns the account off, and setting AdministratorPassword alone doesn't turn it on.
+        public static string EnableAdminCommand { get { return "powershell -NoProfile -Command \"Get-LocalUser | Where-Object { $_.SID.Value -like 'S-1-5-21-*-500' } | Enable-LocalUser\""; } }
+        static bool IsEnableAdmin(string line)
+        {
+            if (line == EnableAdminCommand) return true;
+            return Regex.IsMatch(line, @"^(cmd(\.exe)? /[cd] )*net(\.exe)? user administrator /active:yes$", RegexOptions.IgnoreCase);
         }
 
         public static string DeleteCommand { get { return "cmd /c del /f /q \"%WINDIR%\\System32\\Sysprep\\unattend.xml\" \"%WINDIR%\\Panther\\unattend.xml\""; } }
@@ -125,6 +137,7 @@ namespace CDriveCleaner
                     w.WriteEndElement();
                 }
                 var cmds = s.FirstLogon.Where(c => c.Trim().Length > 0).ToList();
+                if (s.EnableAdmin) cmds.Insert(0, EnableAdminCommand);
                 if (s.DeleteAfter) cmds.Add(DeleteCommand);
                 if (cmds.Count > 0)
                 {
@@ -132,7 +145,7 @@ namespace CDriveCleaner
                     for (int i = 0; i < cmds.Count; i++)
                     {
                         w.WriteStartElement("SynchronousCommand", Ns); w.WriteAttributeString("wcm", "action", Wcm, "add");
-                        el("CommandLine", cmds[i].Trim()); el("Description", i == cmds.Count - 1 && s.DeleteAfter ? "Delete the answer files" : "Command " + (i + 1)); el("Order", (i + 1).ToString(CultureInfo.InvariantCulture));
+                        el("CommandLine", cmds[i].Trim()); el("Description", i == cmds.Count - 1 && s.DeleteAfter ? "Delete the answer files" : i == 0 && s.EnableAdmin ? "Turn on the built-in Administrator" : "Command " + (i + 1)); el("Order", (i + 1).ToString(CultureInfo.InvariantCulture));
                         w.WriteEndElement();
                     }
                     w.WriteEndElement();
@@ -145,13 +158,20 @@ namespace CDriveCleaner
                 el("HideWirelessSetupInOOBE", s.HideWireless ? "true" : "false");
                 if (s.SkipPrivacy) el("ProtectYourPC", "3");
                 w.WriteEndElement();
-                if (s.CreateAccount && s.AccountName.Length > 0)
+                bool local = s.CreateAccount && s.AccountName.Length > 0, admin = !string.IsNullOrEmpty(s.AdminPassword);
+                if (local || admin)
                 {
-                    w.WriteStartElement("UserAccounts", Ns); w.WriteStartElement("LocalAccounts", Ns);
-                    w.WriteStartElement("LocalAccount", Ns); w.WriteAttributeString("wcm", "action", Wcm, "add");
-                    w.WriteStartElement("Password", Ns); el("Value", Encode(s.AccountPassword, "Password")); el("PlainText", "false"); w.WriteEndElement();
-                    el("DisplayName", s.AccountName); el("Group", "Administrators"); el("Name", s.AccountName);
-                    w.WriteEndElement(); w.WriteEndElement(); w.WriteEndElement();
+                    w.WriteStartElement("UserAccounts", Ns);
+                    if (admin) { w.WriteStartElement("AdministratorPassword", Ns); el("Value", Encode(s.AdminPassword, "AdministratorPassword")); el("PlainText", "false"); w.WriteEndElement(); }
+                    if (local)
+                    {
+                        w.WriteStartElement("LocalAccounts", Ns);
+                        w.WriteStartElement("LocalAccount", Ns); w.WriteAttributeString("wcm", "action", Wcm, "add");
+                        w.WriteStartElement("Password", Ns); el("Value", Encode(s.AccountPassword, "Password")); el("PlainText", "false"); w.WriteEndElement();
+                        el("DisplayName", s.AccountName); el("Group", "Administrators"); el("Name", s.AccountName);
+                        w.WriteEndElement(); w.WriteEndElement();
+                    }
+                    w.WriteEndElement();
                 }
                 w.WriteEndElement(); w.WriteEndElement();
                 w.WriteEndElement();
@@ -215,18 +235,27 @@ namespace CDriveCleaner
                 var pv = acc.SelectSingleNode("u:Password/u:Value", m); var pt = acc.SelectSingleNode("u:Password/u:PlainText", m);
                 s.AccountPassword = pv == null ? "" : pt != null && pt.InnerText.Trim().Equals("true", StringComparison.OrdinalIgnoreCase) ? pv.InnerText : Decode(pv.InnerText, "Password");
             }
+            var apv = d.SelectSingleNode("/u:unattend/u:settings[@pass='oobeSystem']/u:component[@name='" + sh + "']/u:UserAccounts/u:AdministratorPassword/u:Value", m);
+            var apt = d.SelectSingleNode("/u:unattend/u:settings[@pass='oobeSystem']/u:component[@name='" + sh + "']/u:UserAccounts/u:AdministratorPassword/u:PlainText", m);
+            if (apv != null) s.AdminPassword = apt != null && apt.InnerText.Trim().Equals("true", StringComparison.OrdinalIgnoreCase) ? apv.InnerText : Decode(apv.InnerText, "AdministratorPassword");
             s.AutoLogon = (get("oobeSystem", sh, "u:AutoLogon/u:Enabled") ?? "").Equals("true", StringComparison.OrdinalIgnoreCase);
             foreach (XmlNode c in d.SelectNodes("/u:unattend/u:settings[@pass='oobeSystem']/u:component[@name='" + sh + "']/u:FirstLogonCommands/u:SynchronousCommand/u:CommandLine", m))
             {
                 string line = c.InnerText.Trim();
-                if (line == DeleteCommand) s.DeleteAfter = true; else if (line.Length > 0) s.FirstLogon.Add(line);
+                if (line == DeleteCommand) s.DeleteAfter = true; else if (IsEnableAdmin(line)) s.EnableAdmin = true; else if (line.Length > 0) s.FirstLogon.Add(line);
             }
             // what this editor doesn't show: listed, so saving over the file never drops them silently
             foreach (XmlElement set in d.SelectNodes("/u:unattend/u:settings", m))
                 foreach (XmlElement comp in set.SelectNodes("u:component", m))
                     foreach (XmlNode child in comp.ChildNodes)
+                    {
                         if (child is XmlElement && !Known.Contains(set.GetAttribute("pass") + "/" + comp.GetAttribute("name") + "/" + child.LocalName))
                             s.Unknown.Add(set.GetAttribute("pass") + ": " + comp.GetAttribute("name") + " / " + child.LocalName);
+                        else if (child is XmlElement && child.LocalName == "UserAccounts")   // only these two parts are shown (not domain accounts)
+                            foreach (XmlNode g in child.ChildNodes)
+                                if (g is XmlElement && g.LocalName != "LocalAccounts" && g.LocalName != "AdministratorPassword")
+                                    s.Unknown.Add(set.GetAttribute("pass") + ": " + comp.GetAttribute("name") + " / UserAccounts / " + g.LocalName);
+                    }
             return s;
         }
 
@@ -264,15 +293,21 @@ namespace CDriveCleaner
                 if (!Regex.IsMatch(s.AccountName ?? "", @"^[^""/\\\[\]:;|=,+*?<>@]{1,20}$") || s.AccountName.Trim().Length == 0 || s.AccountName.EndsWith("."))
                     add(3, "Account name: 1 to 20 characters, without \" / \\ [ ] : ; | = , + * ? < > @ and not ending with a dot.");
                 if (new[] { "administrator", "guest", "defaultaccount", "wdagutilityaccount" }.Contains((s.AccountName ?? "").Trim().ToLowerInvariant()))
-                    add(3, "Account name: \"" + s.AccountName + "\" is a built-in Windows account. Choose another name.");
+                    add(3, "Account name: \"" + s.AccountName + "\" is a built-in Windows account. Choose another name (for the built-in Administrator, use \"Turn on the built-in Administrator\").");
                 if (string.IsNullOrEmpty(s.AccountPassword)) add(2, "The account has no password: anyone can sign in to the new PC. Set one, or ask users to set one at first sign-in.");
-                else add(2, "The password is only encoded in the answer file (Base64), not encrypted: anyone who can read the file can read it. Keep \"Delete the answer file after setup\" on.");
             }
             else if (s.HideOnline) add(1, "No account is created and the online-account screens are hidden: Windows asks for a local account during setup.");
+            if (s.EnableAdmin && string.IsNullOrEmpty(s.AdminPassword)) add(3, "The built-in Administrator would be turned on without a password. Set its password.");
+            if (!string.IsNullOrEmpty(s.AdminPassword) && s.AdminPassword.Length < 8) add(2, "The Administrator password is short. Everyone knows the name Administrator: use at least 8 characters, better 12 or more.");
+            if (s.EnableAdmin && !s.DeleteAfter) add(3, "The Administrator password would stay on the new PC in the answer file. Turn on \"Delete the answer file after setup\".");
+            if (s.EnableAdmin) add(1, "The built-in Administrator is turned on at the first sign-in (found by its ID, so it works in every Windows language). Turn it off when you no longer need it.");
+            else if (!string.IsNullOrEmpty(s.AdminPassword)) add(1, "The built-in Administrator gets this password but stays off (Windows' default after Sysprep).");
+            if ((s.CreateAccount && !string.IsNullOrEmpty(s.AccountPassword)) || !string.IsNullOrEmpty(s.AdminPassword))
+                add(2, "The password is only encoded in the answer file (Base64), not encrypted: anyone who can read the file can read it. Keep \"Delete the answer file after setup\" on.");
             if (s.AutoLogon && !s.CreateAccount) add(2, "Sign in automatically needs the account above.");
             if (s.CopyProfile) add(1, "CopyProfile copies the settings of the account you are signed in with now into every new account. Customize that account before running Sysprep.");
             if (s.SkipRearm) add(1, "SkipRearm keeps the activation timer as it is. Use it when Sysprep stops because it was run too many times.");
-            if (!s.DeleteAfter && (s.CreateAccount || s.ProductKey.Length > 0)) add(2, "The answer file stays on the new PC with the account or product key in it. Turn on \"Delete the answer file after setup\".");
+            if (!s.DeleteAfter && !s.EnableAdmin && (s.CreateAccount || s.ProductKey.Length > 0 || s.AdminPassword.Length > 0)) add(2, "The answer file stays on the new PC with the account or product key in it. Turn on \"Delete the answer file after setup\".");
             if (s.Unknown.Count > 0) add(2, s.Unknown.Count + " setting(s) in the loaded file are not shown here and are not saved by this editor: " + string.Join("; ", s.Unknown.Take(6)) + (s.Unknown.Count > 6 ? "; ..." : "") + ". Save under a new name to keep the original.");
             return p.OrderByDescending(x => x.Level).ToList();
         }
@@ -303,7 +338,7 @@ namespace CDriveCleaner
                         p.Add(new UnattendProblem { Level = 3, Text = "CopyProfile must be in the specialize pass, not oobeSystem." });
                 }
             }
-            foreach (XmlNode pt in d.SelectNodes("//u:Password/u:PlainText", m))
+            foreach (XmlNode pt in d.SelectNodes("//u:PlainText", m))
                 if (pt.InnerText.Trim().Equals("true", StringComparison.OrdinalIgnoreCase)) { p.Add(new UnattendProblem { Level = 2, Text = "A password is stored as plain text. Elixar saves passwords encoded (still readable by anyone who has the file)." }); break; }
             try { p.AddRange(Check(Read(xml))); } catch { }
             return p.OrderByDescending(x => x.Level).ToList();

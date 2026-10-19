@@ -8,6 +8,10 @@ NEW IN 1.2.30
   file (unattend.xml). Set the computer name, owner, product key, time zone,
   languages and keyboards, which setup screens to skip, a local admin
   account, CopyProfile, keeping drivers and first sign-in commands.
+- Built-in Administrator: Sysprep turns it off. Tick "Turn on the built-in
+  Administrator after setup" and give it a password; it is turned on at the
+  first sign-in (found by its ID, so any Windows language works). It can't
+  be turned on without a password or with the answer file left on the PC.
 - Check reads the file the way Windows Setup does and finds wrong names,
   keys, languages, passes and processor types before Sysprep runs.
 - Save to Sysprep's folder, Save as, Load an existing file, or run Sysprep

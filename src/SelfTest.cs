@@ -1427,6 +1427,32 @@ namespace CDriveCleaner
                               Unattend.Read(extra).Unknown.Any(x => x.Contains("Themes")) && Unattend.Decode(Unattend.Encode("abc", "Password"), "Password") == "abc",
                               "Sysprep answer file: builds a valid unattend.xml, reads it back, and finds wrong names, keys, languages, passes and architectures (and never loads outside files)");
                     }
+                    // ---- answer file: the built-in Administrator ----
+                    {
+                        var ad = new UnattendSpec { Arch = Unattend.ThisArch(), UILanguage = "en-US", SystemLocale = "en-US", UserLocale = "en-US", InputLocale = "en-US",
+                                                    CreateAccount = true, AccountName = "Tech", AccountPassword = "Tech-Pass-123", EnableAdmin = true, AdminPassword = "Adm1n <&> \"pw\"" };
+                        ad.FirstLogon.Add("cmd /c echo hi");
+                        string ax = Unattend.Build(ad); var ab = Unattend.Read(ax);
+                        int iEnable = ax.IndexOf("Get-LocalUser"), iMine = ax.IndexOf("echo hi"), iDel = ax.IndexOf("del /f /q");
+                        bool ok = ab.EnableAdmin && ab.AdminPassword == ad.AdminPassword && ab.FirstLogon.Count == 1 && ab.Unknown.Count == 0 && ab.CreateAccount && ab.AccountPassword == ad.AccountPassword &&
+                                  ax.Contains("<AdministratorPassword>") && !ax.Contains("Adm1n") && iEnable > 0 && iEnable < iMine && iMine < iDel && ax.Contains("S-1-5-21-*-500") &&
+                                  !Unattend.CheckXml(ax, Unattend.ThisArch()).Any(x => x.Level == 3);
+                        // Microsoft's own example (password "pw") decodes the same way
+                        ok &= Unattend.Decode("cAB3AEEAZABtAGkAbgBpAHMAdAByAGEAdABvAHIAUABhAHMAcwB3AG8AcgBkAA==", "AdministratorPassword") == "pw";
+                        // only the password, the account stays off
+                        var pwOnly = Unattend.Read(Unattend.Build(new UnattendSpec { Arch = ad.Arch, AdminPassword = "Only-a-password1" }));
+                        ok &= !pwOnly.EnableAdmin && pwOnly.AdminPassword == "Only-a-password1";
+                        // stops: turned on without a password, or the file stays on the PC with it
+                        ok &= Unattend.Check(new UnattendSpec { EnableAdmin = true, AdminPassword = "" }).Any(x => x.Level == 3 && x.Text.Contains("without a password"));
+                        ok &= Unattend.Check(new UnattendSpec { EnableAdmin = true, AdminPassword = "Long-enough-1", DeleteAfter = false }).Any(x => x.Level == 3 && x.Text.Contains("would stay on the new PC"));
+                        ok &= Unattend.Check(new UnattendSpec { AdminPassword = "abc" }).Any(x => x.Level == 2 && x.Text.Contains("is short"));
+                        // a file made elsewhere: net user ... /active:yes is understood, domain accounts are listed as not shown
+                        string other = ax.Replace(Unattend.EnableAdminCommand, "net user Administrator /active:yes")
+                                         .Replace("<AdministratorPassword>", "<DomainAccounts><DomainAccountList /></DomainAccounts><AdministratorPassword>");
+                        var ob = Unattend.Read(other);
+                        ok &= ax.Contains(Unattend.EnableAdminCommand) && ob.EnableAdmin && ob.FirstLogon.Count == 1 && ob.Unknown.Any(x => x.Contains("DomainAccounts"));
+                        check(ok, "Sysprep answer file: turns the built-in Administrator on after Sysprep with its own password (by its ID, so in any language), and won't save it without a password or with the file left on the PC");
+                    }
                     // ---- where Undo goes: never fill a drive ----
                     {
                         long G = 1L << 30;

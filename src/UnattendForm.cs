@@ -17,9 +17,9 @@ namespace CDriveCleaner
         int S(int v) { return (int)Math.Round(v * sc); }
         string path;
         UnattendSpec loaded;
-        TextBox tName, tOwner, tOrg, tKey, tUi, tSys, tUser, tInput, tAccount, tPassword, tCommands;
+        TextBox tName, tOwner, tOrg, tKey, tUi, tSys, tUser, tInput, tAccount, tPassword, tAdminPw, tCommands;
         ComboBox cZone;
-        CheckBox kEula, kOem, kOnline, kWireless, kPrivacy, kAccount, kAuto, kCopy, kDrivers, kRearm, kDelete, kVm;
+        CheckBox kEula, kOem, kOnline, kWireless, kPrivacy, kAccount, kAuto, kAdmin, kCopy, kDrivers, kRearm, kDelete, kVm;
         Label lPath, lProblems;
         public Action<string> Log;
         public static Func<UnattendForm, DialogResult> TestHook;   // previews and the self-test
@@ -80,6 +80,11 @@ namespace CDriveCleaner
             kAccount = chk("Create a local administrator account"); tAccount = new TextBox(); tPassword = new TextBox { UseSystemPasswordChar = true };
             kAuto = chk("Sign in to it automatically once (for first sign-in commands)");
             body.Controls.Add(kAccount); body.Controls.Add(field("Account name", tAccount, 220)); body.Controls.Add(field("Password", tPassword, 220)); body.Controls.Add(kAuto);
+
+            body.Controls.Add(head("Built-in Administrator"));
+            body.Controls.Add(note("Sysprep turns the built-in Administrator off. Elixar can give it a password and turn it on again at the first sign-in."));
+            kAdmin = chk("Turn on the built-in Administrator after setup"); tAdminPw = new TextBox { UseSystemPasswordChar = true };
+            body.Controls.Add(kAdmin); body.Controls.Add(field("Administrator password", tAdminPw, 220));
             body.Controls.Add(note("A password in an answer file is only encoded, not encrypted. Elixar doesn't keep it anywhere else."));
 
             body.Controls.Add(head("Image"));
@@ -119,7 +124,7 @@ namespace CDriveCleaner
             };
             bRun.Click += (o, e) => RunSysprep();
             kAccount.CheckedChanged += (o, e) => { tAccount.Enabled = tPassword.Enabled = kAuto.Enabled = kAccount.Checked; };
-            foreach (Control c in new Control[] { tName, tOwner, tOrg, tKey, tUi, tSys, tUser, tInput, tAccount, tPassword, tCommands })
+            foreach (Control c in new Control[] { tName, tOwner, tOrg, tKey, tUi, tSys, tUser, tInput, tAccount, tPassword, tAdminPw, tCommands })
                 c.TextChanged += (o, e) => lProblems.Text = Lang.T("Click Check to check the answer file.");
 
             // start with the file in Sysprep's folder when there is one, else with this PC's settings
@@ -144,6 +149,7 @@ namespace CDriveCleaner
             int zi = cZone.Items.IndexOf(s.TimeZone); if (zi < 0 && s.TimeZone.Length > 0) zi = cZone.Items.Add(s.TimeZone); cZone.SelectedIndex = zi;
             tUi.Text = s.UILanguage; tSys.Text = s.SystemLocale; tUser.Text = s.UserLocale; tInput.Text = s.InputLocale;
             kEula.Checked = s.HideEula; kOem.Checked = s.HideOem; kOnline.Checked = s.HideOnline; kWireless.Checked = s.HideWireless; kPrivacy.Checked = s.SkipPrivacy;
+            kAdmin.Checked = s.EnableAdmin; tAdminPw.Text = s.AdminPassword;
             kAccount.Checked = s.CreateAccount; tAccount.Text = s.AccountName; tPassword.Text = s.AccountPassword; kAuto.Checked = s.AutoLogon;
             tAccount.Enabled = tPassword.Enabled = kAuto.Enabled = s.CreateAccount;
             kCopy.Checked = s.CopyProfile; kDrivers.Checked = s.PersistDrivers; kRearm.Checked = s.SkipRearm;
@@ -160,6 +166,7 @@ namespace CDriveCleaner
                 TimeZone = cZone.SelectedItem as string ?? "", UILanguage = tUi.Text.Trim(), SystemLocale = tSys.Text.Trim(), UserLocale = tUser.Text.Trim(), InputLocale = tInput.Text.Trim(),
                 HideEula = kEula.Checked, HideOem = kOem.Checked, HideOnline = kOnline.Checked, HideWireless = kWireless.Checked, SkipPrivacy = kPrivacy.Checked,
                 CreateAccount = kAccount.Checked, AccountName = tAccount.Text.Trim(), AccountPassword = tPassword.Text, AutoLogon = kAccount.Checked && kAuto.Checked,
+                EnableAdmin = kAdmin.Checked, AdminPassword = tAdminPw.Text,
                 CopyProfile = kCopy.Checked, PersistDrivers = kDrivers.Checked, SkipRearm = kRearm.Checked, DeleteAfter = kDelete.Checked
             };
             s.FirstLogon.AddRange(tCommands.Lines.Select(l => l.Trim()).Where(l => l.Length > 0));
