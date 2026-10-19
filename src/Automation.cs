@@ -32,6 +32,7 @@ namespace CDriveCleaner
         public const string LogonTask = Folder + "Low space check at sign-in";
         public const string CleanTask = Folder + "Weekly clean";
         public const string MailTask = Folder + "Email reports";
+        public const string TidyTask = Folder + "Daily tidy";
         // schedules saved before the rename (version 1.3/1.4 was called "C Drive Cleaner")
         public const string OldFolder = @"C Drive Cleaner\";
         public static readonly string[] OldTasks = { OldFolder + "Low space check", OldFolder + "Low space check at sign-in", OldFolder + "Weekly clean" };
@@ -83,6 +84,12 @@ namespace CDriveCleaner
         public static string CreateMailArgs(string exe, string hhmm)
         {
             return "/Create /F /TN " + Quote(MailTask) + " /TR " + Quote(ElevatedAction(exe, "--mail-daily")) + " /SC DAILY /ST " + hhmm + " /RL HIGHEST";
+        }
+
+        // the daily tidy (old Recycle Bin items, Undo, a Safe clean when C: is low) runs as administrator, through the launcher
+        public static string CreateTidyArgs(string exe, string hhmm)
+        {
+            return "/Create /F /TN " + Quote(TidyTask) + " /TR " + Quote(ElevatedAction(exe, "--daily-tidy")) + " /SC DAILY /ST " + hhmm + " /RL HIGHEST";
         }
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
@@ -355,20 +362,24 @@ namespace CDriveCleaner
         DateTimePicker timeCheck, timeClean;
         ComboBox cmbDay;
         Label lblAlertState, lblCleanState, lblAutoItems;
-        Button btnSaveAuto, btnTestAlert, btnRunAuto;
+        Button btnSaveAuto, btnTestAlert, btnRunAuto, btnTidyNow;
+        CheckBox chkBin, chkLowClean;
+        ComboBox cmbBinDays, cmbUndoDays;
+        Label lblTidyState;
+        public string TidyStateText { get { return lblTidyState == null ? "" : lblTidyState.Text; } }   // self-test
 
         void BuildAutomation()
         {
             pageAuto = new TabPage("Automation") { BackColor = Color.FromArgb(246, 248, 251) };
-            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(S(16), S(12), S(16), S(12)), AutoScroll = true };
+            var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(S(16), S(12), S(16), S(12)), AutoScroll = true };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 5; i++) root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            for (int i = 0; i < 6; i++) root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             var title = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), Text = "Automation", Margin = new Padding(0, 0, 0, S(2)) };
             var intro = new Label
             {
                 AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(900), 0), Margin = new Padding(S(1), 0, 0, S(12)),
-                Text = Win.IsWindows ? "These run through Windows Task Scheduler, even when this program is closed. If you move the program folder, open this tab and click Save again."
+                Text = !LinuxUi ? "These run through Windows Task Scheduler, even when this program is closed. If you move the program folder, open this tab and click Save again."
                                      : "These run as systemd timers for your account, even when Elixar is closed. They never run as root, so the system items (which need your password) are left for when you clean yourself."
             };
 
@@ -376,7 +387,7 @@ namespace CDriveCleaner
             var gAlert = new GroupBox { Text = "Low-space alert", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Anchor = AnchorStyles.Left | AnchorStyles.Top, Padding = new Padding(S(12), S(8), S(12), S(10)), Margin = new Padding(0, 0, 0, S(12)), MinimumSize = new Size(S(760), 0) };
             var fa = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             var r1 = Row();
-            chkAlert = new CheckBox { AutoSize = true, Text = Win.IsWindows ? "Warn me when C: (or another internal drive) has less than" : "Warn me when the system disk has less than", Margin = new Padding(0, S(4), S(4), 0) };
+            chkAlert = new CheckBox { AutoSize = true, Text = !LinuxUi ? "Warn me when C: (or another internal drive) has less than" : "Warn me when the system disk has less than", Margin = new Padding(0, S(4), S(4), 0) };
             numPercent = new NumericUpDown { Minimum = 5, Maximum = 50, Value = 15, Width = S(56) };
             r1.Controls.AddRange(new Control[] { chkAlert, numPercent, Lbl("% free") });
             var r2 = Row();
@@ -401,28 +412,57 @@ namespace CDriveCleaner
             {
                 AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(22), S(6), 0, 0),
                 Text = "Cleans: " + string.Join(", ", Automation.AutoItems().Select(i => i.Name)) +
-                       (Win.IsWindows ? ".\nNever: Caution items, Recycle Bin, browser caches or DISM. Open apps are skipped, never closed. A notification shows what was freed."
+                       (!LinuxUi ? ".\nNever: Caution items, Recycle Bin, browser caches or DISM. Open apps are skipped, never closed. A notification shows what was freed."
                                       : ".\nNever: the Trash, browser caches or anything that needs your password. Open apps are skipped, never closed. A notification shows what was freed.")
             };
             lblCleanState = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(22), S(6), 0, 0), Text = "Checking..." };
             fc.Controls.AddRange(new Control[] { r3, lblAutoItems, lblCleanState });
             gClean.Controls.Add(fc);
 
+            // --- trash and Undo
+            var gTidy = new GroupBox { Text = "Recycle Bin and Undo", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Anchor = AnchorStyles.Left | AnchorStyles.Top, Padding = new Padding(S(12), S(8), S(12), S(10)), Margin = new Padding(0, 0, 0, S(12)), MinimumSize = new Size(S(760), 0) };
+            var ft = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            var r5 = Row();
+            chkBin = new CheckBox { AutoSize = true, Text = "Every day, empty what has been in the Recycle Bin for more than", Margin = new Padding(0, S(4), S(4), 0) };
+            cmbBinDays = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(90) };
+            foreach (var d in TidyPrefs.BinChoices) cmbBinDays.Items.Add(d + " days");
+            cmbBinDays.SelectedIndex = 1;   // 30 days
+            r5.Controls.AddRange(new Control[] { chkBin, cmbBinDays });
+            var binNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(22), S(2), 0, S(4)),
+                Text = !LinuxUi ? "On every internal drive, only your own Recycle Bin. What you deleted recently stays, so you can still get it back." : "Only what has been in the Trash that long." };
+            var r6 = Row();
+            cmbUndoDays = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(90) };
+            foreach (var d in TidyPrefs.UndoChoices) cmbUndoDays.Items.Add(d + " days");
+            cmbUndoDays.SelectedIndex = 1;  // 30 days
+            r6.Controls.AddRange(new Control[] { Lbl("Keep files you remove (Smart scan, Duplicates) in Undo for"), cmbUndoDays });
+            var undoNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(2), S(2), 0, S(4)),
+                Text = "Tools > Undo puts them back, also from USB drives (which have no Recycle Bin). After that they are deleted for good. Undo uses your second drive when you have one, so C: gets its space back right away." };
+            chkLowClean = new CheckBox { AutoSize = true, Text = "When C: drops under the alert limit, run the Safe clean right away (at most once a day)", Margin = new Padding(0, S(6), 0, 0) };
+            lblTidyState = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(2), S(8), 0, 0), Text = "Checking..." };
+            ft.Controls.AddRange(new Control[] { r5, binNote, r6, undoNote, chkLowClean, lblTidyState });
+            gTidy.Controls.Add(ft);
+
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) };
             btnSaveAuto = MakeButton("Save");
             btnSaveAuto.Font = new Font("Segoe UI Semibold", 9.5f);
             btnTestAlert = MakeButton("Show a test alert");
             btnRunAuto = MakeButton("Run the weekly clean now");
-            buttons.Controls.AddRange(new Control[] { btnSaveAuto, btnTestAlert, btnRunAuto });
+            btnTidyNow = MakeButton("Empty old Recycle Bin items now...");
+            buttons.Controls.AddRange(new Control[] { btnSaveAuto, btnTestAlert, btnRunAuto, btnTidyNow });
 
             root.Controls.Add(title, 0, 0);
             root.Controls.Add(intro, 0, 1);
             root.Controls.Add(gAlert, 0, 2);
             root.Controls.Add(gClean, 0, 3);
-            root.Controls.Add(buttons, 0, 4);
+            root.Controls.Add(gTidy, 0, 4);
+            root.Controls.Add(buttons, 0, 5);
             pageAuto.Controls.Add(root);
 
-            if (testMode) btnSaveAuto.Enabled = btnRunAuto.Enabled = false;
+            if (testMode) btnSaveAuto.Enabled = btnRunAuto.Enabled = btnTidyNow.Enabled = false;
+            chkBin.CheckedChanged += (o, e) => cmbBinDays.Enabled = chkBin.Checked;
+            cmbBinDays.SelectedIndexChanged += (o, e) => LoadTidyState(false);
+            btnTidyNow.Click += (o, e) => TidyNow();
+            LoadTidyState(true);
             btnSaveAuto.Click += (o, e) => SaveAutomation();
             btnTestAlert.Click += (o, e) =>
             {
@@ -451,13 +491,66 @@ namespace CDriveCleaner
             };
         }
 
+        bool tidyUnscheduled;
+        int BinDaysChosen { get { return TidyPrefs.BinChoices[Math.Max(0, cmbBinDays.SelectedIndex)]; } }
+
+        // the settings (from Elixar's protected folder) and how full the Recycle Bin and Undo are
+        void LoadTidyState(bool settingsToo)
+        {
+            if (settingsToo)
+            {
+                var p = TidyPrefs.Load();
+                chkBin.Checked = p.BinDays > 0;
+                if (p.BinDays > 0) cmbBinDays.SelectedIndex = Array.IndexOf(TidyPrefs.BinChoices, p.BinDays);
+                cmbBinDays.Enabled = chkBin.Checked;
+                cmbUndoDays.SelectedIndex = Math.Max(0, Array.IndexOf(TidyPrefs.UndoChoices, p.UndoDays));
+                chkLowClean.Checked = p.LowClean;
+            }
+            int days = BinDaysChosen;
+            System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                long total, old; RecycleAging.Stats(days, out total, out old);
+                var u = Quarantine.List();
+                return Tuple.Create(total, old, u.Count, u.Sum(b => b.Bytes));
+            }).ContinueWith(t => UI(() =>
+            {
+                if (t.IsFaulted) { lblTidyState.Text = ""; return; }
+                var r = t.Result;
+                lblTidyState.Text = Lang.T(!LinuxUi
+                    ? "Your Recycle Bin: " + Fs.Fmt(r.Item1) + (r.Item1 > 0 ? ", of which " + Fs.Fmt(r.Item2) + " was deleted more than " + days + " days ago." : ".") +
+                      "  Undo: " + (r.Item3 == 0 ? "empty." : r.Item3 + (r.Item3 == 1 ? " item, " : " items, ") + Fs.Fmt(r.Item4) + ".")
+                    : "Undo: " + (r.Item3 == 0 ? "empty." : r.Item3 + (r.Item3 == 1 ? " item, " : " items, ") + Fs.Fmt(r.Item4) + "."));
+                if (tidyUnscheduled) { lblTidyState.Text += "\n" + Lang.T("Not scheduled yet: click Save to start the daily tidy."); lblTidyState.ForeColor = CautionColor; }
+                else lblTidyState.ForeColor = Color.DimGray;
+                btnTidyNow.Enabled = !testMode && r.Item2 > 0;
+            }));
+        }
+
+        void TidyNow()
+        {
+            if (testMode) return;
+            int days = BinDaysChosen;
+            if (Lang.Box(this, Lang.T("Delete for good what has been in your Recycle Bin for more than " + days + " days?") + "\n\n" + Lang.T("What you deleted more recently stays in the Recycle Bin."),
+                    "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            btnTidyNow.Enabled = false;
+            System.Threading.Tasks.Task.Factory.StartNew(() => { int n; long b = RecycleAging.EmptyOld(days, Log, out n); return Tuple.Create(n, b); }).ContinueWith(t => UI(() =>
+            {
+                string msg = t.IsFaulted ? "Could not empty the old items: " + t.Exception.GetBaseException().Message
+                                         : "Recycle Bin: " + t.Result.Item1 + " old items removed (" + Fs.Fmt(t.Result.Item2) + ").";
+                Log(Lang.T(msg));
+                if (!t.IsFaulted && t.Result.Item1 > 0) try { Activity.Add("clean", "Recycle Bin: " + t.Result.Item1 + " old items removed", t.Result.Item2); } catch { }
+                LoadTidyState(false);
+                StartMeasure(() => RefreshDashboard());
+            }));
+        }
+
         FlowLayoutPanel Row() { return new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, S(2), 0, S(2)) }; }
         Label Lbl(string t, int left = 0) { return new Label { AutoSize = true, Text = t, Margin = new Padding(left, S(6), S(6), 0) }; }
 
         public void LoadAutomationState()
         {
             System.Threading.Tasks.Task.Factory.StartNew(() => new[] { Automation.Query(Automation.CheckTask), Automation.Query(Automation.LogonTask), Automation.Query(Automation.CleanTask),
-                                                                        Automation.Query(Automation.OldTasks[0]), Automation.Query(Automation.OldTasks[1]), Automation.Query(Automation.OldTasks[2]) })
+                                                                        Automation.Query(Automation.OldTasks[0]), Automation.Query(Automation.OldTasks[1]), Automation.Query(Automation.OldTasks[2]), Automation.Query(Automation.TidyTask) })
             .ContinueWith(t => UI(() =>
             {
                 if (t.IsFaulted) { lblAlertState.Text = lblCleanState.Text = "Could not read Task Scheduler."; return; }
@@ -489,12 +582,17 @@ namespace CDriveCleaner
                 else if (old) { lblAlertState.Text += "  Old C Drive Cleaner schedules are still there; Save removes them."; }
                 var unsafeTasks = new[] { check, logon }.Where(x => x.Exists && !Install.IsProtectedExe(x.Command)).ToList();
                 if (clean.Exists && !Install.IsSafeElevatedTask(clean.Command, clean.Arguments, "--auto-clean")) unsafeTasks.Add(clean);
+                var tidyTask = t.Result[6];
+                if (tidyTask.Exists && !Install.IsSafeElevatedTask(tidyTask.Command, tidyTask.Arguments, "--daily-tidy")) unsafeTasks.Add(tidyTask);
                 if (unsafeTasks.Count > 0)
                 {
                     lblAlertState.Text += "  Not protected: a schedule starts Elixar from a folder other programs can change. Click Save to secure it.";
                     lblAlertState.ForeColor = CautionColor;
                 }
-                lblCleanState.Text = (clean.Exists ? "On: every " + cmbDay.SelectedItem + " at " + timeClean.Value.ToString("HH:mm") + ".  " : "Off.  ") + last;
+                lblCleanState.Text = Lang.T((clean.Exists ? "On: every " + cmbDay.SelectedItem + " at " + timeClean.Value.ToString("HH:mm") + ".  " : "Off.  ") + last);
+                if (lblAlertState.Text == "Off.") lblAlertState.Text = Lang.T("Off.");
+                tidyUnscheduled = TidyPrefs.Load().AnyDaily && !tidyTask.Exists && !testMode;
+                LoadTidyState(false);
             }));
         }
 
@@ -503,7 +601,11 @@ namespace CDriveCleaner
             if (testMode) return;
             // schedules always start the protected copy in Program Files, which only administrators can change
             string exe = Application.ExecutablePath;
-            if (chkAlert.Checked || chkClean.Checked)
+            var tidy = TidyPrefs.Load();
+            tidy.UndoDays = TidyPrefs.UndoChoices[Math.Max(0, cmbUndoDays.SelectedIndex)];
+            tidy.BinDays = chkBin.Checked ? BinDaysChosen : 0;
+            tidy.LowClean = chkLowClean.Checked;
+            if (chkAlert.Checked || chkClean.Checked || tidy.AnyDaily)
             {
                 string ierr = Install.Ensure();
                 if (ierr != null)
@@ -535,6 +637,9 @@ namespace CDriveCleaner
                 run("remove daily space check", Automation.DeleteArgs(Automation.CheckTask));
                 run("remove sign-in check", Automation.DeleteArgs(Automation.LogonTask));
             }
+            if (!tidy.Save()) errors.Add("Recycle Bin and Undo settings: could not be saved");
+            if (tidy.AnyDaily) run("daily tidy", Automation.CreateTidyArgs(exe, timeCheck.Value.ToString("HH:mm")));
+            else run("remove daily tidy", Automation.DeleteArgs(Automation.TidyTask));
             if (chkClean.Checked) run("weekly clean", Automation.CreateCleanArgs(exe, Automation.Days[Math.Max(0, cmbDay.SelectedIndex)], timeClean.Value.ToString("HH:mm")));
             else run("remove weekly clean", Automation.DeleteArgs(Automation.CleanTask));
             // clean up schedules left from the old name

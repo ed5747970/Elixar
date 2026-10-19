@@ -1,5 +1,5 @@
 // The Smart scan window for one drive: duplicate files (you choose which copy stays) and files not used for months.
-// Nothing is ticked for you. What you pick goes to the Recycle Bin, after you confirm.
+// Nothing is ticked for you. What you pick goes to Elixar's Undo (kept 7, 30 or 90 days, your choice in Automation), after you confirm.
 
 using System;
 using System.Collections.Generic;
@@ -78,7 +78,7 @@ namespace CDriveCleaner
             cmbKeep = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(240) };
             cmbKeep.Items.AddRange(new object[] { Lang.T("Keep the oldest copy"), Lang.T("Keep the newest copy"), Lang.T("Keep the copy with the shortest path") });
             cmbKeep.SelectedIndex = 0;
-            btnDupPick = Btn("Select extra copies"); btnDupNone = Btn("Select none"); btnDupRecycle = Btn("Move selected to Recycle Bin...");
+            btnDupPick = Btn("Select extra copies"); btnDupNone = Btn("Select none"); btnDupRecycle = Btn("Move selected to Undo...");
             btnDupRecycle.Font = new Font("Segoe UI Semibold", 9f);
             lblDupSel = new Label { AutoSize = true, ForeColor = Quiet, Margin = new Padding(S(6), S(8), 0, 0) };
             lvDups = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
@@ -98,7 +98,7 @@ namespace CDriveCleaner
             cmbSize = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(140) };
             cmbSize.Items.AddRange(new object[] { Lang.T("10 MB and up"), Lang.T("100 MB and up"), Lang.T("1 GB and up") });
             cmbSize.SelectedIndex = 1;
-            btnOldAll = Btn("Select all shown"); btnOldNone = Btn("Select none"); btnOldRecycle = Btn("Move selected to Recycle Bin...");
+            btnOldAll = Btn("Select all shown"); btnOldNone = Btn("Select none"); btnOldRecycle = Btn("Move selected to Undo...");
             btnOldRecycle.Font = new Font("Segoe UI Semibold", 9f);
             lblOldSel = new Label { AutoSize = true, ForeColor = Quiet, Margin = new Padding(S(6), S(8), 0, 0) };
             lvOld = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
@@ -114,7 +114,7 @@ namespace CDriveCleaner
 
             // similar photos
             pSim = new TabPage("Similar photos") { BackColor = BackColor };
-            btnSimPick = Btn("Select all but the biggest"); var btnSimNone = Btn("Select none"); btnSimRecycle = Btn("Move selected to Recycle Bin...");
+            btnSimPick = Btn("Select all but the biggest"); var btnSimNone = Btn("Select none"); btnSimRecycle = Btn("Move selected to Undo...");
             btnSimRecycle.Font = new Font("Segoe UI Semibold", 9f);
             lblSimSel = new Label { AutoSize = true, ForeColor = Quiet, Margin = new Padding(S(6), S(8), 0, 0) };
             lvSim = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
@@ -147,7 +147,7 @@ namespace CDriveCleaner
 
             t.Controls.Add(lblHead, 0, 0); t.Controls.Add(lblSum, 0, 1); t.Controls.Add(prog, 0, 2);
             t.Controls.Add(new Label { AutoSize = true, ForeColor = Quiet, MaximumSize = new Size(S(1040), 0), Margin = new Padding(S(1), S(4), 0, S(6)),
-                Text = Lang.T("Nothing is ticked for you. What you pick goes to the Recycle Bin, so you can get it back. Windows, apps, games and AppData are never listed.") }, 0, 3);
+                Text = Lang.T("Nothing is ticked for you. What you pick goes to Undo, so you can get it back (Tools > Undo). Windows, apps, games and AppData are never listed.") }, 0, 3);
             t.Controls.Add(tabs, 0, 4);
             Controls.Add(t);
 
@@ -297,7 +297,7 @@ namespace CDriveCleaner
             var sm = lvSim.CheckedItems.Cast<ListViewItem>().ToList(); var em = lvEmpty.CheckedItems.Cast<ListViewItem>().ToList();
             lblSimSel.Text = sm.Count == 0 ? "" : Lang.T(sm.Count + " selected (" + Fs.Fmt(Sum(sm)) + ")");
             lblEmptySel.Text = em.Count == 0 ? "" : Lang.T(em.Count + " selected");
-            bool idle = cts == null;
+            bool idle = cts == null && !moving;
             btnSimRecycle.Enabled = idle && sm.Count > 0 && !test;
             btnEmptyRemove.Enabled = idle && em.Count > 0 && !test;
             btnCompress.Enabled = idle && o.Count > 0 && !test;
@@ -397,25 +397,33 @@ namespace CDriveCleaner
 
         void RecycleOld() { Recycle(lvOld.CheckedItems.Cast<ListViewItem>().ToList(), lvOld); }
 
+        bool moving;
+
+        // your own files go to Undo (also from USB drives, which have no Recycle Bin), kept for the days you chose
         void Recycle(List<ListViewItem> sel, ListView lv)
         {
-            if (test || sel.Count == 0) return;
-            var usb = sel.Where(r => Duplicates.OnUsb(((FileInfo)r.Tag).FullName)).ToList();
-            string usbNote = usb.Count == 0 ? "" : "\n\n" + Lang.T(usb.Count + " of them are on a USB drive, which has no Recycle Bin: those are deleted for good.");
-            if (Lang.Box(this, Lang.T("Move " + sel.Count + " files (" + Fs.Fmt(Sum(sel)) + ") to the Recycle Bin?") + "\n\n" + Lang.T("You can get them back from the Recycle Bin.") + usbNote,
-                    "Elixar", MessageBoxButtons.OKCancel, usb.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question) != DialogResult.OK) return;
-            int ok = 0; long bytes = 0;
+            if (test || sel.Count == 0 || moving) return;
+            int keep = TidyPrefs.Load().UndoDays;
+            if (Lang.Box(this, Lang.T("Move " + sel.Count + " files (" + Fs.Fmt(Sum(sel)) + ") to Undo?") + "\n\n" +
+                    Lang.T("They are kept for " + keep + " days, and Tools > Undo puts them back. After that they are deleted for good. You can change the days in Automation."),
+                    "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            var paths = sel.Select(r => ((FileInfo)r.Tag).FullName).ToList();
+            moving = true; UpdateSel();
             Cursor = Cursors.WaitCursor;
-            foreach (var r in sel)
+            lblStatus.Text = Lang.T("Moving " + sel.Count + " files to Undo...");
+            string label = "Smart scan of " + title + " (" + paths.Count + " files)";
+            Task.Factory.StartNew(() => Quarantine.MoveToUndo(label, paths, null, keep), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
-                var f = (FileInfo)r.Tag; long len = 0; try { len = f.Length; } catch { }
-                if (Duplicates.Recycle(f.FullName)) { ok++; bytes += len; lv.Items.Remove(r); }
-            }
-            Cursor = Cursors.Default;
-            string msg = "Moved " + ok + " of " + sel.Count + " files (" + Fs.Fmt(bytes) + ") to the Recycle Bin. Empty the Recycle Bin to free the space.";
-            lblStatus.Text = Lang.T(msg);
-            if (owner != null) { owner.Log(Lang.T("Smart scan of " + title + " - " + msg)); try { Activity.Add("clean", "Smart scan: " + ok + " files from " + title + " to the Recycle Bin", bytes); } catch { } }
-            UpdateSel();
+                moving = false; Cursor = Cursors.Default;
+                int ok = 0;
+                foreach (var r in sel) if (!File.Exists(((FileInfo)r.Tag).FullName)) { ok++; lv.Items.Remove(r); }
+                long bytes = t.IsFaulted ? 0 : t.Result;
+                string msg = t.IsFaulted ? "Could not move the files to Undo: " + t.Exception.GetBaseException().Message
+                                         : "Moved " + ok + " of " + sel.Count + " files (" + Fs.Fmt(bytes) + ") to Undo, kept for " + keep + " days (Tools > Undo puts them back).";
+                lblStatus.Text = Lang.T(msg);
+                if (owner != null) { owner.Log(Lang.T("Smart scan of " + title + " - " + msg)); try { Activity.Add("clean", "Smart scan: " + ok + " files from " + title + " to Undo", bytes); } catch { } }
+                UpdateSel();
+            }));
         }
     }
 }

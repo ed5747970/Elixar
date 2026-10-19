@@ -312,6 +312,24 @@ namespace CDriveCleaner
                     File.WriteAllText(Path.Combine(old.Dir, "manifest.txt"), File.ReadAllText(Path.Combine(old.Dir, "manifest.txt"))
                         .Replace(old.Time.ToString("s", System.Globalization.CultureInfo.InvariantCulture), DateTime.Now.AddDays(-8).ToString("s", System.Globalization.CultureInfo.InvariantCulture)));
                     check(Quarantine.PurgeOld(null) == 1 && Quarantine.List().Count == 0, "Undo: items older than 7 days are deleted for good");
+                    // your own files: kept for the days you chose (30 here); a 7-day item next to it goes first
+                    string mine = Path.Combine(root, "victim2"); Directory.CreateDirectory(mine);
+                    string f1 = Path.Combine(mine, "holiday.mp4"); File.WriteAllBytes(f1, new byte[3000]);
+                    long movedMine = Quarantine.MoveToUndo("Smart scan of D: (1 files)", new[] { f1 }, null, 30);
+                    var mb = Quarantine.List().First(b => b.Label.StartsWith("Smart scan"));
+                    File.WriteAllText(Path.Combine(mb.Dir, "manifest.txt"), File.ReadAllText(Path.Combine(mb.Dir, "manifest.txt"))
+                        .Replace(mb.Time.ToString("s", System.Globalization.CultureInfo.InvariantCulture), DateTime.Now.AddDays(-8).ToString("s", System.Globalization.CultureInfo.InvariantCulture)));
+                    mb = Quarantine.List().First(b => b.Label.StartsWith("Smart scan"));
+                    check(movedMine == 3000 && !File.Exists(f1) && mb.Keep == 30 && mb.DaysLeft() == 22 && Quarantine.PurgeOld(null) == 0 && Quarantine.List().Count == 1,
+                          "Undo: files you remove are kept for the days you chose (30), not the 7 days of Caution items");
+                    check(Quarantine.Restore(mb, null) == 1 && File.Exists(f1), "Undo: your file comes back from Undo");
+                    var tp = TidyPrefs.Parse(new[] { "undoDays=5", "binDays=1000", "lowClean=1" });
+                    var tp2 = TidyPrefs.Parse(new TidyPrefs { UndoDays = 90, BinDays = 60, LowClean = true }.Text().Split('\n'));
+                    check(tp.UndoDays == 30 && tp.BinDays == 0 && tp.LowClean && tp2.UndoDays == 90 && tp2.BinDays == 60 && tp2.LowClean && new TidyPrefs().UndoDays == 30 && !new TidyPrefs().AnyDaily,
+                          "Recycle Bin and Undo settings: only the offered choices are accepted (a changed file can't set 0 or 1000 days)");
+                    string tidyArgs = Automation.CreateTidyArgs(@"C:\Program Files\Elixar\Elixar.exe", "12:00");
+                    check(tidyArgs.Contains("Elixar\\Daily tidy") && tidyArgs.Contains("--daily-tidy") && tidyArgs.Contains("/SC DAILY") && tidyArgs.Contains("/RL HIGHEST"),
+                          "Daily tidy: runs once a day with administrator rights (through the protected launcher when installed)");
                 } catch (Exception ex) { check(false, "Undo tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
                 finally { Quarantine.OverrideRoot = null; }
 
@@ -1335,6 +1353,36 @@ namespace CDriveCleaner
                                   "Leftovers: only a folder no installed app owns, untouched for 3 months, is offered (not an installed app's, Microsoft's, a code-named one or a recently used one)");
                         }
                         finally { Leftovers.NamesOverride = null; }
+                    }
+                    // ---- Recycle Bin: only what was deleted long ago ----
+                    {
+                        string bin = Path.Combine(root, "rb", "S-1-5-21-1"); Directory.CreateDirectory(bin);
+                        Action<string, int, bool> put = (id, daysAgo, folder) =>
+                        {
+                            File.WriteAllBytes(Path.Combine(bin, "$I" + id + ".txt"), RecycleAging.MakeInfo(DateTime.Now.AddDays(-daysAgo), 4096, @"C:\Users\me\Documents\" + id + ".txt"));
+                            string rdata = Path.Combine(bin, "$R" + id + ".txt");
+                            if (folder) { Directory.CreateDirectory(rdata); File.WriteAllBytes(Path.Combine(rdata, "inside.bin"), new byte[4096]); }
+                            else File.WriteAllBytes(rdata, new byte[4096]);
+                        };
+                        put("OLD001", 45, false); put("OLD002", 40, true); put("NEW001", 3, false);
+                        File.WriteAllText(Path.Combine(bin, "desktop.ini"), "[.ShellClassInfo]");
+                        var parsed = RecycleAging.ParseInfo(RecycleAging.MakeInfo(new DateTime(2026, 1, 2, 3, 4, 5), 123, @"C:\a\b.txt"));
+                        bool linkOk = true;
+                        string precious = Path.Combine(root, "rb-precious"); Directory.CreateDirectory(precious); File.WriteAllText(Path.Combine(precious, "keep.txt"), "x");
+                        if (!win)
+                        {
+                            File.WriteAllBytes(Path.Combine(bin, "$ILNK001"), RecycleAging.MakeInfo(DateTime.Now.AddDays(-50), 1, "x"));
+                            try { using (var lp = Process.Start(new ProcessStartInfo("ln", "-s \"" + precious + "\" \"" + Path.Combine(bin, "$RLNK001") + "\"") { UseShellExecute = false })) lp.WaitForExit(); } catch { }
+                        }
+                        long tot, oldB; RecycleAging.BinsOverride = () => new List<string> { bin };
+                        try { RecycleAging.Stats(30, out tot, out oldB); } finally { RecycleAging.BinsOverride = null; }
+                        int rn; long rb = RecycleAging.EmptyOldIn(bin, DateTime.Now.AddDays(-30), out rn);
+                        if (!win) linkOk = File.Exists(Path.Combine(precious, "keep.txt")) && !File.Exists(Path.Combine(bin, "$ILNK001"));
+                        check(parsed != null && parsed.Size == 123 && parsed.Original == @"C:\a\b.txt" && parsed.Deleted == new DateTime(2026, 1, 2, 3, 4, 5) && RecycleAging.ParseInfo(new byte[30]) == null &&
+                              tot >= 3 * 4096 && oldB >= 2 * 4096 && rn >= 2 && rb >= 2 * 4096 && linkOk &&
+                              !File.Exists(Path.Combine(bin, "$ROLD001.txt")) && !File.Exists(Path.Combine(bin, "$IOLD001.txt")) && !Directory.Exists(Path.Combine(bin, "$ROLD002.txt")) &&
+                              File.Exists(Path.Combine(bin, "$RNEW001.txt")) && File.Exists(Path.Combine(bin, "$INEW001.txt")) && File.Exists(Path.Combine(bin, "desktop.ini")),
+                              "Recycle Bin: only what was deleted more than 30 days ago is emptied; recent items stay, and a link inside is removed without touching where it points");
                     }
                     // ---- what grew, tray, reminder, report ----
                     {

@@ -1,7 +1,19 @@
-ELIXAR  (version 2.2.3)
+ELIXAR  (version 2.2.4)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2.4
+- Files you remove yourself (Smart scan, Duplicates) go to Elixar's Undo
+  instead of the Recycle Bin, kept 7, 30 or 90 days (your choice, 30 by
+  default). Tools > Undo puts them back, also files from USB drives.
+- Automation > Recycle Bin and Undo (the daily tidy):
+  * empties only what has been in your Recycle Bin for more than 14, 30, 60
+    or 90 days (recent deletions stay), on every internal drive
+  * deletes Undo items whose time is up
+  * optional: runs the Safe clean right away when C: is under your limit
+  * "Empty old Recycle Bin items now..." does it at once
+  Click Save in Automation once to start it.
 
 NEW IN 2.2.3 (security)
 - Uninstallers start through cmd.exe /d: an "AutoRun" command any program can

@@ -26,7 +26,7 @@ namespace CDriveCleaner
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
-            bool scheduled = args.Contains("--auto-clean") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb");
+            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb");
             if (Win.IsWindows)
             {
                 // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
@@ -68,7 +68,12 @@ namespace CDriveCleaner
                     "This is how the low-space alert looks. " + Fs.Fmt(Sys.Free()) + " is free on C: right now.", ToolTipIcon.Info, false);
                 return 0;
             }
-            if (args.Contains("--mail-daily") || args.Contains("--auto-clean")) Install.HideLauncherWindow();
+            if (args.Contains("--mail-daily") || args.Contains("--auto-clean") || args.Contains("--daily-tidy")) Install.HideLauncherWindow();
+            if (args.Contains("--daily-tidy"))
+            {
+                Application.EnableVisualStyles();
+                return Tidy.Daily();
+            }
             if (args.Contains("--mail-daily"))
             {
                 Application.EnableVisualStyles();

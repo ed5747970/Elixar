@@ -18,7 +18,9 @@ namespace CDriveCleaner
         public string Kind = "files";      // files | drivers
         public long Bytes;
         public List<string[]> Items = new List<string[]>();  // { storedName, originalPath, bytes }
+        public int Keep = Quarantine.KeepDays;   // how many days this batch is kept (your own files: your choice in Automation)
         public int DaysLeft(int keepDays) { return Math.Max(0, keepDays - (int)Math.Floor((DateTime.Now - Time).TotalDays)); }
+        public int DaysLeft() { return DaysLeft(Keep); }
     }
 
     public static class Quarantine
@@ -105,6 +107,7 @@ namespace CDriveCleaner
             sb.Append("label\t").Append(b.Label).Append('\n');
             sb.Append("kind\t").Append(b.Kind).Append('\n');
             sb.Append("time\t").Append(b.Time.ToString("s", CultureInfo.InvariantCulture)).Append('\n');
+            sb.Append("keep\t").Append(b.Keep.ToString(CultureInfo.InvariantCulture)).Append('\n');
             foreach (var it in b.Items) sb.Append("item\t").Append(it[0]).Append('\t').Append(it[1]).Append('\t').Append(it[2]).Append('\n');
             File.WriteAllText(Path.Combine(b.Dir, "manifest.txt"), sb.ToString());
         }
@@ -122,6 +125,7 @@ namespace CDriveCleaner
                     var p = line.Split('\t');
                     if (p[0] == "label" && p.Length >= 2) b.Label = p[1];
                     else if (p[0] == "kind" && p.Length >= 2) b.Kind = p[1];
+                    else if (p[0] == "keep" && p.Length >= 2) { int k; if (int.TryParse(p[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out k)) b.Keep = Math.Max(1, Math.Min(365, k)); }
                     else if (p[0] == "time" && p.Length >= 2) hasTime = DateTime.TryParse(p[1], CultureInfo.InvariantCulture, DateTimeStyles.None, out b.Time);
                     else if (p[0] == "item" && p.Length >= 4)
                     {
@@ -275,25 +279,31 @@ namespace CDriveCleaner
         public static int PurgeOld(Action<string> log)
         {
             int n = 0;
-            foreach (var b in List().Where(x => x.DaysLeft(KeepDays) == 0))
+            foreach (var b in List().Where(x => x.DaysLeft() == 0))
             {
                 Delete(b);
                 n++;
-                if (log != null) log("Undo: deleted \"" + b.Label + "\" from " + b.Time.ToString("d MMM") + " (" + Fs.Fmt(b.Bytes) + "), kept " + KeepDays + " days.");
+                if (log != null) log("Undo: deleted \"" + b.Label + "\" from " + b.Time.ToString("d MMM") + " (" + Fs.Fmt(b.Bytes) + "), kept " + b.Keep + " days.");
             }
             return n;
         }
 
         // one call for a whole cleanup item: everything goes into one Undo entry
-        public static void MoveToUndo(string label, IEnumerable<string> paths, Action<string> log)
+        public static void MoveToUndo(string label, IEnumerable<string> paths, Action<string> log) { MoveToUndo(label, paths, log, KeepDays); }
+
+        // returns how many bytes went into Undo (files in use stay where they are)
+        public static long MoveToUndo(string label, IEnumerable<string> paths, Action<string> log, int keepDays)
         {
             var list = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-            if (list.Count == 0) return;
+            if (list.Count == 0) return 0;
             long need = list.Sum(p => Fs.SizeOf(p));
             var b = Begin(label, "files", need);
-            foreach (var p in list) MoveIn(b, p, log);
+            b.Keep = Math.Max(1, Math.Min(365, keepDays));
+            long moved = 0;
+            foreach (var p in list) moved += MoveIn(b, p, log);
             Commit(b);
-            if (log != null) log("  Kept in Undo for " + KeepDays + " days: " + b.Dir + (RootIsOffC(b.Dir) ? "" : "  (no second drive: the space comes back after " + KeepDays + " days or when you delete it in Tools > Undo)"));
+            if (log != null) log("  Kept in Undo for " + b.Keep + " days: " + b.Dir + (RootIsOffC(b.Dir) ? "" : "  (no second drive: the space comes back after " + b.Keep + " days or when you delete it in Tools > Undo)"));
+            return moved;
         }
     }
 }

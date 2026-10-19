@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.3</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.4</p></div>
 </div></header>
 <main class="wrap">
 
@@ -90,7 +90,7 @@
 <h3>Your other drives (D:, E:, USB)</h3>
 <p>Pick a drive in the switch. Its page shows how full it is, whether it is a <strong>data drive</strong> (no Windows on it) or has its own Windows installation, its biggest folders and largest files, and three buttons:</p>
 <ul>
-  <li><strong>Smart scan:</strong> reads the drive once and finds <strong>duplicate files</strong> (exactly the same content, compared by fingerprint) and big files <strong>not used for 6 months</strong> (or a year, or 2 years). For duplicates you choose which copy stays: the oldest, the newest or the one with the shortest path. Nothing is ticked for you; what you pick goes to the Recycle Bin. Windows, apps, games and AppData are never listed. On C:, Smart scan looks at your own folders. It also lists <strong>empty folders</strong> (removed only if they are still empty, one at a time, so nothing put there since is lost), can <strong>compress</strong> files you keep but rarely open (Windows' own NTFS compression: the files stay where they are and open as usual; not offered for videos, photos, music or archives, which don't get smaller), and, if you tick <strong>Also look for similar photos</strong>, finds photos that look alike but aren't exact copies (resized, edited or burst shots), keeping the biggest of each set.</li>
+  <li><strong>Smart scan:</strong> reads the drive once and finds <strong>duplicate files</strong> (exactly the same content, compared by fingerprint) and big files <strong>not used for 6 months</strong> (or a year, or 2 years). For duplicates you choose which copy stays: the oldest, the newest or the one with the shortest path. Nothing is ticked for you; what you pick goes to Undo (Tools &rsaquo; Undo puts it back). Windows, apps, games and AppData are never listed. On C:, Smart scan looks at your own folders. It also lists <strong>empty folders</strong> (removed only if they are still empty, one at a time, so nothing put there since is lost), can <strong>compress</strong> files you keep but rarely open (Windows' own NTFS compression: the files stay where they are and open as usual; not offered for videos, photos, music or archives, which don't get smaller), and, if you tick <strong>Also look for similar photos</strong>, finds photos that look alike but aren't exact copies (resized, edited or burst shots), keeping the biggest of each set.</li>
   <li><strong>Clean D:</strong> opens the Cleaner at that drive's own group: its Recycle Bin, pieces left by a disk check (found.000), and Steam's shader cache and unfinished downloads in game libraries there. Nothing is ticked for you, and the weekly clean never touches other drives.</li>
   <li><strong>Explore:</strong> the folder drill-down for that drive.</li>
 </ul>
@@ -195,11 +195,11 @@
 <h3>Move off C:</h3>
 <p>Moves Downloads, Documents, Pictures, Videos, Music and Desktop to your second drive the way Windows does it (Properties &rsaquo; Location): every file is copied and checked, then Windows is pointed at the new place, then the old copies are deleted. &ldquo;Move back to C:&rdquo; undoes it. Folders kept in sync by OneDrive are left to OneDrive. Steam games on C: are listed by size; Steam moves them itself (Settings &rsaquo; Storage &rsaquo; Move). Buttons open Windows&rsquo; settings for moving Store apps and for saving new files on another drive.</p>
 <h3>Duplicates</h3>
-<p>Finds files with exactly the same content in Documents, Pictures, Videos, Music, Desktop, Downloads or folders you add. Windows, apps and AppData are never searched. Extra copies go to the Recycle Bin and at least one copy of each file is always kept.</p>
+<p>Finds files with exactly the same content in Documents, Pictures, Videos, Music, Desktop, Downloads or folders you add. Windows, apps and AppData are never searched. Extra copies go to Undo (kept for the days you chose in Automation) and at least one copy of each file is always kept.</p>
 <h3>Leftovers</h3>
 <p>Folders in AppData and ProgramData left behind by apps you removed. A folder is listed only when no installed app, publisher, service, program that starts with Windows or running program matches its name, nothing in it changed for 3 months, and it holds at least 1 MB. Folders of Windows, drivers, browsers, games platforms and security programs are never listed, and neither are folders named with a code instead of a name. These are guesses, so nothing is ticked: look first (double-click opens a folder). What you pick goes to Undo for 7 days, so you can put it back.</p>
 <h3>Undo</h3>
-<p>Caution items, removed drivers and removed startup entries are kept here for 7 days, on your second drive when there is one, so C: space is freed right away. Restore puts them back exactly where they were; after 7 days they are deleted for good.</p>
+<p>Files you remove yourself (Smart scan, Duplicates) are kept here for 7, 30 or 90 days, your choice in Automation (30 by default). Caution items, removed drivers and removed startup entries are kept for 7 days. Undo uses your second drive when there is one, so C: space is freed right away. Restore puts everything back exactly where it was, also files from a USB drive (which has no Recycle Bin); when its time runs out, an item is deleted for good.</p>
 
 <h2 id="phone">Phone</h2>
 <p>The Phone tab cleans an Android phone over a USB cable and moves big photos and videos off an iPhone.</p>
@@ -214,10 +214,12 @@
 <p>Copies go to a &ldquo;Phone backup&rdquo; folder on your second drive, or in Pictures.</p>
 
 <h2 id="automation">Automation</h2>
-<p>Two schedules run through Windows Task Scheduler even when Elixar is closed; click Save to turn them on or off.</p>
+<p>These schedules run through Windows Task Scheduler even when Elixar is closed; click Save to turn them on or off.</p>
 <ul>
   <li><strong>Low-space alert:</strong> a Windows notification when C: drops under the limit you choose (default 15%), checked daily and a few minutes after you sign in. The same check warns you when a drive's health gets worse.</li>
   <li><strong>Weekly auto-clean:</strong> cleans only the 11 default Safe items on the day and time you choose. Never Caution items, the Recycle Bin, browser caches, privacy items or DISM. Open apps are skipped, never closed, and a notification shows what was freed.</li>
+  <li><strong>Recycle Bin and Undo</strong> (the &ldquo;daily tidy&rdquo;): every day, Elixar empties only what has been in your Recycle Bin for more than 14, 30, 60 or 90 days, on every internal drive, and only your own Recycle Bin. What you deleted recently stays. It also deletes Undo items whose time is up, and, if you tick it, runs the Safe clean right away when C: drops under your alert limit (at most once a day). <strong>Empty old Recycle Bin items now&hellip;</strong> does the same at once. The section shows how much of your Recycle Bin is old.</li>
+  <li><strong>Keep files you remove in Undo for:</strong> 7, 30 or 90 days (see Undo, under Tools).</li>
 </ul>
 <div class="note">Schedules start the protected copy in C:\Program Files\Elixar. After updating Elixar, open Automation and click Save once so they use the new version.</div>
 
@@ -357,6 +359,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>2.2.4</td><td>Files you remove (Smart scan, Duplicates) go to Undo for 7, 30 or 90 days, also from USB drives; daily tidy: old Recycle Bin items (only those older than your choice), Undo, and a Safe clean when C: is low</td></tr>
   <tr><td>2026-10-19</td><td>2.2.3</td><td>Deeper security check: cmd AutoRun, files put next to Elixar.exe, .NET profiler settings, redefined Program Files/Path, Docker with your normal rights, update size limits (see Security)</td></tr>
   <tr><td>2026-10-19</td><td>2.2.2</td><td>OneDrive tab (only when OneDrive is signed in): make files you don't use online-only; Smart scan finds similar photos and empty folders and can compress rarely used files; Leftovers of removed apps (Tools); what grew this week; Export report (print to PDF); icon next to the clock; a monthly Smart scan reminder for other drives; 6 security protections (see Security)</td></tr>
   <tr><td>2026-10-19</td><td>2.2.1</td><td>Your other drives: Smart scan (duplicates with your choice of which copy stays, big files not used for 6+ months), Clean D: (Recycle Bin, disk-check leftovers, Steam caches), duplicates on any or all drives, low-space alerts for every internal drive; data drives and drives with their own Windows are told apart</td></tr>

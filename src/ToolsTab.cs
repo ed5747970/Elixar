@@ -354,7 +354,7 @@ namespace CDriveCleaner
             var t = Page(5);
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            dupStatus = Note("Finds files with exactly the same content in your own folders, on any drive and across drives (compared byte for byte by fingerprint). Windows, apps and AppData are never searched. Extra copies go to the Recycle Bin.");
+            dupStatus = Note("Finds files with exactly the same content in your own folders, on any drive and across drives (compared byte for byte by fingerprint). Windows, apps and AppData are never searched. Extra copies go to Undo, so you can get them back (Tools > Undo).");
             var top = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Margin = new Padding(0, 0, 0, S(6)) };
             top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             dupFolders = new ListBox { Dock = DockStyle.Fill, Height = S(96), IntegralHeight = false };
@@ -377,7 +377,7 @@ namespace CDriveCleaner
             btnDupFind = MakeButton("Find duplicates"); btnDupFind.Font = new Font("Segoe UI Semibold", 9f);
             btnDupStop = MakeButton("Stop"); btnDupStop.Enabled = false;
             btnDupSelect = MakeButton("Select extra copies");
-            btnDupRecycle = MakeButton("Move selected to Recycle Bin..."); btnDupRecycle.Enabled = false;
+            btnDupRecycle = MakeButton("Move selected to Undo..."); btnDupRecycle.Enabled = false;
             row.Controls.AddRange(new Control[] { btnDupFind, btnDupStop, btnDupSelect, btnDupRecycle });
 
             t.Controls.Add(Title("Duplicate files"), 0, 0); t.Controls.Add(dupStatus, 0, 1); t.Controls.Add(top, 0, 2); t.Controls.Add(dupList, 0, 3); t.Controls.Add(row, 0, 4);
@@ -432,7 +432,7 @@ namespace CDriveCleaner
         {
             var sel = dupList.CheckedItems.Cast<ListViewItem>().ToList();
             btnDupRecycle.Enabled = sel.Count > 0 && !testMode && dupCts == null;
-            btnDupRecycle.Text = sel.Count > 0 ? "Move " + sel.Count + " to Recycle Bin (" + Fs.Fmt(sel.Sum(r => ((FileInfo)r.Tag).Length)) + ")..." : "Move selected to Recycle Bin...";
+            btnDupRecycle.Text = Lang.T(sel.Count > 0 ? "Move " + sel.Count + " to Undo (" + Fs.Fmt(sel.Sum(r => ((FileInfo)r.Tag).Length)) + ")..." : "Move selected to Undo...");
         }
 
         public void FindDuplicates()
@@ -490,19 +490,25 @@ namespace CDriveCleaner
                 Lang.Box(this, "Keep at least one copy in each set. Untick one file in:\n\n" + string.Join("\n", blocked), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            // a USB stick has no Recycle Bin: Windows deletes from it for good
-            var usb = sel.Where(r => Duplicates.OnUsb(((FileInfo)r.Tag).FullName)).ToList();
-            string usbNote = usb.Count == 0 ? "" : "\n\n" + Lang.T(usb.Count + " of them are on a USB drive, which has no Recycle Bin: those are deleted for good.");
-            if (Lang.Box(this, Lang.T("Move " + sel.Count + " files (" + Fs.Fmt(sel.Sum(r => ((FileInfo)r.Tag).Length)) + ") to the Recycle Bin?") + "\n\n" + Lang.T("You can get them back from the Recycle Bin.") + usbNote,
-                    "Elixar", MessageBoxButtons.OKCancel, usb.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question) != DialogResult.OK) return;
-            int ok = 0;
-            foreach (var r in sel)
+            // to Undo, kept for the days you chose (also from USB drives, which have no Recycle Bin)
+            int keep = TidyPrefs.Load().UndoDays;
+            if (Lang.Box(this, Lang.T("Move " + sel.Count + " files (" + Fs.Fmt(sel.Sum(r => ((FileInfo)r.Tag).Length)) + ") to Undo?") + "\n\n" +
+                    Lang.T("They are kept for " + keep + " days, and Tools > Undo puts them back. After that they are deleted for good. You can change the days in Automation."),
+                    "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            var paths = sel.Select(r => ((FileInfo)r.Tag).FullName).ToList();
+            btnDupRecycle.Enabled = false; dupStatus.Text = Lang.T("Moving " + sel.Count + " files to Undo...");
+            Task.Factory.StartNew(() => Quarantine.MoveToUndo("Duplicates (" + paths.Count + " files)", paths, null, keep), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
-                if (Duplicates.Recycle(((FileInfo)r.Tag).FullName)) { ok++; dupList.Items.Remove(r); }
-            }
-            Log("Duplicates: moved " + ok + " of " + sel.Count + " files to the Recycle Bin.");
-            dupStatus.Text = "Moved " + ok + " files to the Recycle Bin. Empty the Recycle Bin to free the space.";
-            UpdateDupButton();
+                int ok = 0;
+                foreach (var r in sel) if (!File.Exists(((FileInfo)r.Tag).FullName)) { ok++; dupList.Items.Remove(r); }
+                long bytes = t.IsFaulted ? 0 : t.Result;
+                string msg = t.IsFaulted ? "Could not move the files to Undo: " + t.Exception.GetBaseException().Message
+                                         : "Moved " + ok + " of " + sel.Count + " files (" + Fs.Fmt(bytes) + ") to Undo, kept for " + keep + " days (Tools > Undo puts them back).";
+                Log("Duplicates: " + msg);
+                dupStatus.Text = Lang.T(msg);
+                if (ok > 0) try { Activity.Add("clean", "Duplicates: " + ok + " files to Undo", bytes); } catch { }
+                UpdateDupButton();
+            }));
         }
 
         // ================= Undo =================
@@ -511,7 +517,7 @@ namespace CDriveCleaner
             var t = Page(4);
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            undoStatus = Note("Caution items and removed drivers are kept here for " + Quarantine.KeepDays + " days before they are deleted for good. Restore puts them back exactly where they were.");
+            undoStatus = Note("Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were.");
             undoList = new ListView { View = View.Details, FullRowSelect = true, HideSelection = false, Dock = DockStyle.Fill, MultiSelect = false, ShowItemToolTips = true };
             undoList.Columns.Add("When", S(130)); undoList.Columns.Add("What", S(330)); undoList.Columns.Add("Size", S(85), HorizontalAlignment.Right);
             undoList.Columns.Add("Deleted for good in", S(140)); undoList.Columns.Add("Kept at", S(380));
@@ -571,15 +577,15 @@ namespace CDriveCleaner
                         var lvi = new ListViewItem(b.Time.ToString("d MMM yyyy HH:mm")) { Tag = b, ToolTipText = string.Join("\n", b.Items.Select(i => i[1]).Take(15)) };
                         lvi.SubItems.Add(b.Label);
                         lvi.SubItems.Add(Fs.Fmt(b.Bytes));
-                        int d = b.DaysLeft(Quarantine.KeepDays);
+                        int d = b.DaysLeft();
                         lvi.SubItems.Add(d <= 0 ? "today" : d == 1 ? "1 day" : d + " days");
                         lvi.SubItems.Add(b.Dir);
                         undoList.Items.Add(lvi);
                     }
                 undoList.EndUpdate();
                 int n = undoList.Items.Count;
-                undoStatus.Text = n == 0 ? "Nothing in Undo. Caution items and drivers you remove are kept here for " + Quarantine.KeepDays + " days."
-                    : n + (n == 1 ? " item, " : " items, ") + Fs.Fmt(t.Result.Sum(b => b.Bytes)) + " in total. Each is deleted for good after " + Quarantine.KeepDays + " days. Select one to restore it.";
+                undoStatus.Text = n == 0 ? "Nothing in Undo. Files you remove are kept here for " + TidyPrefs.Load().UndoDays + " days, Caution items and drivers for " + Quarantine.KeepDays + " days."
+                    : n + (n == 1 ? " item, " : " items, ") + Fs.Fmt(t.Result.Sum(b => b.Bytes)) + " in total. Each is deleted for good when its time runs out (see the last columns). Select one to restore it.";
                 UpdateUndoButtons();
                 if (UndoDone != null) UndoDone();
             }));
