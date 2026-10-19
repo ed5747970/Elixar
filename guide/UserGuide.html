@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.2.28</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.2.29</p></div>
 </div></header>
 <main class="wrap">
 
@@ -198,6 +198,14 @@
 <p>Finds files with exactly the same content in Documents, Pictures, Videos, Music, Desktop, Downloads or folders you add. Windows, apps and AppData are never searched. Extra copies go to Undo (kept for the days you chose in Automation) and at least one copy of each file is always kept.</p>
 <h3>Leftovers</h3>
 <p>Folders in AppData and ProgramData left behind by apps you removed. A folder is listed only when no installed app, publisher, service, program that starts with Windows or running program matches its name, nothing in it changed for 3 months, and it holds at least 1 MB. Folders of Windows, drivers, browsers, games platforms and security programs are never listed, and neither are folders named with a code instead of a name. These are guesses, so nothing is ticked: look first (double-click opens a folder). What you pick goes to Undo for 7 days, so you can put it back.</p>
+<h3>Sysprep</h3>
+<p>Gets this PC ready for Sysprep before you capture an image (Sysprep with Generalize). <strong>Check this PC</strong> lists what would stop Sysprep and offers Microsoft's fix for each; nothing changes without asking, and a restore point is made before a fix:</p>
+<ul>
+  <li><strong>Stops Sysprep:</strong> BitLocker on the Windows drive (Turn BitLocker off: it decrypts in the background); Store apps installed for one account only (Remove them for all accounts); Windows upgraded in place (Microsoft's workaround, 3 registry values; a clean install is the supported way); Sysprep's state left from an earlier run or too many runs (Reset Sysprep's state).</li>
+  <li><strong>Fix first:</strong> a restart Windows is waiting for; little free space (clean first).</li>
+  <li><strong>Good to know:</strong> Store app updates (pause them while you prepare, turn them back on afterwards), other accounts on the PC, domain membership, errors from the last Sysprep run (Sysprep's log is read and explained).</li>
+</ul>
+<p><strong>Open Sysprep&hellip;</strong> only opens Windows' Sysprep: choose Enter System Out-of-Box Experience (OOBE), tick Generalize, and Shutdown there.</p>
 <h3>Undo</h3>
 <p>Files you remove yourself (Smart scan, Duplicates) are kept here for 7, 30 or 90 days, your choice in Automation (30 by default). Caution items, removed drivers and removed startup entries are kept for 7 days. Undo uses your second drive when there is one, so C: space is freed right away. Restore puts everything back exactly where it was, also files from a USB drive (which has no Recycle Bin); when its time runs out, an item is deleted for good.</p>
 
@@ -360,6 +368,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>1.2.29</td><td>Tools &rsaquo; Sysprep: checks what stops Sysprep (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state, a pending restart) and offers Microsoft's fix for each; reads Sysprep's log</td></tr>
   <tr><td>2026-10-19</td><td>1.2.28</td><td>Security check: Undo never fills a drive (files stay on their own drive when it is full, files from C: go to a second drive, and a copy is refused when no drive has room); old copies left in Program Files after an update are removed</td></tr>
   <tr><td>2026-10-19</td><td>1.2.27</td><td>New version numbers: 1.2.27 comes after 2.2.7 and counts as newer than every earlier version. When you start a new version and an older one is installed, Elixar offers to update the installed copy in place (settings, schedules and email sign-in are kept; nothing is uninstalled). Every question and message now appears in Elixar's own look (light or dark, Hebrew right to left): lists in a card with sizes on the right, a red button when something is deleted, Enter/Esc on the safe choice; Ctrl+C copies the text</td></tr>
   <tr><td>2026-10-19</td><td>2.2.6</td><td>Dark theme: no light lines left around lists, at the end of list headers or under group titles</td></tr>

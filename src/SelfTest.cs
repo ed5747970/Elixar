@@ -1385,6 +1385,25 @@ namespace CDriveCleaner
                         }
                         finally { Theme.Dark = wasDark; }
                     }
+                    // ---- Sysprep readiness ----
+                    {
+                        var sf = new SysprepFacts();
+                        Sysprep.ApplyPs(sf, "BL|FullyEncrypted|100\nDOM|False\nPKG|SpotifyAB.SpotifyMusic|SpotifyAB.SpotifyMusic_1.2.3.0_x64__zpdnekdrzrea0\nPKG|Microsoft.OneDriveSync|Microsoft.OneDriveSync_21.0.0.0_neutral__8wekyb3d8bbwe\n");
+                        sf.PendingRestart = true; sf.OtherAccounts.Add("Test"); sf.Free = 4L << 30;
+                        var sc = Sysprep.Assess(sf);
+                        Func<string, int> lvl = id => { var c = sc.FirstOrDefault(x => x.Id == id); return c == null ? -1 : c.Level; };
+                        var ready = Sysprep.Assess(new SysprepFacts { StoreUpdatesPaused = true, Free = 50L << 30 });
+                        var logs = Sysprep.ParseLog("2026-10-19 SYSPRP Package SpotifyAB.SpotifyMusic_1.2.3.0_x64__zpdnekdrzrea0 was installed for a user, but not provisioned for all users. This package will not function properly in the sysprep image.\n" +
+                                                    "Error SYSPRP BitLocker-Sysprep: BitLocker is on for the OS volume. Turn BitLocker off to run Sysprep. (0x80310039)\nError [0x0f0036] SYSPRP spopk.dll:: Sysprep will not run on an upgraded OS.");
+                        var upg = Sysprep.Assess(new SysprepFacts { Upgraded = true, GeneralizationState = 3, StoreUpdatesPaused = true, Free = 50L << 30 });
+                        check(sf.BitLocker == "FullyEncrypted" && sf.Unprovisioned.Count == 2 && lvl("bitlocker") == 3 && lvl("appx") == 3 && sc.First(x => x.Id == "appx").Items.Count == 2 &&
+                              lvl("restart") == 2 && lvl("space") == 2 && lvl("accounts") == 1 && lvl("storeupdates") == 1 && sc[0].Level == 3 &&
+                              Sysprep.Summary(sc) == "2 things stop Sysprep, 2 things to fix first." &&
+                              ready.All(x => x.Level <= 1) && Sysprep.Summary(ready).StartsWith("Ready for Sysprep") &&
+                              logs.Count == 3 && logs[0].Kind == "appx" && logs[0].Package.StartsWith("SpotifyAB") && logs[1].Kind == "bitlocker" && logs[2].Kind == "upgrade" &&
+                              upg.Any(x => x.Id == "upgrade" && x.Level == 3 && x.FixRisky) && upg.Any(x => x.Id == "state" && x.Level == 3),
+                              "Sysprep: finds what stops it (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state) and reads its log");
+                    }
                     // ---- where Undo goes: never fill a drive ----
                     {
                         long G = 1L << 30;

@@ -1,7 +1,15 @@
-ELIXAR  (version 1.2.28)
+ELIXAR  (version 1.2.29)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.2.29
+- Tools > Sysprep: gets the PC ready for Sysprep before you capture an image.
+  Checks BitLocker, Store apps installed for one account only, an upgraded
+  Windows, Sysprep's state from earlier runs, a pending restart, Store
+  updates, other accounts, domain and free space, and reads Sysprep's log.
+  Each problem comes with Microsoft's fix (asked first, restore point made).
+  "Open Sysprep..." opens Windows' Sysprep; you choose its options there.
 
 NEW IN 1.2.28 (security check)
 - Undo never fills a drive: files you remove stay on their own drive when it

@@ -49,10 +49,11 @@ namespace CDriveCleaner
             pageDups = new TabPage("Duplicates") { BackColor = pageTools.BackColor };
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
             pageLeft = new TabPage("Leftovers") { BackColor = pageTools.BackColor };
+            pageSysprep = new TabPage("Sysprep") { BackColor = pageTools.BackColor };
             if (LinuxUi) toolsTabs.TabPages.Add(pageDups);   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageLeft, pageUndo });
+            else toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageLeft, pageSysprep, pageUndo });
             pageTools.Controls.Add(toolsTabs);
-            BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildUndo();
+            BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();
         }
 
@@ -63,6 +64,7 @@ namespace CDriveCleaner
             else if (toolsTabs.SelectedTab == pageStartup && !startLoaded) RefreshStartup();
             else if (toolsTabs.SelectedTab == pageMove && !moveLoaded) RefreshMove();
             else if (toolsTabs.SelectedTab == pageUndo) RefreshUndo();
+            else if (toolsTabs.SelectedTab == pageSysprep) OnSysprepTab();
         }
 
         public void ShowTools(int inner) { tabs.SelectedTab = pageTools; toolsTabs.SelectedIndex = inner; OnToolsTab(); }
