@@ -1,9 +1,9 @@
-ELIXAR  (version 2.3.0)
+ELIXAR  (version 2.2.1)
 The cure for a full C: drive
 Made by Elisar
 =======================
 
-NEW IN 2.3
+NEW IN 2.2.1
 - Your other drives (D:, E:, USB): pick one on the Dashboard.
   * Smart scan: reads the drive once and finds duplicate files (you choose
     which copy stays: oldest, newest or shortest path) and big files not used
