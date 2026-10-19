@@ -862,6 +862,7 @@ HE = {
 "Update":"עדכון",
 "Provider":"ספק",
 "Class":"סוג",
+"The cure for a cluttered PC":"התרופה למחשב עמוס",
 "Recycle Bin and Undo":"סל המיחזור וביטול",
 "Every day, empty what has been in the Recycle Bin for more than":"בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-",
 "7 days":"7 ימים",

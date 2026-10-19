@@ -55,7 +55,7 @@ namespace CDriveCleaner
                     var sh = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
                     var sc = sh.GetType().InvokeMember("CreateShortcut", System.Reflection.BindingFlags.InvokeMethod, null, sh, new object[] { StartMenuLink });
                     Action<string, object> set = (n, val) => sc.GetType().InvokeMember(n, System.Reflection.BindingFlags.SetProperty, null, sc, new[] { val });
-                    set("TargetPath", Install.Exe); set("WorkingDirectory", Install.Dir); set("Description", "Elixar - the cure for a full C: drive"); set("IconLocation", Install.Exe + ",0");
+                    set("TargetPath", Install.Exe); set("WorkingDirectory", Install.Dir); set("Description", "Elixar - the cure for a cluttered PC"); set("IconLocation", Install.Exe + ",0");
                     sc.GetType().InvokeMember("Save", System.Reflection.BindingFlags.InvokeMethod, null, sc, null);
                     return 0;
                 });

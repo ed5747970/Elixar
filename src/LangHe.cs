@@ -1138,6 +1138,7 @@ namespace CDriveCleaner
             d["Update"] = "עדכון";
             d["Provider"] = "ספק";
             d["Class"] = "סוג";
+            d["The cure for a cluttered PC"] = "התרופה למחשב עמוס";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["7 days"] = "7 ימים";

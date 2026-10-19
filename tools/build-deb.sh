@@ -26,7 +26,7 @@ cat > "$ROOT/usr/share/applications/elixar.desktop" <<'DESK'
 Type=Application
 Name=Elixar
 GenericName=Disk cleaner
-Comment=The cure for a full disk
+Comment=The cure for a cluttered PC
 Exec=elixar
 Icon=elixar
 Terminal=false
@@ -48,7 +48,7 @@ Maintainer: Elisar <337002386+ed5747970@users.noreply.github.com>
 Depends: mono-runtime (>= 6.8), libmono-system-windows-forms4.0-cil, libmono-system-drawing4.0-cil, libmono-system-core4.0-cil, libmono-system4.0-cil, libmono-corlib4.5-cil, libmono-system-io-compression4.0-cil, libmono-system-io-compression-filesystem4.0-cil, libmono-system-security4.0-cil, libmono-system-serviceprocess4.0-cil, libmono-system-web-extensions4.0-cil, libmono-system-xml4.0-cil, libgdiplus, ca-certificates-mono
 Recommends: pkexec | policykit-1, libnotify-bin, xdg-utils, libglib2.0-bin, libsecret-tools
 Homepage: https://github.com/ed5747970/elixar
-Description: The cure for a full disk
+Description: The cure for a cluttered PC
  Elixar shows what fills your disks and cleans what is safe to clean:
  caches, thumbnails, old update packages (apt), old Snap versions, old
  system logs and crash reports. It runs as you and asks for your password

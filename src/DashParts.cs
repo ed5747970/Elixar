@@ -238,7 +238,7 @@ namespace CDriveCleaner
             var ns = TextRenderer.MeasureText(g, "Elixar", nf);
             TextRenderer.DrawText(g, "Elixar", nf, new Point(x, (Height - ns.Height) / 2), Color.White);
             var tf = TagFont ?? Font;
-            string tag = Win.IsWindows ? "The cure for a full C: drive" : "The cure for a full disk";
+            string tag = Lang.T("The cure for a cluttered PC");
             var ts = TextRenderer.MeasureText(g, tag, tf);
             TextRenderer.DrawText(g, tag, tf, new Point(x + ns.Width + 8, (Height - ts.Height) / 2 + 1), Color.FromArgb(190, 225, 230));
             // signature on the right

@@ -1,6 +1,6 @@
 # Elixar
 
-The cure for a full C: drive. Made by Elisar.
+The cure for a cluttered PC. Made by Elisar.
 
 Elixar shows what fills drive C:, from Critical to Safe, and removes only what you choose: caches, temp files,
 old drivers, Windows.old, apps you don't use, phone clutter and more, with Undo for anything risky.

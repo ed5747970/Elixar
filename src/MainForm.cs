@@ -542,23 +542,30 @@ namespace CDriveCleaner
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));          // 0 header
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));      // 1 overview or details
 
-            // header: title and status, Overview | Details, and a few tools
-            var head = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 6, RowCount = 1, Margin = new Padding(S(5), 0, S(5), S(6)) };
+            // header, two rows:  [drives .............. Refresh  Explore  Folder map  Remove apps]
+            //                    [status line ......................... Overview | Details]
+            // every control is centred in its row, so pills, switch and buttons line up
+            var head = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 5, RowCount = 2, Margin = new Padding(S(5), 0, S(5), S(6)) };
             head.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 5; i++) head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            var titles = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
+            for (int i = 0; i < 4; i++) head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            head.RowStyles.Add(new RowStyle(SizeType.AutoSize)); head.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             dashHeader = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = "Drive C:", Margin = new Padding(0) };
             statusTail = Lang.T("Waiting for the first scan...");
-            dashStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = StatusText(), Margin = new Padding(S(2), 0, 0, 0) };
-            titles.Controls.Add(BuildDrivePicker()); titles.Controls.Add(dashStatus);
-            dashView = new Segmented { Options = new[] { Lang.T("Overview"), Lang.T("Details") }, Scale_ = s, Font = new Font("Segoe UI", 9.5f), Margin = new Padding(0, S(9), S(14), 0) };
+            // one line that never wraps: when the window is narrow it ends with "..." (the whole text is in the tooltip)
+            dashStatus = new Label { AutoSize = false, AutoEllipsis = true, Dock = DockStyle.Fill, Height = S(24), TextAlign = Lang.Hebrew ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft,
+                                     ForeColor = Color.DimGray, Text = StatusText(), Margin = new Padding(S(2), S(4), S(12), 0), UseMnemonic = false };
+            var statusTip = new ToolTip();
+            dashStatus.TextChanged += (o, e) => statusTip.SetToolTip(dashStatus, dashStatus.Text);
+            var picker = BuildDrivePicker(); picker.Anchor = AnchorStyles.Left; picker.Margin = new Padding(0, S(2), S(12), S(2));
+            dashView = new Segmented { Options = new[] { Lang.T("Overview"), Lang.T("Details") }, Scale_ = s, Font = new Font("Segoe UI", 9f), Margin = new Padding(0, S(4), S(3), 0), Anchor = AnchorStyles.Right };
             dashView.FitWidth();
             Func<string, Button> tool = text =>
             {
                 var b = MakeButton(text);
                 b.FlatStyle = FlatStyle.Flat; b.BackColor = Color.White; b.FlatAppearance.BorderColor = Color.FromArgb(214, 219, 228);
                 b.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 241, 255);
-                b.Margin = new Padding(S(3), S(9), S(3), 0);
+                b.Margin = new Padding(S(3), S(2), S(3), S(2)); b.Anchor = AnchorStyles.Left;
+                b.MinimumSize = new Size(0, picker.Height);   // as tall as the drive pills
                 return b;
             };
             btnDashRefresh = tool("Refresh (F5)");
@@ -566,8 +573,9 @@ namespace CDriveCleaner
             var btnMap = tool("Folder map");
             var btnDashApps = tool("Remove apps...");
             btnDashApps.Visible = !LinuxUi;
-            head.Controls.Add(titles, 0, 0); head.Controls.Add(dashView, 1, 0); head.Controls.Add(btnDashRefresh, 2, 0);
-            head.Controls.Add(btnExplore, 3, 0); head.Controls.Add(btnMap, 4, 0); head.Controls.Add(btnDashApps, 5, 0);
+            head.Controls.Add(picker, 0, 0); head.Controls.Add(btnDashRefresh, 1, 0);
+            head.Controls.Add(btnExplore, 2, 0); head.Controls.Add(btnMap, 3, 0); head.Controls.Add(btnDashApps, 4, 0);
+            head.Controls.Add(dashStatus, 0, 1); head.Controls.Add(dashView, 1, 1); head.SetColumnSpan(dashView, 4);
             btnMap.Click += (o, e) => OpenMap(CurRoot());
             btnDashApps.Click += (o, e) => ShowStoreTab();
             btnExplore.Click += (o, e) => OpenDrill(CurRoot());

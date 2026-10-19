@@ -493,10 +493,11 @@ namespace CDriveCleaner
         }
         public void ClickSwitch() { if (HasSwitch && !SwitchBusy && SwitchClicked != null) SwitchClicked(); }   // self-test and keyboard
 
-        void DrawSwitch(Graphics g, Color on)
+        // drawn on the value line ("On" / "Off"), so the caption above keeps its full width
+        void DrawSwitch(Graphics g, Color on, int rowTop, int rowH)
         {
             int w = S(40), h = S(22), pad = S(14);
-            var r = new Rectangle(Rtl ? pad : Width - pad - w, pad + (S(32) - h) / 2, w, h);
+            var r = new Rectangle(Rtl ? pad : Width - pad - w, rowTop + (rowH - h) / 2, w, h);
             SwitchRect = r;
             var back = SwitchBusy ? Theme.Grid : SwitchOn ? on : (Theme.Dark ? Color.FromArgb(78, 78, 94) : Color.FromArgb(196, 201, 212));
             using (var path = new GraphicsPath())
@@ -525,12 +526,12 @@ namespace CDriveCleaner
             bool spark = Spark != null && Spark.Count >= 2;
             int sparkW = spark ? Math.Min(S(58), Width / 3) : 0;
             int cx = pad + ic + S(10);
-            int capRight = HasSwitch ? S(48) : 0;
-            Txt(g, Caption, cf, new Rectangle(cx, pad + (ic - cf.Height) / 2, Width - cx - pad - capRight, cf.Height + 2), Theme.Quiet, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
-            if (HasSwitch) DrawSwitch(g, Theme.MapFore(Color.FromArgb(0, 150, 90)));
+            Txt(g, Caption, cf, new Rectangle(cx, pad + (ic - cf.Height) / 2, Width - cx - pad, cf.Height + 2), Theme.Quiet, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
 
             int y = pad + ic + S(10);
-            Txt(g, Value, vf, new Rectangle(pad, y, Width - 2 * pad, vf.Height + 2), Theme.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+            int swW = HasSwitch ? S(48) : 0;
+            if (HasSwitch) DrawSwitch(g, Theme.MapFore(Color.FromArgb(0, 150, 90)), y, vf.Height + 2);
+            Txt(g, Value, vf, new Rectangle(pad, y, Width - 2 * pad - swW, vf.Height + 2), Theme.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
             y += vf.Height + S(2);
             if (spark) DrawSpark(g, M(new Rectangle(Width - pad - sparkW, y - S(1), sparkW, Font.Height + S(2))), acc);
             Txt(g, Sub, Font, new Rectangle(pad, y, Width - 2 * pad - (spark ? sparkW + S(6) : 0), Math.Max(Font.Height, Height - y - S(8))), Theme.Quiet, TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);

@@ -1,7 +1,14 @@
-ELIXAR  (version 1.2.31)
-The cure for a full C: drive
+ELIXAR  (version 1.2.32)
+The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.32
+- New slogan: "The cure for a cluttered PC" (Elixar does far more than the
+  C: drive now).
+- Dashboard header tidied: the drives and the tools sit on one line, the
+  status line fits on one line, and Overview | Details moved next to it.
+  The Auto-delete switch no longer covers the tile's title.
 
 NEW IN 1.2.31 (golden image)
 - Tools > Sysprep now also checks what would be copied to every PC:

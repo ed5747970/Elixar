@@ -94,7 +94,7 @@ namespace CDriveCleaner
                 h.Append("<!doctype html><html dir=\"").Append(dir).Append("\"><head><meta charset=\"utf-8\"></head><body style=\"margin:0;background:#f6f8fb;font-family:Segoe UI,Arial,sans-serif;color:#18202b\">");
                 h.Append("<div style=\"max-width:640px;margin:0 auto;padding:20px\">");
                 h.Append("<div style=\"background:linear-gradient(90deg,#261e5c,#14465a);color:#fff;border-radius:10px 10px 0 0;padding:14px 20px;font-size:18px;font-weight:600\">Elixar");
-                h.Append("<span style=\"font-weight:400;font-size:13px;opacity:.8\"> &nbsp;").Append(H(L("The cure for a full C: drive", "התרופה לכונן C: מלא"))).Append("</span></div>");
+                h.Append("<span style=\"font-weight:400;font-size:13px;opacity:.8\"> &nbsp;").Append(H(L("The cure for a cluttered PC", "התרופה למחשב עמוס"))).Append("</span></div>");
                 h.Append("<div style=\"background:#fff;border-radius:0 0 10px 10px;padding:18px 22px;border-top:4px solid ").Append(accent).Append("\">");
                 h.Append("<h2 style=\"margin:0 0 10px;font-size:20px\">").Append(H(subject)).Append("</h2>");
                 t.Append(subject).Append("\r\n").Append(new string('=', Math.Min(60, subject.Length))).Append("\r\n\r\n");

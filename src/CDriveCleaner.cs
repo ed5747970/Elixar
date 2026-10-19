@@ -24,11 +24,11 @@ using System.Windows.Forms;
 [assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
 [assembly: AssemblyTitle("Elixar")]
 [assembly: AssemblyProduct("Elixar")]
-[assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
+[assembly: AssemblyDescription("Elixar - the cure for a cluttered PC. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("1.2.31.1")]
-[assembly: AssemblyFileVersion("1.2.31.1")]
+[assembly: AssemblyVersion("1.2.32.1")]
+[assembly: AssemblyFileVersion("1.2.32.1")]
 
 namespace CDriveCleaner
 {
