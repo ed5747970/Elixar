@@ -16,7 +16,7 @@ namespace CDriveCleaner
         TabPage pageSysprep;
         Label spSummary;
         FlowLayoutPanel spList;
-        Button spCheck, spOpen, spLog;
+        Button spCheck, spOpen, spLog, spAnswer;
         SysprepFacts spFacts;
         List<SysprepCheck> spChecks = new List<SysprepCheck>();
         bool spBusy, spLoaded;
@@ -31,8 +31,9 @@ namespace CDriveCleaner
             spCheck = MakeButton("Check this PC"); spCheck.Font = new Font("Segoe UI Semibold", 9f);
             spOpen = MakeButton("Open Sysprep...");
             spLog = MakeButton("Sysprep's log");
+            spAnswer = MakeButton("Answer file...");
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, S(8)) };
-            row.Controls.AddRange(new Control[] { spCheck, spOpen, spLog });
+            row.Controls.AddRange(new Control[] { spCheck, spOpen, spAnswer, spLog });
             spList = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Margin = new Padding(0) };
             t.Controls.Add(Title("Get this PC ready for Sysprep"), 0, 0);
             t.Controls.Add(Note("Before you capture an image of this PC (Sysprep with Generalize), Elixar checks what would make Sysprep stop and offers Microsoft's fix for each. Nothing changes without asking, and a restore point is made before a fix. Sysprep itself is only opened: you choose its options there."), 0, 1);
@@ -41,6 +42,7 @@ namespace CDriveCleaner
             t.Controls.Add(spList, 0, 4);
             pageSysprep.Controls.Add(t);
             spCheck.Click += (o, e) => SysprepRefresh();
+            spAnswer.Click += (o, e) => { UnattendForm.ShowFor(this, testMode, Log); if (spLoaded) SysprepRefresh(); };
             spOpen.Click += (o, e) => SysprepOpen();
             spLog.Click += (o, e) =>
             {
@@ -115,6 +117,7 @@ namespace CDriveCleaner
                 case "accounts": try { Shell.Open("ms-settings:otherusers"); } catch { } return;
                 case "space": tabs.SelectedTab = pageClean; return;
                 case "log": spLog.PerformClick(); return;
+                case "answer": spAnswer.PerformClick(); return;
                 case "storeupdates":
                 {
                     bool pause = !spFacts.StoreUpdatesPaused;

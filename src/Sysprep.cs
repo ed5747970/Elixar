@@ -39,6 +39,7 @@ namespace CDriveCleaner
         public long Free = -1;
         public string LogText = "";          // setuperr.log + the end of setupact.log, from the last Sysprep run
         public DateTime LogTime = DateTime.MinValue;
+        public bool AnswerExists; public int AnswerBad, AnswerWarn;   // the answer file in Sysprep's folder
     }
 
     public static class Sysprep
@@ -104,6 +105,16 @@ namespace CDriveCleaner
             try { f.Free = new DriveInfo(SysDrive).AvailableFreeSpace; } catch { }
             if (status != null) status("Checking BitLocker and the Store apps of every account...");
             try { ApplyPs(f, StoreData.RunPs(PsScript.Replace("__SYS__", SysDrive), 180000)); } catch { }
+            try
+            {
+                if (File.Exists(Unattend.SysprepFile))
+                {
+                    f.AnswerExists = true;
+                    var probs = Unattend.CheckXml(File.ReadAllText(Unattend.SysprepFile), Unattend.ThisArch());
+                    f.AnswerBad = probs.Count(p => p.Level == 3); f.AnswerWarn = probs.Count(p => p.Level == 2);
+                }
+            }
+            catch { f.AnswerExists = true; f.AnswerBad = 1; }
             try
             {
                 string err = Path.Combine(Panther, "setuperr.log"), act = Path.Combine(Panther, "setupact.log");
@@ -199,6 +210,13 @@ namespace CDriveCleaner
                     Detail = log.Any(x => x.Kind == "rearm") ? "The last run stopped because Sysprep was run too many times on this Windows. Resetting its state (and skipping the activation rearm) lets it run again."
                                                              : "Sysprep remembers an unfinished earlier run and stops with \"A fatal error occurred\". Resetting its state lets it run again.",
                     FixText = "Reset Sysprep's state..." });
+
+            if (f.AnswerExists)
+                list.Add(f.AnswerBad > 0
+                    ? new SysprepCheck { Id = "answer", Level = 3, Title = "The answer file has problems", Detail = "Windows Setup would stop on the answer file in Sysprep's folder (" + f.AnswerBad + " problem(s)). Fix it, or delete it.", FixText = "Edit the answer file..." }
+                    : new SysprepCheck { Id = "answer", Level = f.AnswerWarn > 0 ? 1 : 0, Title = "Answer file ready", Detail = f.AnswerWarn > 0 ? "Sysprep's folder has an answer file. " + f.AnswerWarn + " thing(s) worth a look." : "Sysprep's folder has an answer file, and it checks out.", FixText = "Edit the answer file..." });
+            else
+                list.Add(new SysprepCheck { Id = "answer", Level = 1, Title = "No answer file", Detail = "Optional: an answer file sets up each new PC by itself (name, language, time zone, setup screens, an account).", FixText = "Create an answer file..." });
 
             if (f.PendingRestart)
                 list.Add(new SysprepCheck { Id = "restart", Level = 2, Title = "Windows is waiting for a restart", Detail = "Updates are half-installed. Restart the PC first, then check again." });

@@ -21,6 +21,7 @@
   main { padding:8px 0 48px; }
   h2 { font-size:22px; color:var(--brand); margin:40px 0 8px; padding-top:8px; border-top:1px solid var(--line); }
   h3 { font-size:17px; margin:22px 0 6px; }
+  h4 { font-size:15px; margin:16px 0 4px; }
   p, li { max-width:760px; }
   table { border-collapse:collapse; width:100%; margin:12px 0 16px; font-size:15px; }
   th, td { text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid var(--line); }
@@ -44,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.2.29</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.2.30</p></div>
 </div></header>
 <main class="wrap">
 
@@ -206,6 +207,18 @@
   <li><strong>Good to know:</strong> Store app updates (pause them while you prepare, turn them back on afterwards), other accounts on the PC, domain membership, errors from the last Sysprep run (Sysprep's log is read and explained).</li>
 </ul>
 <p><strong>Open Sysprep&hellip;</strong> only opens Windows' Sysprep: choose Enter System Out-of-Box Experience (OOBE), tick Generalize, and Shutdown there.</p>
+<h4>Answer file (unattend.xml)</h4>
+<p><strong>Answer file&hellip;</strong> makes, loads and checks the answer file that sets up each PC made from your image by itself, without anyone clicking through Windows' setup screens:</p>
+<ul>
+  <li><strong>This PC:</strong> computer name (<code>*</code> = a random name for each PC), owner, organization, product key (optional), time zone.</li>
+  <li><strong>Language:</strong> Windows language, system locale, formats, keyboards (names like en-US or he-IL).</li>
+  <li><strong>Setup screens to skip:</strong> license, manufacturer registration, Microsoft account screens (use a local account), Wi-Fi, privacy questions.</li>
+  <li><strong>Account:</strong> a local administrator account with a password, and signing in to it automatically once.</li>
+  <li><strong>Image:</strong> CopyProfile (copy this account's settings to every new account), keep installed drivers, SkipRearm.</li>
+  <li><strong>First sign-in:</strong> commands that run once (for example installing an app), and <em>Delete the answer file after setup</em> (on by default).</li>
+</ul>
+<p><strong>Check</strong> reads the file the way Windows Setup does: wrong names, product keys, languages, time zones, setup passes, duplicate parts, parts made for another processor type, and settings in the wrong pass. Problems that would stop Setup are red and block saving. <strong>Save to Sysprep's folder</strong> writes <code>C:\Windows\System32\Sysprep\unattend.xml</code>, which Sysprep uses by itself; <strong>Save as&hellip;</strong> writes anywhere. <strong>Load&hellip;</strong> opens an existing file (settings this editor doesn't show are kept out and you are told which; save under a new name to keep the original). <strong>Run Sysprep with it&hellip;</strong> saves, shows the exact command (Generalize, OOBE, Shutdown, <code>/mode:vm</code> for a virtual machine) and runs it only after you confirm.</p>
+<p><strong>Safety:</strong> a password in an answer file is only encoded (Base64), never encrypted, so anyone who can read the file can read it. Elixar doesn't keep it anywhere else, and <em>Delete the answer file after setup</em> removes the file from the new PC at its first sign-in. Outside files are read with web links and DTDs turned off, and files over 4 MB are refused.</p>
 <h3>Undo</h3>
 <p>Files you remove yourself (Smart scan, Duplicates) are kept here for 7, 30 or 90 days, your choice in Automation (30 by default). Caution items, removed drivers and removed startup entries are kept for 7 days. Undo uses your second drive when there is one, so C: space is freed right away. Restore puts everything back exactly where it was, also files from a USB drive (which has no Recycle Bin); when its time runs out, an item is deleted for good.</p>
 
@@ -368,6 +381,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>1.2.30</td><td>Tools &rsaquo; Sysprep &rsaquo; Answer file: make, load and check unattend.xml (name, language, time zone, setup screens, account, CopyProfile, drivers, first sign-in commands); save to Sysprep's folder or run Sysprep with it</td></tr>
   <tr><td>2026-10-19</td><td>1.2.29</td><td>Tools &rsaquo; Sysprep: checks what stops Sysprep (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state, a pending restart) and offers Microsoft's fix for each; reads Sysprep's log</td></tr>
   <tr><td>2026-10-19</td><td>1.2.28</td><td>Security check: Undo never fills a drive (files stay on their own drive when it is full, files from C: go to a second drive, and a copy is refused when no drive has room); old copies left in Program Files after an update are removed</td></tr>
   <tr><td>2026-10-19</td><td>1.2.27</td><td>New version numbers: 1.2.27 comes after 2.2.7 and counts as newer than every earlier version. When you start a new version and an older one is installed, Elixar offers to update the installed copy in place (settings, schedules and email sign-in are kept; nothing is uninstalled). Every question and message now appears in Elixar's own look (light or dark, Hebrew right to left): lists in a card with sizes on the right, a red button when something is deleted, Enter/Esc on the safe choice; Ctrl+C copies the text</td></tr>

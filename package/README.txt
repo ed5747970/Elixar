@@ -1,7 +1,19 @@
-ELIXAR  (version 1.2.29)
+ELIXAR  (version 1.2.30)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.2.30
+- Tools > Sysprep > "Answer file...": full support for the Sysprep answer
+  file (unattend.xml). Set the computer name, owner, product key, time zone,
+  languages and keyboards, which setup screens to skip, a local admin
+  account, CopyProfile, keeping drivers and first sign-in commands.
+- Check reads the file the way Windows Setup does and finds wrong names,
+  keys, languages, passes and processor types before Sysprep runs.
+- Save to Sysprep's folder, Save as, Load an existing file, or run Sysprep
+  with it (the command is shown and asked first; /mode:vm for VMs).
+- The password is only encoded in the file, so "Delete the answer file
+  after setup" is on by default.
 
 NEW IN 1.2.29
 - Tools > Sysprep: gets the PC ready for Sysprep before you capture an image.

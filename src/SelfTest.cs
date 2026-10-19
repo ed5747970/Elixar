@@ -1404,6 +1404,29 @@ namespace CDriveCleaner
                               upg.Any(x => x.Id == "upgrade" && x.Level == 3 && x.FixRisky) && upg.Any(x => x.Id == "state" && x.Level == 3),
                               "Sysprep: finds what stops it (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state) and reads its log");
                     }
+                    // ---- Sysprep answer file (unattend.xml) ----
+                    {
+                        var us = new UnattendSpec { Arch = Unattend.ThisArch(), ComputerName = "*", Owner = "Elisar", TimeZone = "", UILanguage = "en-US", SystemLocale = "he-IL", UserLocale = "he-IL", InputLocale = "en-US;he-IL",
+                                                    CreateAccount = true, AccountName = "Tech", AccountPassword = "P@ss <w0rd> & \"x\"", AutoLogon = true, CopyProfile = true, ProductKey = "" };
+                        us.FirstLogon.Add("msiexec /i \"C:\\Setup\\app.msi\" /qn");
+                        string ux = Unattend.Build(us);
+                        var back = Unattend.Read(ux);
+                        var uprobs = Unattend.CheckXml(ux, Unattend.ThisArch());
+                        bool round = back.AccountName == "Tech" && back.AccountPassword == us.AccountPassword && back.AutoLogon && back.CopyProfile && back.DeleteAfter && back.FirstLogon.Count == 1 &&
+                                     back.FirstLogon[0] == us.FirstLogon[0] && back.UILanguage == "en-US" && back.InputLocale == "en-US;he-IL" && back.HideOnline && back.SkipPrivacy && back.Unknown.Count == 0 &&
+                                     !ux.Contains("P@ss") && ux.Contains("<CopyProfile>true</CopyProfile>") && !uprobs.Any(x => x.Level == 3);
+                        var badSpec = Unattend.Check(new UnattendSpec { ComputerName = "MY PC!", ProductKey = "ABCDE-12345", UILanguage = "xx-YY", CreateAccount = true, AccountName = "Administrator" });
+                        string wrongPlace = ux.Replace("<CopyProfile>true</CopyProfile>", "").Replace("<HideEULAPage>", "<CopyProfile>true</CopyProfile><HideEULAPage>");
+                        string otherArch = ux.Replace("processorArchitecture=\"" + Unattend.ThisArch() + "\"", "processorArchitecture=\"x86\"");
+                        string xxe = "<?xml version=\"1.0\"?><!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><unattend xmlns=\"urn:schemas-microsoft-com:unattend\">&e;</unattend>";
+                        string extra = ux.Replace("<ComputerName>", "<Themes><ThemeName>x</ThemeName></Themes><ComputerName>");
+                        check(round && badSpec.Count(x => x.Level == 3) == 4 &&
+                              Unattend.CheckXml(wrongPlace, Unattend.ThisArch()).Any(x => x.Text.StartsWith("CopyProfile must be in the specialize")) &&
+                              Unattend.CheckXml(otherArch, Unattend.ThisArch()).Any(x => x.Level == 3 && x.Text.Contains("is for x86")) &&
+                              Unattend.CheckXml(xxe, Unattend.ThisArch()).Any(x => x.Text.StartsWith("The file is not valid XML")) &&
+                              Unattend.Read(extra).Unknown.Any(x => x.Contains("Themes")) && Unattend.Decode(Unattend.Encode("abc", "Password"), "Password") == "abc",
+                              "Sysprep answer file: builds a valid unattend.xml, reads it back, and finds wrong names, keys, languages, passes and architectures (and never loads outside files)");
+                    }
                     // ---- where Undo goes: never fill a drive ----
                     {
                         long G = 1L << 30;
