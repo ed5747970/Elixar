@@ -40,6 +40,18 @@ namespace CDriveCleaner
         public string LogText = "";          // setuperr.log + the end of setupact.log, from the last Sysprep run
         public DateTime LogTime = DateTime.MinValue;
         public bool AnswerExists; public int AnswerBad, AnswerWarn;   // the answer file in Sysprep's folder
+        // golden image (GoldenImage.cs): only whether a secret is there, never the secret itself
+        public bool AutoLogonSecret;
+        public List<string> WifiKeys = new List<string>();        // Wi-Fi profiles with a saved password
+        public List<string[]> Creds = new List<string[]>();       // Credential Manager { target, type } of this account
+        public List<string> OldAnswers = new List<string>();      // answer files Windows Setup reads before Sysprep's
+        public List<string> UsbAnswers = new List<string>();      // on USB drives
+        public List<string> BrowserLogins = new List<string>();   // "Chrome (Tech): 12"
+        public List<string> KeyFiles = new List<string>();        // SSH keys, cloud sign-ins
+        public string ElixarMail;                                 // Elixar's own email sign-in
+        public List<string> CloneApps = new List<string>();       // "Product: what to do"
+        public bool EntraJoined, MdmEnrolled, AuditMode, CopyProfile, Win11, StartForNew, AppsForNew;
+        public string Vm = "";
     }
 
     public static class Sysprep
@@ -115,6 +127,8 @@ namespace CDriveCleaner
                 }
             }
             catch { f.AnswerExists = true; f.AnswerBad = 1; }
+            if (status != null) status("Looking for saved passwords, keys and programs with their own ID...");
+            try { GoldenImage.ReadInto(f); } catch { }
             try
             {
                 string err = Path.Combine(Panther, "setuperr.log"), act = Path.Combine(Panther, "setupact.log");
@@ -229,8 +243,10 @@ namespace CDriveCleaner
                 list.Add(new SysprepCheck { Id = "storeupdates", Level = 0, Title = "Store updates are paused", Detail = "Turn them back on after the image is made.", FixText = "Turn Store updates back on" });
 
             if (f.OtherAccounts.Count > 0)
-                list.Add(new SysprepCheck { Id = "accounts", Level = 1, Title = f.OtherAccounts.Count == 1 ? "1 other account on this PC" : f.OtherAccounts.Count + " other accounts on this PC",
-                    Detail = "Each account's files and Store apps go into the image. Remove the accounts you don't need in Settings > Accounts > Other users.", FixText = "Open Accounts settings", Items = f.OtherAccounts.ToList() });
+                list.Add(new SysprepCheck { Id = "accounts", Level = f.CopyProfile ? 2 : 1, Title = f.OtherAccounts.Count == 1 ? "1 other account on this PC" : f.OtherAccounts.Count + " other accounts on this PC",
+                    Detail = f.CopyProfile ? "Your answer file uses CopyProfile: keep only the account you customized, so that one is copied to new accounts. Each account's files and Store apps also go into the image. Remove the others in Settings > Accounts > Other users."
+                                           : "Each account's files and Store apps go into the image. Remove the accounts you don't need in Settings > Accounts > Other users.",
+                    FixText = "Open Accounts settings", Items = f.OtherAccounts.ToList() });
 
             if (f.Domain)
                 list.Add(new SysprepCheck { Id = "domain", Level = 1, Title = "This PC is in a domain", Detail = "Sysprep takes the PC out of the domain. Join it again after setup (or let your deployment do it)." });
@@ -247,6 +263,7 @@ namespace CDriveCleaner
                 list.Add(new SysprepCheck { Id = "log", Level = 1, Title = "The last Sysprep run (" + f.LogTime.ToString("d MMM HH:mm") + ") wrote errors",
                     Detail = "None of them is a known blocker. Open the log to read them.", FixText = "Open the log" });
 
+            GoldenImage.AddChecks(f, list);
             return list.OrderByDescending(c => c.Level).ToList();
         }
 

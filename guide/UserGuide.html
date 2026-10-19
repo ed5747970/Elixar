@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.2.30</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 1.2.31</p></div>
 </div></header>
 <main class="wrap">
 
@@ -207,6 +207,19 @@
   <li><strong>Good to know:</strong> Store app updates (pause them while you prepare, turn them back on afterwards), other accounts on the PC, domain membership, errors from the last Sysprep run (Sysprep's log is read and explained).</li>
 </ul>
 <p><strong>Open Sysprep&hellip;</strong> only opens Windows' Sysprep: choose Enter System Out-of-Box Experience (OOBE), tick Generalize, and Shutdown there.</p>
+<h4>Golden image</h4>
+<p>Besides what stops Sysprep, <strong>Check this PC</strong> looks for what would be copied to every PC made from the image. Elixar only checks whether a password is there; it never reads it.</p>
+<ul>
+  <li><strong>Saved passwords and keys:</strong> a password saved for automatic sign-in (Winlogon or Sysinternals Autologon), Wi-Fi passwords, saved sign-ins in Credential Manager, old answer files that Windows Setup would read before yours (in <code>Windows\Panther</code> or on a USB drive), saved browser passwords (Chrome, Edge, Brave, Vivaldi, Opera, Firefox, counted per account), SSH keys and command-line cloud sign-ins (AWS, Azure, Google Cloud, Kubernetes, Docker, Git, npm), and Elixar's own email sign-in. Elixar removes the first four and its email sign-in after asking; the others are listed for you to move or delete.</li>
+  <li><strong>Programs with their own ID:</strong> management, security and remote-support agents (for example Configuration Manager, Intune, CrowdStrike, SentinelOne, Defender for Endpoint, Symantec, Kaspersky, TeamViewer, AnyDesk) make an ID when installed. Each one is listed with the vendor's golden-image step. A PC joined to Microsoft Entra ID or enrolled in Intune is flagged too.</li>
+  <li><strong>How to build:</strong> a virtual machine is reminded to take a checkpoint before Sysprep; <em>Restart into Audit mode</em> runs <code>sysprep /audit /reboot</code>; <em>Copy mine to new accounts</em> copies your Start layout and default apps to the default account with Windows' own tools (Windows' original files are kept as <code>.before-elixar</code> copies). With CopyProfile in the answer file, extra accounts are flagged, so the right one is copied.</li>
+</ul>
+<p>The <strong>Golden image</strong> buttons:</p>
+<ul>
+  <li><strong>Image cleanup&hellip;</strong> removes what an image doesn't need: Windows Update downloads, caches, temp files, error reports, crash dumps, servicing logs, the Recycle Bin, old Windows and upgrade leftovers, a final component cleanup (<code>DISM /ResetBase</code>: installed updates can no longer be removed), event logs, the hibernation file (off by default) and restore points (always last). Each line shows its size and what it does; nothing runs without your confirmation, and nothing in it can be undone.</li>
+  <li><strong>Image passport&hellip;</strong> saves an HTML report of the image: Windows version and build, the checklist, the answer file (without passwords or the product key), programs, Store apps for new accounts, updates and added drivers. Keep it next to the image to know what is in each version.</li>
+  <li><strong>Capture kit&hellip;</strong> writes <code>Capture-Image.cmd</code>, <code>Split-Image.cmd</code> and a README to a USB drive. After Sysprep shuts the PC down, start it from Windows PE or a Windows installation USB (Shift+F10) and run the kit: it finds the Windows partition, asks for a name (letters, digits and _ only) and captures it with DISM, compressed and verified. Split-Image makes parts under 4 GB for FAT32 media.</li>
+</ul>
 <h4>Answer file (unattend.xml)</h4>
 <p><strong>Answer file&hellip;</strong> makes, loads and checks the answer file that sets up each PC made from your image by itself, without anyone clicking through Windows' setup screens:</p>
 <ul>
@@ -382,6 +395,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>1.2.31</td><td>Tools &rsaquo; Sysprep &rsaquo; Golden image: finds saved passwords and keys, programs that clone their ID, Entra/Intune; Audit mode, VM checkpoint reminder, Start layout and default apps for new accounts; Image cleanup, Image passport and Capture kit</td></tr>
   <tr><td>2026-10-19</td><td>1.2.30</td><td>Tools &rsaquo; Sysprep &rsaquo; Answer file: make, load and check unattend.xml (name, language, time zone, setup screens, account, built-in Administrator and its password, CopyProfile, drivers, first sign-in commands); save to Sysprep's folder or run Sysprep with it</td></tr>
   <tr><td>2026-10-19</td><td>1.2.29</td><td>Tools &rsaquo; Sysprep: checks what stops Sysprep (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state, a pending restart) and offers Microsoft's fix for each; reads Sysprep's log</td></tr>
   <tr><td>2026-10-19</td><td>1.2.28</td><td>Security check: Undo never fills a drive (files stay on their own drive when it is full, files from C: go to a second drive, and a copy is refused when no drive has room); old copies left in Program Files after an update are removed</td></tr>

@@ -1453,6 +1453,71 @@ namespace CDriveCleaner
                         ok &= ax.Contains(Unattend.EnableAdminCommand) && ob.EnableAdmin && ob.FirstLogon.Count == 1 && ob.Unknown.Any(x => x.Contains("DomainAccounts"));
                         check(ok, "Sysprep answer file: turns the built-in Administrator on after Sysprep with its own password (by its ID, so in any language), and won't save it without a password or with the file left on the PC");
                     }
+                    // ---- golden image: secrets, cloned IDs, cleanup, passport, capture kit ----
+                    {
+                        bool ok = true; var why = new List<string>();
+                        Action<bool, string> need = (c, w) => { if (!c) { ok = false; why.Add(w); } };
+                        // Chrome's password table, read without SQLite: 6 saved, 3 marked "never save"
+                        byte[] gz = Convert.FromBase64String("H4sIAAAAAAAC/+1XzW8SQRR/b2H56MfBeCAkHubYBlJatl8xGqXNpiVSaBFMajSbBca6cVkou9Q2nkjjwb/Cu/+F53ow8WLiv+HBxIsDSzpTdkw/rMak/AKzM7/Z37z39i3zhsc7Bcuj5EWr0zQ9ooECiPCQEADWBYgBB7JveGR8HhSYO3in9m/Gn/1xxL+M8X8gjEJuYuPc3DRE1QnWxmET8DO+Rwfv4xR8gw9wxKhLYT6qwS3Q8KXntd27mYy7OkcPzWbbppnuqoSMBwQrXLAiIWMBwTIXLEvIaECwxAVLEjISECxywaKEVAMCjQs0CRkOCLJckJWQoYBggQsWJKSS8QXx07l5LpiXkNN4wjbyDYANPMEfV36RjhGjiWQS3z73zJpN7dae5bh+q6yX9VxFJ5XcWkEnPkdmWh2LdYxuxyZPcuX1zVyZFEsVUqwWCmli1j2rdWYyTbou7ThmkxrUpk3qeJKZA9PuUs63Tdd93eo0gorTGV+xViitpYlr7TnMaIeadlPiU802669sy/Vow6gdGX2jJF+s6Bu6eJfVOCW3y/mtXHmXPNJ3Sa5aKeWL7EFs6cVKmlSL+Z2qLj6EYHyjcQXjOevy7CxLw9KlEzc92P+/A/uMcUMwgaEk+j/EeD//CvYAv7BmjH+P7VAkkUrh7mDfdPdtdho3XLrfpU59dKie2UlHJmf6W0WajWZTSiTxIIlgOQ16OLzL7Hqtwdjw824s+NdQP/8q1AE/YZvV/q+se91w1UkNWFHqTWkxkNZWVEJhNRKNXfUqWTQbnhgYndLicNHyXAv5Glv0U6zQV/aLL/JU8W08E22IRf3Sa3NxFiUxn1f/B3/qUoDHWIKPrPN79G7Hh4ksiM6LB70/TeSFg+ZGe5OxoVf3RK/E0+Rf94Yby0YlKTjnoPomMgzgjhiAeFi9dof54r8AB3X6iQAQAAA=");
+                        byte[] db;
+                        using (var zi = new System.IO.Compression.GZipStream(new MemoryStream(gz), System.IO.Compression.CompressionMode.Decompress))
+                        using (var mo = new MemoryStream()) { zi.CopyTo(mo); db = mo.ToArray(); }
+                        need(GoldenImage.ChromiumLogins(db) == 6, "sqlite count");
+                        var bad = (byte[])db.Clone(); for (int i = 512; i < bad.Length; i += 37) bad[i] ^= 0xA5;
+                        int nb = GoldenImage.ChromiumLogins(bad); need(nb == -1 || nb <= 9, "damaged db");
+                        need(GoldenImage.ChromiumLogins(new byte[4096]) == -1, "junk db");
+                        need(GoldenImage.FirefoxLogins("{\"logins\":[{\"encryptedPassword\":\"MDIE\"},{\"encryptedPassword\":\"MDoE\"}]}") == 2, "firefox");
+                        // Wi-Fi profiles: only ones with a saved key; DTDs are refused
+                        string wl = "<?xml version=\"1.0\"?><WLANProfile xmlns=\"http://www.microsoft.com/networking/WLAN/profile/v1\"><name>Home &amp; Co</name><MSM><security><sharedKey><keyType>passPhrase</keyType><protected>true</protected><keyMaterial>01000000D08C</keyMaterial></sharedKey></security></MSM></WLANProfile>";
+                        need(GoldenImage.WifiProfileWithKey(wl) == "Home & Co", "wifi key");
+                        need(GoldenImage.WifiProfileWithKey(wl.Replace("<keyMaterial>01000000D08C</keyMaterial>", "")) == null, "wifi open");
+                        need(GoldenImage.WifiProfileWithKey("<?xml version=\"1.0\"?><!DOCTYPE x [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><WLANProfile><name>&e;</name><keyMaterial>1</keyMaterial></WLANProfile>") == null, "wifi dtd");
+                        need(!GoldenImage.SafeWifiName("a\" & calc") && GoldenImage.SafeWifiName("Office-5G"), "wifi name");
+                        // programs with their own ID, virtual machines
+                        var cl = GoldenImage.CloneMatches(new[] { "CSFalconService", "ScreenConnect Client (1a2b)", "Spooler", "teamviewer" });
+                        need(cl.Count == 3 && cl.Any(x => x.StartsWith("CrowdStrike Falcon:")) && cl.Any(x => x.StartsWith("ConnectWise ScreenConnect:")), "clone");
+                        need(GoldenImage.VmName("Microsoft Corporation", "Virtual Machine") == "Hyper-V" && GoldenImage.VmName("VMware, Inc.", "VMware7,1") == "VMware" &&
+                             GoldenImage.VmName("innotek GmbH", "VirtualBox") == "VirtualBox" && GoldenImage.VmName("Dell Inc.", "OptiPlex 7090") == "", "vm");
+                        // the checklist
+                        var gf = new SysprepFacts { AutoLogonSecret = true, ElixarMail = "a@b.c", EntraJoined = true, Vm = "Hyper-V", CopyProfile = true };
+                        gf.WifiKeys.Add("Home"); gf.Creds.Add(new[] { "TERMSRV/x", "2" }); gf.OldAnswers.Add(@"C:\Windows\Panther\unattend.xml"); gf.KeyFiles.Add(@"C:\Users\a\.ssh\id_rsa");
+                        gf.BrowserLogins.Add("Chrome (a): 3"); gf.CloneApps.AddRange(cl); gf.OtherAccounts.Add("Old");
+                        var gc = Sysprep.Assess(gf);
+                        foreach (var id in new[] { "sec-autologon", "sec-wifi", "sec-creds", "sec-answer", "sec-browser", "sec-keys", "sec-elixar", "clone", "entra", "vm", "audit", "defaults" })
+                            need(gc.Any(c => c.Id == id), "check " + id);
+                        need(!gc.Any(c => c.Id == "secrets") && gc.First(c => c.Id == "accounts").Level == 2, "copyprofile accounts");
+                        var clean = Sysprep.Assess(new SysprepFacts { AuditMode = true, StartForNew = true, AppsForNew = true });
+                        need(clean.Any(c => c.Id == "secrets" && c.Level == 0) && clean.First(c => c.Id == "audit").Level == 0 && clean.First(c => c.Id == "defaults").Level == 0, "clean checklist");
+                        // the passport: escaped, and never a password, the product key, Wi-Fi names or saved sign-ins
+                        var pd = new GoldenImage.PassportData { Computer = "PC<1>", Checks = gc };
+                        pd.Programs.Add(new[] { "Tool <script>alert(1)</script>", "1.0", "Me & Co" });
+                        GoldenImage.ApplyPassportPs(pd, "UPD|KB5065426|2026-10-14\nAPX|Microsoft.WindowsCalculator|11.0\nDRV|Intel|Net|1.2|2025-01-01\n");
+                        pd.Answer = new UnattendSpec { AccountName = "Tech", CreateAccount = true, AccountPassword = "Acc-Secret-1", EnableAdmin = true, AdminPassword = "Adm-Secret-2", ProductKey = "ABCDE-FGHIJ-KLMNO-PQRST-UVWXY" };
+                        string ph = GoldenImage.Passport(pd);
+                        need(!ph.Contains("<script>") && ph.Contains("&lt;script&gt;") && ph.Contains("KB5065426") && ph.Contains("Microsoft.WindowsCalculator"), "passport content");
+                        need(!ph.Contains("Acc-Secret-1") && !ph.Contains("Adm-Secret-2") && !ph.Contains("ABCDE-FGHIJ") && !ph.Contains("TERMSRV") && !ph.Contains(">Home<") && !ph.Contains("id_rsa"), "passport secrets");
+                        // the capture kit: CRLF batch files that check the typed name before using it
+                        var kit = GoldenImage.CaptureKit();
+                        string cap = kit["Capture-Image.cmd"], spl = kit["Split-Image.cmd"];
+                        need(kit.Count == 3 && kit.Values.All(v => !v.Replace("\r\n", "").Contains("\n")), "kit crlf");
+                        need(cap.Contains("/Capture-Image") && cap.Contains("/Verify") && cap.Contains("delims=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_") && cap.Contains("FAT32") && spl.Contains("/Split-Image"), "kit content");
+                        need(cap.IndexOf("delims=0123") < cap.IndexOf("/Capture-Image") && spl.IndexOf("delims=0123") < spl.IndexOf("/Split-Image"), "kit checks name first");
+                        // image cleanup: the Cleaner's items plus the four for images, restore points included
+                        bool was = Catalog.WindowsOnLinux; Catalog.WindowsOnLinux = true;
+                        try
+                        {
+                            var ii = GoldenImage.ImageItems();
+                            need(ii.Count == GoldenImage.ImageCatalogNames.Length + 4 && ii.Any(i => i.Name.Contains("/ResetBase")) && ii.Any(i => i.Name == "Restore points") && ii.Any(i => i.Name == "Windows event logs"), "image items");
+                        }
+                        finally { Catalog.WindowsOnLinux = was; }
+                        // old answer files: only the ones Elixar found itself are ever deleted
+                        string outside = Path.Combine(Path.GetTempPath(), "elixar-test-unattend-" + Guid.NewGuid().ToString("N") + ".xml");
+                        File.WriteAllText(outside, "<x/>");
+                        string de = GoldenImage.DeleteAnswerFiles(new[] { outside });
+                        need(File.Exists(outside) && de != null && de.Contains("skipped"), "answer delete refuses");
+                        try { File.Delete(outside); } catch { }
+                        check(ok, "Golden image: finds saved passwords (Wi-Fi, browsers, keys) without reading them, programs that clone their ID, and writes a passport without secrets and a capture kit that checks its input" + (ok ? "" : " [" + string.Join(", ", why) + "]"));
+                    }
                     // ---- where Undo goes: never fill a drive ----
                     {
                         long G = 1L << 30;

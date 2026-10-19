@@ -16,7 +16,7 @@ namespace CDriveCleaner
         TabPage pageSysprep;
         Label spSummary;
         FlowLayoutPanel spList;
-        Button spCheck, spOpen, spLog, spAnswer;
+        Button spCheck, spOpen, spLog, spAnswer, spClean, spPassport, spKit;
         SysprepFacts spFacts;
         List<SysprepCheck> spChecks = new List<SysprepCheck>();
         bool spBusy, spLoaded;
@@ -24,8 +24,8 @@ namespace CDriveCleaner
 
         void BuildSysprep()
         {
-            var t = Page(5);
-            for (int i = 0; i < 4; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var t = Page(6);
+            for (int i = 0; i < 5; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             spSummary = new Label { AutoSize = true, MaximumSize = new Size(S(1000), 0), Font = new Font("Segoe UI Semibold", 11f), Margin = new Padding(S(1), S(4), 0, S(8)), Text = Lang.T("Not checked yet.") };
             spCheck = MakeButton("Check this PC"); spCheck.Font = new Font("Segoe UI Semibold", 9f);
@@ -34,16 +34,25 @@ namespace CDriveCleaner
             spAnswer = MakeButton("Answer file...");
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, S(8)) };
             row.Controls.AddRange(new Control[] { spCheck, spOpen, spAnswer, spLog });
+            // golden image: what to do before and after Sysprep
+            spClean = MakeButton("Image cleanup..."); spPassport = MakeButton("Image passport..."); spKit = MakeButton("Capture kit...");
+            var row2 = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, S(8)) };
+            row2.Controls.Add(new Label { AutoSize = true, Text = Lang.T("Golden image:"), Font = new Font("Segoe UI Semibold", 9.5f), Margin = new Padding(S(1), S(7), S(8), 0) });
+            row2.Controls.AddRange(new Control[] { spClean, spPassport, spKit });
             spList = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Margin = new Padding(0) };
             t.Controls.Add(Title("Get this PC ready for Sysprep"), 0, 0);
             t.Controls.Add(Note("Before you capture an image of this PC (Sysprep with Generalize), Elixar checks what would make Sysprep stop and offers Microsoft's fix for each. Nothing changes without asking, and a restore point is made before a fix. Sysprep itself is only opened: you choose its options there."), 0, 1);
             t.Controls.Add(spSummary, 0, 2);
             t.Controls.Add(row, 0, 3);
-            t.Controls.Add(spList, 0, 4);
+            t.Controls.Add(row2, 0, 4);
+            t.Controls.Add(spList, 0, 5);
             pageSysprep.Controls.Add(t);
             spCheck.Click += (o, e) => SysprepRefresh();
             spAnswer.Click += (o, e) => { UnattendForm.ShowFor(this, testMode, Log); if (spLoaded) SysprepRefresh(); };
             spOpen.Click += (o, e) => SysprepOpen();
+            spClean.Click += (o, e) => { ImageCleanForm.ShowFor(this, testMode, Log); if (spLoaded) SysprepRefresh(); };
+            spPassport.Click += (o, e) => SysprepPassport();
+            spKit.Click += (o, e) => SysprepKit();
             spLog.Click += (o, e) =>
             {
                 string err = Path.Combine(Sysprep.Panther, "setuperr.log"), act = Path.Combine(Sysprep.Panther, "setupact.log");
@@ -96,7 +105,7 @@ namespace CDriveCleaner
             text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(tw, 0), Text = Lang.T(c.Title), Font = new Font("Segoe UI Semibold", 10f), ForeColor = Theme.Ink, Margin = new Padding(0, 0, 0, S(2)), UseMnemonic = false });
             text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(tw, 0), Text = Lang.T(c.Detail), ForeColor = Theme.Quiet, Margin = new Padding(0), UseMnemonic = false });
             if (c.Items.Count > 0)
-                text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(tw, 0), Text = string.Join("\n", c.Items.Take(12).Select(i => "•  " + i)) + (c.Items.Count > 12 ? "\n+ " + (c.Items.Count - 12) : ""),
+                text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(tw, 0), Text = string.Join("\n", c.Items.Take(12).Select(i => "•  " + (c.Id == "clone" ? Lang.T(i) : i))) + (c.Items.Count > 12 ? "\n+ " + (c.Items.Count - 12) : ""),
                                               ForeColor = Theme.Ink, Margin = new Padding(0, S(4), 0, 0), UseMnemonic = false });
             card.Controls.Add(pill, 0, 0); card.Controls.Add(text, 1, 0);
             if (c.FixText.Length > 0)
@@ -118,6 +127,21 @@ namespace CDriveCleaner
                 case "space": tabs.SelectedTab = pageClean; return;
                 case "log": spLog.PerformClick(); return;
                 case "answer": spAnswer.PerformClick(); return;
+                case "clone": tabs.SelectedTab = pageApps; return;
+                case "entra": case "mdm": try { Shell.Open("ms-settings:workplace"); } catch { } return;
+                case "sec-keys":
+                    try
+                    {
+                        string first = c.Items.FirstOrDefault(File.Exists);
+                        if (first != null) Process.Start(new ProcessStartInfo(Win.SystemExe("explorer.exe"), "/select,\"" + first + "\"") { UseShellExecute = false });
+                    }
+                    catch { }
+                    return;
+                case "sec-elixar":
+                    if (Lang.Box(this, Lang.T("Sign Elixar out of email?") + "\n\n" + Lang.T("Elixar forgets the sign-in on this PC and cancels it. Sign in again on the PCs that need it (Settings > Email account)."),
+                                 "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+                    try { MailAccount.Disconnect(); Log(Lang.T("Sysprep: Elixar signed out of email.")); } catch (Exception ex) { Log("Sysprep: " + ex.Message); }
+                    SysprepRefresh(); return;
                 case "storeupdates":
                 {
                     bool pause = !spFacts.StoreUpdatesPaused;
@@ -150,6 +174,40 @@ namespace CDriveCleaner
                                                                                     : "Sysprep's state is reset and the old logs are kept under a new name.");
                     run = () => Sysprep.ResetState(rearm);
                     break;
+                case "sec-autologon":
+                    ask = Lang.T("Remove the saved automatic sign-in password?") + "\n\n" + Lang.T("Automatic sign-in stops on this PC; you sign in with your password.");
+                    run = GoldenImage.RemoveAutoLogon;
+                    break;
+                case "sec-wifi":
+                    var nets = spFacts.WifiKeys.ToList();
+                    ask = Lang.T("Remove these saved Wi-Fi networks?") + "\n\n" + string.Join("\n", nets.Take(20).Select(x => "  - " + x)) + "\n\n" +
+                          Lang.T("This PC forgets them and their passwords, and disconnects if it is on one of them.");
+                    run = () => GoldenImage.RemoveWifi(nets);
+                    break;
+                case "sec-creds":
+                    var creds = spFacts.Creds.ToList();
+                    ask = Lang.T("Remove these saved sign-ins from Credential Manager?") + "\n\n" + string.Join("\n", creds.Take(20).Select(x => "  - " + x[0])) + (creds.Count > 20 ? "\n  + " + (creds.Count - 20) : "") + "\n\n" +
+                          Lang.T("Network drives, remote desktops and apps will ask for their passwords again.");
+                    run = () => GoldenImage.RemoveCredentials(creds);
+                    break;
+                case "sec-answer":
+                    risky = true;
+                    var files = spFacts.OldAnswers.ToList();
+                    ask = Lang.T("Delete these old answer files?") + "\n\n" + string.Join("\n", files.Select(x => "  - " + x)) + "\n\n" +
+                          Lang.T("They are deleted, not moved to Undo: they can hold passwords.");
+                    run = () => GoldenImage.DeleteAnswerFiles(files);
+                    break;
+                case "audit":
+                    risky = true;
+                    ask = Lang.T("Restart into Audit mode now?") + "\n\n" + Lang.T("Save your work first: the PC restarts at once. Windows signs in as the built-in Administrator. When the image is ready, check here again and run Sysprep with OOBE and Generalize.");
+                    run = GoldenImage.RestartIntoAudit;
+                    break;
+                case "defaults":
+                    ask = Lang.T("Copy your Start menu and default apps to every new account?") + "\n\n" +
+                          Lang.T("Elixar exports them with Windows' own tools and puts them in the default account. Windows' original files are kept as copies (.before-elixar).");
+                    bool w11 = spFacts.Win11;
+                    run = () => GoldenImage.CopyDefaults(w11, m => UI(() => Log(Lang.T(m))));
+                    break;
                 default: return;
             }
             if ((risky ? Lang.BoxNo(this, ask, "Elixar") != DialogResult.Yes : Lang.Box(this, ask, "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK)) return;
@@ -163,6 +221,53 @@ namespace CDriveCleaner
                 if (err != null) Lang.Box(this, Lang.T("That didn't work:") + "\n\n" + err, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 SysprepRefresh();
             }));
+        }
+
+        void SysprepPassport()
+        {
+            if (testMode || spBusy) return;
+            string file;
+            using (var d = new SaveFileDialog { Filter = "HTML (*.html)|*.html", Title = Lang.T("Save the image passport"),
+                                                FileName = "Image passport - " + Environment.MachineName + " - " + DateTime.Now.ToString("yyyy-MM-dd") + ".html",
+                                                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                file = d.FileName;
+            }
+            spBusy = true; spCheck.Enabled = spOpen.Enabled = spPassport.Enabled = false;
+            spSummary.Text = Lang.T("Writing the image passport..."); spSummary.ForeColor = Theme.Ink;
+            var checks = spChecks.ToList();
+            Task.Factory.StartNew(() =>
+            {
+                var data = GoldenImage.ReadPassport(checks, s => UI(() => spSummary.Text = Lang.T(s)));
+                File.WriteAllText(file, GoldenImage.Passport(data), new System.Text.UTF8Encoding(false));
+                return data;
+            }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            {
+                spBusy = false; spCheck.Enabled = spPassport.Enabled = true; spOpen.Enabled = !testMode;
+                if (spLoaded) SysprepFill(); else spSummary.Text = Lang.T("Not checked yet.");
+                if (t.IsFaulted) { Lang.Box(this, Lang.T("The passport could not be written: ") + t.Exception.GetBaseException().Message, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                Log(Lang.T("Image passport saved: " + file));
+                try { Shell.Open(file); } catch { }
+            }));
+        }
+
+        void SysprepKit()
+        {
+            if (testMode) return;
+            string folder;
+            using (var d = new FolderBrowserDialog { Description = Lang.T("Choose the USB drive (or a folder on it) for the capture kit. Use an NTFS or exFAT drive with room for the image."), ShowNewFolderButton = true })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                folder = d.SelectedPath;
+            }
+            string err = GoldenImage.WriteKit(folder);
+            if (err != null) { Lang.Box(this, Lang.T("The capture kit could not be written: ") + err, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            Log(Lang.T("Capture kit saved: " + folder));
+            Lang.Box(this, Lang.T("The capture kit is ready:") + "\n\n  " + folder + "\n\n" +
+                     Lang.T("After Sysprep shuts the PC down, start it from Windows PE or a Windows installation USB (Shift+F10 opens a command prompt) and run Capture-Image.cmd from this drive. README.txt has the steps."),
+                     "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try { Shell.Open(folder); } catch { }
         }
 
         void SysprepOpen()

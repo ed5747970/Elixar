@@ -1,7 +1,23 @@
-ELIXAR  (version 1.2.30)
+ELIXAR  (version 1.2.31)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.2.31 (golden image)
+- Tools > Sysprep now also checks what would be copied to every PC:
+  saved passwords (automatic sign-in, Wi-Fi, Credential Manager, browsers),
+  old answer files Windows would use instead of yours, SSH keys and cloud
+  sign-ins, and Elixar's own email sign-in. It only checks whether they are
+  there; it never reads them. Several can be removed from here (asked first).
+- Programs that give each PC its own ID (management, security and remote
+  agents such as SCCM, CrowdStrike, TeamViewer) are listed with the vendor's
+  golden-image step; Entra ID join and Intune enrollment are flagged.
+- Virtual machine: a reminder to take a checkpoint. Restart into Audit mode.
+  Copy your Start layout and default apps to every new account.
+- Image cleanup: Windows Update leftovers, caches, logs, a final component
+  cleanup (DISM /ResetBase), hibernation file and restore points (last).
+- Image passport: an HTML report of what is in the image (no passwords).
+- Capture kit: DISM scripts for Windows PE to capture and split the image.
 
 NEW IN 1.2.30
 - Tools > Sysprep > "Answer file...": full support for the Sysprep answer
