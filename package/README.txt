@@ -1,7 +1,13 @@
-ELIXAR  (version 1.2.27)
+ELIXAR  (version 1.2.28)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 1.2.28 (security check)
+- Undo never fills a drive: files you remove stay on their own drive when it
+  is nearly full (a move there needs no room), files from C: go to your
+  second drive, and if no drive has room nothing is moved and Elixar says so.
+- Old copies of Elixar.exe left in Program Files after an update are removed.
 
 NEW IN 1.2.27
 - New version numbers: 1.2.27 is the release after 2.2.7. Elixar knows it is

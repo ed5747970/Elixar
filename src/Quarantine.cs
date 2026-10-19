@@ -54,10 +54,73 @@ namespace CDriveCleaner
                 }
             }
             catch { }
-            string pd = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            string root = Path.Combine(string.IsNullOrEmpty(pd) ? Path.GetTempPath() : pd, FolderName);
+            string root = Path.Combine(ProgramData, FolderName);
             Locked.Lock(root);
             return root;
+        }
+
+        // never a folder of the signed-in user (like Temp): Undo is written with administrator rights
+        static string ProgramData { get { string pd = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData); return string.IsNullOrEmpty(pd) ? @"C:\ProgramData" : pd; } }
+
+        public class DriveRoom { public string Root = ""; public bool Usable; public bool System; public long Free, Total; }
+
+        // Where Undo goes for these files, so that no drive is filled up:
+        //  1. all files on one other internal drive (D:): Undo on that drive - a move there is a rename and needs no room
+        //  2. another internal drive with room for what has to be copied there, plus 2 GB to spare (files from C: free C:)
+        //  3. the Windows drive, if what has to be copied onto it still leaves 5 GB or 5% free (files already on C: need no room)
+        // Otherwise null: nothing is moved, and Elixar says there isn't enough room.
+        public static string ChooseRoot(List<DriveRoom> drives, Dictionary<string, long> bytesByDrive)
+        {
+            Func<string, string> key = r => (r ?? "").TrimEnd('\\').ToUpperInvariant();
+            Func<DriveRoom, long> toCopy = d => bytesByDrive.Where(kv => key(kv.Key) != key(d.Root)).Sum(kv => kv.Value);
+            if (bytesByDrive.Count == 1)
+            {
+                var same = drives.FirstOrDefault(d => d.Usable && !d.System && key(d.Root) == key(bytesByDrive.Keys.First()));
+                if (same != null) return same.Root;
+            }
+            foreach (var d in drives.Where(x => x.Usable && !x.System))
+                if (d.Free - toCopy(d) >= (2L << 30)) return d.Root;
+            var sys = drives.FirstOrDefault(x => x.System);
+            if (sys != null && (toCopy(sys) == 0 || sys.Free - toCopy(sys) >= Math.Max(5L << 30, sys.Total / 20))) return sys.Root;   // files already on it: a rename
+            return null;
+        }
+
+        public static Func<List<DriveRoom>> DrivesOverride;   // self-test
+        static List<DriveRoom> Drives()
+        {
+            if (DrivesOverride != null) return DrivesOverride();
+            var list = new List<DriveRoom>();
+            string sysRoot = Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)) ?? @"C:\";
+            foreach (var d in DriveInfo.GetDrives())
+                try
+                {
+                    if (!d.IsReady) continue;
+                    bool sys = string.Equals(d.RootDirectory.FullName, sysRoot, StringComparison.OrdinalIgnoreCase);
+                    list.Add(new DriveRoom { Root = d.RootDirectory.FullName, System = sys, Free = d.AvailableFreeSpace, Total = d.TotalSize,
+                                             Usable = d.DriveType == DriveType.Fixed && d.DriveFormat == "NTFS" });
+                }
+                catch { }
+            return list;
+        }
+
+        // a batch for these files on the right drive (see ChooseRoot); an IOException when no drive has room
+        public static UndoBatch BeginFor(string label, string kind, IList<string> paths)
+        {
+            if (OverrideRoot != null || !Win.IsWindows) return Begin(label, kind, 0);
+            var by = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in paths)
+            {
+                string r = Path.GetPathRoot(Path.GetFullPath(p)) ?? "";
+                long sz = Fs.SizeOf(p); long cur; by.TryGetValue(r, out cur); by[r] = cur + sz;
+            }
+            var drives = Drives();
+            string root = ChooseRoot(drives, by);
+            if (root == null)
+                throw new IOException("There isn't enough free space to keep these files in Undo (" + Fs.Fmt(by.Values.Sum()) + "). Free up some space first, or pick fewer files.");
+            var sys = drives.FirstOrDefault(d => d.System);
+            string dir = sys != null && string.Equals(root, sys.Root, StringComparison.OrdinalIgnoreCase) ? Path.Combine(ProgramData, FolderName) : Path.Combine(root, FolderName);
+            if (!Locked.Lock(dir)) throw new IOException("Undo could not prepare a protected folder on " + root);
+            return NewBatch(dir, label, kind);
         }
 
         public static bool RootIsOffC(string root)
@@ -90,9 +153,10 @@ namespace CDriveCleaner
             return t.Length > 40 ? t.Substring(0, 40) : t;
         }
 
-        public static UndoBatch Begin(string label, string kind, long need)
+        public static UndoBatch Begin(string label, string kind, long need) { return NewBatch(RootFor(need), label, kind); }
+
+        static UndoBatch NewBatch(string root, string label, string kind)
         {
-            string root = RootFor(need);
             var b = new UndoBatch { Time = DateTime.Now, Label = label, Kind = kind };
             b.Dir = Path.Combine(root, b.Time.ToString("yyyyMMdd-HHmmss") + "-" + Safe(label));
             int n = 1;
@@ -296,8 +360,7 @@ namespace CDriveCleaner
         {
             var list = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
             if (list.Count == 0) return 0;
-            long need = list.Sum(p => Fs.SizeOf(p));
-            var b = Begin(label, "files", need);
+            var b = BeginFor(label, "files", list);
             b.Keep = Math.Max(1, Math.Min(365, keepDays));
             long moved = 0;
             foreach (var p in list) moved += MoveIn(b, p, log);

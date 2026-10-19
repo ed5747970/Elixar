@@ -1385,6 +1385,20 @@ namespace CDriveCleaner
                         }
                         finally { Theme.Dark = wasDark; }
                     }
+                    // ---- where Undo goes: never fill a drive ----
+                    {
+                        long G = 1L << 30;
+                        Func<string, bool, bool, long, long, Quarantine.DriveRoom> D = (r, usable, sys, free, total) => new Quarantine.DriveRoom { Root = r, Usable = usable, System = sys, Free = free * G, Total = total * G };
+                        Func<string, long, Dictionary<string, long>> one = (r, gb) => new Dictionary<string, long> { { r, gb * G } };
+                        var c = D(@"C:\", true, true, 3, 250); var dFull = D(@"D:\", true, false, 1, 900); var dRoom = D(@"D:\", true, false, 400, 900); var usb = D(@"E:\", false, false, 50, 64);
+                        string fromFullD = Quarantine.ChooseRoot(new List<Quarantine.DriveRoom> { c, dFull }, one(@"D:\", 40));          // nearly full D: -> stays on D: (a rename)
+                        string fromC = Quarantine.ChooseRoot(new List<Quarantine.DriveRoom> { c, dRoom }, one(@"C:\", 10));             // C: -> D: (frees C:)
+                        string fromFullC = Quarantine.ChooseRoot(new List<Quarantine.DriveRoom> { c, dFull }, one(@"C:\", 10));         // no room on D: -> stays on C: (a rename)
+                        string fromUsbNoRoom = Quarantine.ChooseRoot(new List<Quarantine.DriveRoom> { c, dFull, usb }, one(@"E:\", 20)); // USB, no room anywhere -> refused
+                        string fromUsb = Quarantine.ChooseRoot(new List<Quarantine.DriveRoom> { c, dRoom, usb }, one(@"E:\", 20));      // USB -> D:
+                        check(fromFullD == @"D:\" && fromC == @"D:\" && fromFullC == @"C:\" && fromUsbNoRoom == null && fromUsb == @"D:\",
+                              "Undo: never fills a drive - files stay on their own drive when it is full, C: files go to a second drive, and a USB copy is refused when no drive has room");
+                    }
                     // ---- version numbers started again at 1.2.27 ----
                     {
                         Func<string, Version> V = x => new Version(x);

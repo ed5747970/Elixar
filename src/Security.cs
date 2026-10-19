@@ -745,6 +745,8 @@ namespace CDriveCleaner
                     if (File.Exists(Exe)) { try { File.Delete(Exe); } catch { File.Move(Exe, Exe + ".old-" + DateTime.Now.Ticks); } }
                     File.Move(tmp, Exe);
                 }
+                // older copies that were in use during an update ("Elixar.exe.old-...") are removed once they are free
+                try { foreach (var o in Directory.GetFiles(Dir, "Elixar.exe.old-*")) try { File.Delete(o); } catch { } } catch { }
                 SafeFile.RemoveDownloadMark(Exe);
                 string lerr = WriteLauncher();
                 if (lerr != null) return lerr;
