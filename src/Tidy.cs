@@ -25,6 +25,7 @@ namespace CDriveCleaner
         public static readonly int[] BinChoices = { 14, 30, 60, 90 };
         public int UndoDays = 30;       // your own files in Undo
         public int BinDays = 0;         // 0: off; else items deleted more than this many days ago leave the Recycle Bin
+        public int BinChoice = 30;      // the days used when auto-delete is switched on (also from the Dashboard)
         public bool LowClean = false;   // run the Safe clean when C: is under the alert limit
         public string LastLowClean = "";
         public bool AnyDaily { get { return BinDays > 0 || LowClean; } }
@@ -42,6 +43,7 @@ namespace CDriveCleaner
                 int n; bool num = int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out n);
                 if (k == "undoDays" && num && UndoChoices.Contains(n)) p.UndoDays = n;            // anything else: the default
                 else if (k == "binDays" && num && (n == 0 || BinChoices.Contains(n))) p.BinDays = n;
+                else if (k == "binChoice" && num && BinChoices.Contains(n)) p.BinChoice = n;
                 else if (k == "lowClean") p.LowClean = v == "1";
                 else if (k == "lastLowClean" && Regex.IsMatch(v, @"^\d{4}-\d\d-\d\d$")) p.LastLowClean = v;
             }
@@ -56,7 +58,7 @@ namespace CDriveCleaner
 
         public string Text()
         {
-            return "undoDays=" + UndoDays + "\nbinDays=" + BinDays + "\nlowClean=" + (LowClean ? 1 : 0) + "\nlastLowClean=" + LastLowClean + "\n";
+            return "undoDays=" + UndoDays + "\nbinDays=" + BinDays + "\nbinChoice=" + BinChoice + "\nlowClean=" + (LowClean ? 1 : 0) + "\nlastLowClean=" + LastLowClean + "\n";
         }
 
         public bool Save()

@@ -1354,6 +1354,37 @@ namespace CDriveCleaner
                         }
                         finally { Leftovers.NamesOverride = null; }
                     }
+                    // ---- the Auto-delete switch, the time box and the dark theme ----
+                    {
+                        var sw = new TileCard { HasSwitch = true, Width = 220, Height = 120 };
+                        int flips = 0; sw.SwitchClicked += () => flips++;
+                        sw.ClickSwitch(); sw.SwitchBusy = true; sw.ClickSwitch(); sw.SwitchBusy = false;
+                        var tp3 = TidyPrefs.Parse(new TidyPrefs { BinDays = 0, BinChoice = 60 }.Text().Split('\n'));
+                        check(flips == 1 && tp3.BinChoice == 60 && !tp3.AnyDaily && TidyPrefs.Parse(new[] { "binChoice=5" }).BinChoice == 30,
+                              "Dashboard: the Auto-delete switch flips once per click (not while it is saving), and remembers the days you chose");
+                        sw.Dispose();
+                        var tb = new TimeBox();
+                        tb.Value = DateTime.Today.AddHours(13).AddMinutes(24); var t1 = tb.Value;
+                        tb.Value = DateTime.Today.AddHours(20); var t2 = tb.Value;
+                        check(t1.Hour == 13 && t1.Minute == 24 && t2.Hour == 20 && t2.Minute == 0 && tb.Items.Count == 97 && (string)tb.Items[0] == "00:00",
+                              "Automation: the time box keeps any time (also one from an older schedule) and offers every 15 minutes");
+                        tb.Dispose();
+                        bool wasDark = Theme.Dark;
+                        try
+                        {
+                            Theme.Dark = true;
+                            var df = new Form(); var tcx = new TabControl(); tcx.TabPages.Add(new TabPage("A")); var gbx = new GroupBox { Text = "Box" };
+                            var lvx = new ListView { View = View.Details }; lvx.Columns.Add("Name"); var btx = new Button { Text = "Go", Enabled = false };
+                            gbx.Controls.Add(btx); df.Controls.AddRange(new Control[] { tcx, gbx, lvx });
+                            Theme.Apply(df);
+                            var lifted = Theme.MapFore(Color.FromArgb(0, 125, 70));
+                            check(Theme.IsSelfPainted(tcx) && Theme.IsSelfPainted(gbx) && Theme.IsSelfPainted(lvx) && Theme.IsSelfPainted(btx) && lvx.OwnerDraw &&
+                                  (0.299 * lifted.R + 0.587 * lifted.G + 0.114 * lifted.B) / 255 > 0.6 && Theme.MapFore(lifted) == lifted,
+                                  "Dark theme: tab frames, group boxes, list headers and disabled buttons are painted dark, and dark coloured text is lifted to stay readable");
+                            df.Dispose();
+                        }
+                        finally { Theme.Dark = wasDark; }
+                    }
                     // ---- Recycle Bin: only what was deleted long ago ----
                     {
                         string bin = Path.Combine(root, "rb", "S-1-5-21-1"); Directory.CreateDirectory(bin);

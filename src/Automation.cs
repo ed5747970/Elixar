@@ -359,7 +359,7 @@ namespace CDriveCleaner
         TabPage pageAuto;
         CheckBox chkAlert, chkLogon, chkClean;
         NumericUpDown numPercent;
-        DateTimePicker timeCheck, timeClean;
+        TimeBox timeCheck, timeClean;
         ComboBox cmbDay;
         Label lblAlertState, lblCleanState, lblAutoItems;
         Button btnSaveAuto, btnTestAlert, btnRunAuto, btnTidyNow;
@@ -391,7 +391,7 @@ namespace CDriveCleaner
             numPercent = new NumericUpDown { Minimum = 5, Maximum = 50, Value = 15, Width = S(56) };
             r1.Controls.AddRange(new Control[] { chkAlert, numPercent, Lbl("% free") });
             var r2 = Row();
-            timeCheck = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = S(70), Value = DateTime.Today.AddHours(12) };
+            timeCheck = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(12) };
             chkLogon = new CheckBox { AutoSize = true, Checked = true, Text = "and a few minutes after I sign in", Margin = new Padding(S(10), S(4), 0, 0) };
             r2.Controls.AddRange(new Control[] { Lbl("Check every day at", S(22)), timeCheck, chkLogon });
             lblAlertState = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(22), S(6), 0, 0), Text = "Checking..." };
@@ -406,7 +406,7 @@ namespace CDriveCleaner
             cmbDay = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(110) };
             cmbDay.Items.AddRange(Automation.Days);
             cmbDay.SelectedIndex = 6;   // Sunday (by position: the names are translated in Hebrew)
-            timeClean = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = S(70), Value = DateTime.Today.AddHours(20) };
+            timeClean = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(20) };
             r3.Controls.AddRange(new Control[] { chkClean, cmbDay, Lbl("at"), timeClean });
             lblAutoItems = new Label
             {
@@ -492,6 +492,47 @@ namespace CDriveCleaner
         }
 
         bool tidyUnscheduled;
+
+        // the Dashboard's Auto-delete switch: the daily tidy on (old Recycle Bin items, Undo, a clean when C: is low) or off
+        public void SetAutoDelete(bool on)
+        {
+            if (testMode || LinuxUi) return;
+            var p = TidyPrefs.Load();
+            if (on && Lang.Box(this, Lang.T("Turn on auto-delete?") + "\n\n" +
+                    Lang.T("Every day, Elixar deletes for good what has been in your Recycle Bin for more than " + p.BinChoice + " days (what you deleted more recently stays), deletes Undo items whose time is up, and runs the Safe clean when C: is under your alert limit.") + "\n\n" +
+                    Lang.T("You can change the details in Automation."), "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            p.BinDays = on ? p.BinChoice : 0;
+            p.LowClean = on;
+            var tile = tiles != null ? tiles[3] : null;
+            if (tile != null) { tile.SwitchBusy = true; tile.Invalidate(); }
+            System.Threading.Tasks.Task.Factory.StartNew(() => ApplyTidy(p)).ContinueWith(t => UI(() =>
+            {
+                string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result;
+                if (tile != null) { tile.SwitchBusy = false; tile.SwitchOn = err == null ? on : !on; tile.Invalidate(); }
+                Log(Lang.T(err == null ? (on ? "Auto-delete is on: every day, old Recycle Bin items and expired Undo items are deleted." : "Auto-delete is off.") : "Auto-delete could not be changed: " + err));
+                if (err != null) Lang.Box(this, Lang.T("Auto-delete could not be changed: " + err), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (chkBin != null) LoadTidyState(true);
+                tidyUnscheduled = false;
+                RefreshOverview();
+            }));
+        }
+
+        // saves the settings and puts the daily schedule in place (or removes it); null when it worked
+        static string ApplyTidy(TidyPrefs p)
+        {
+            string exe = Application.ExecutablePath;
+            if (p.AnyDaily)
+            {
+                string ierr = Install.Ensure();
+                if (ierr != null) return "Elixar could not put its protected copy in " + Install.Dir + ": " + ierr;
+                exe = Install.Exe;
+            }
+            if (!p.Save()) return "The settings could not be saved.";
+            string outp, hhmm = "12:00";
+            try { var ck = Automation.Query(Automation.CheckTask); if (ck.Start.HasValue) hhmm = ck.Start.Value.ToString("HH:mm"); } catch { }
+            int code = Automation.RunSchtasks(p.AnyDaily ? Automation.CreateTidyArgs(exe, hhmm) : Automation.DeleteArgs(Automation.TidyTask), out outp);
+            return code == 0 || !p.AnyDaily ? null : "Task Scheduler said: " + outp;
+        }
         int BinDaysChosen { get { return TidyPrefs.BinChoices[Math.Max(0, cmbBinDays.SelectedIndex)]; } }
 
         // the settings (from Elixar's protected folder) and how full the Recycle Bin and Undo are
@@ -501,7 +542,7 @@ namespace CDriveCleaner
             {
                 var p = TidyPrefs.Load();
                 chkBin.Checked = p.BinDays > 0;
-                if (p.BinDays > 0) cmbBinDays.SelectedIndex = Array.IndexOf(TidyPrefs.BinChoices, p.BinDays);
+                cmbBinDays.SelectedIndex = Math.Max(0, Array.IndexOf(TidyPrefs.BinChoices, p.BinDays > 0 ? p.BinDays : p.BinChoice));
                 cmbBinDays.Enabled = chkBin.Checked;
                 cmbUndoDays.SelectedIndex = Math.Max(0, Array.IndexOf(TidyPrefs.UndoChoices, p.UndoDays));
                 chkLowClean.Checked = p.LowClean;
@@ -604,6 +645,7 @@ namespace CDriveCleaner
             var tidy = TidyPrefs.Load();
             tidy.UndoDays = TidyPrefs.UndoChoices[Math.Max(0, cmbUndoDays.SelectedIndex)];
             tidy.BinDays = chkBin.Checked ? BinDaysChosen : 0;
+            tidy.BinChoice = BinDaysChosen;
             tidy.LowClean = chkLowClean.Checked;
             if (chkAlert.Checked || chkClean.Checked || tidy.AnyDaily)
             {

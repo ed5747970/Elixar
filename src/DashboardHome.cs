@@ -85,6 +85,7 @@ namespace CDriveCleaner
         public bool DiskChecked; public HealthLevel Disk = HealthLevel.Unknown; public int DiskCount;
         public DateTime? LastClean; public long LastCleanBytes; public bool LastCleanAuto;
         public bool AutoKnown, AutoClean, AutoAlert; public string AutoDay = "";
+        public bool TidyOn, TidyLow; public int TidyDays;   // auto-delete (the daily tidy)
         public string MailEmail; public bool MailReports; public int MailLevel;
         public long UndoBytes; public int UndoCount;
         public long TrashBytes = -1, AptBytes = -1, SnapBytes = -1, OneDriveFree = -1;
@@ -476,7 +477,39 @@ namespace CDriveCleaner
         public Font ValueFont, CapFont;
         bool hover;
 
+        // an on/off switch in the corner (the Auto-delete tile): clicking it flips the switch, clicking elsewhere opens the tab
+        public bool HasSwitch, SwitchOn, SwitchBusy;
+        public event Action SwitchClicked;
+        public Rectangle SwitchRect { get; private set; }
+        bool downOnSwitch;
+
         public TileCard() { Cursor = Cursors.Hand; }
+
+        protected override void OnMouseDown(MouseEventArgs e) { downOnSwitch = HasSwitch && SwitchRect.Contains(e.Location); base.OnMouseDown(e); }
+        protected override void OnClick(EventArgs e)
+        {
+            if (downOnSwitch) { downOnSwitch = false; if (!SwitchBusy && SwitchClicked != null) SwitchClicked(); return; }
+            base.OnClick(e);
+        }
+        public void ClickSwitch() { if (HasSwitch && !SwitchBusy && SwitchClicked != null) SwitchClicked(); }   // self-test and keyboard
+
+        void DrawSwitch(Graphics g, Color on)
+        {
+            int w = S(40), h = S(22), pad = S(14);
+            var r = new Rectangle(Rtl ? pad : Width - pad - w, pad + (S(32) - h) / 2, w, h);
+            SwitchRect = r;
+            var back = SwitchBusy ? Theme.Grid : SwitchOn ? on : (Theme.Dark ? Color.FromArgb(78, 78, 94) : Color.FromArgb(196, 201, 212));
+            using (var path = new GraphicsPath())
+            {
+                int d = h;
+                path.AddArc(r.X, r.Y, d, d, 90, 180); path.AddArc(r.Right - d, r.Y, d, d, 270, 180); path.CloseFigure();
+                using (var b = new SolidBrush(back)) g.FillPath(b, path);
+            }
+            int k = h - S(6);
+            bool right = SwitchOn ^ Rtl;
+            var knob = new Rectangle(right ? r.Right - k - S(3) : r.X + S(3), r.Y + S(3), k, k);
+            using (var b = new SolidBrush(Color.White)) g.FillEllipse(b, knob);
+        }
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -492,7 +525,9 @@ namespace CDriveCleaner
             bool spark = Spark != null && Spark.Count >= 2;
             int sparkW = spark ? Math.Min(S(58), Width / 3) : 0;
             int cx = pad + ic + S(10);
-            Txt(g, Caption, cf, new Rectangle(cx, pad + (ic - cf.Height) / 2, Width - cx - pad, cf.Height + 2), Theme.Quiet, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+            int capRight = HasSwitch ? S(48) : 0;
+            Txt(g, Caption, cf, new Rectangle(cx, pad + (ic - cf.Height) / 2, Width - cx - pad - capRight, cf.Height + 2), Theme.Quiet, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
+            if (HasSwitch) DrawSwitch(g, Theme.MapFore(Color.FromArgb(0, 150, 90)));
 
             int y = pad + ic + S(10);
             Txt(g, Value, vf, new Rectangle(pad, y, Width - 2 * pad, vf.Height + 2), Theme.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
@@ -721,7 +756,7 @@ namespace CDriveCleaner
 
             tileGrid = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), Padding = new Padding(0) };
             var capFont = new Font("Segoe UI Semibold", 8.25f); var valFont = new Font("Segoe UI Semibold", 12.5f);
-            string[] caps = Win.IsWindows ? new[] { "Disk health", "Space trend", "Last clean", "Automation", "Email reports", "Undo" }
+            string[] caps = !LinuxUi ? new[] { "Disk health", "Space trend", "Last clean", "Auto-delete", "Email reports", "Undo" }
                                           : new[] { "Trash", "Space trend", "Last clean", "Automation", "Email reports", "Update packages" };
             tiles = new TileCard[6];
             for (int i = 0; i < 6; i++)
@@ -729,12 +764,14 @@ namespace CDriveCleaner
                 string cap = Lang.T(caps[i]);
                 tiles[i] = new TileCard
                 {
-                    Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Kind = Win.IsWindows ? TileKinds[i] : LinuxTileKinds[i], Caption = Lang.Hebrew ? cap : cap.ToUpperInvariant(),
+                    Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Kind = !LinuxUi ? TileKinds[i] : LinuxTileKinds[i], Caption = Lang.Hebrew ? cap : cap.ToUpperInvariant(),
                     Value = "...", Accent = Theme.Accent, CapFont = capFont, ValueFont = valFont, AccessibleName = cap
                 };
                 int k = i;
                 tiles[i].Click += (o, e) => TileClicked(k);
             }
+            tiles[3].HasSwitch = !LinuxUi;
+            tiles[3].SwitchClicked += () => SetAutoDelete(!tiles[3].SwitchOn);
             LayoutTiles(6);
 
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0) };
@@ -795,7 +832,7 @@ namespace CDriveCleaner
 
         void TileClicked(int k)
         {
-            if (!Win.IsWindows && (k == 0 || k == 5))
+            if (LinuxUi && (k == 0 || k == 5))
             {
                 if (k == 0) { try { Lx.Open("trash:///"); } catch { } }
                 else tabs.SelectedTab = pageClean;
@@ -848,6 +885,7 @@ namespace CDriveCleaner
                 var undo = new List<UndoBatch>();
                 try { undo = Quarantine.List(); } catch { }
                 sum.UndoCount = undo.Count; sum.UndoBytes = undo.Sum(b => Math.Max(0, b.Bytes));
+                if (!LinuxUi) try { var tp = TidyPrefs.Load(); sum.TidyOn = tp.AnyDaily; sum.TidyLow = tp.LowClean; sum.TidyDays = tp.BinDays; } catch { }
                 if (Win.IsWindows || Growth.OverrideFile != null) try { sum.Grew = Growth.Grew(DateTime.Today, 7, 256L << 20); } catch { }
                 if (odAccounts.Count > 0 && !LinuxUi) try { sum.OneDriveFree = OneDrive.QuickFreeable(); } catch { }
                 if (Lx.On)
@@ -878,6 +916,7 @@ namespace CDriveCleaner
                     catch { }
                 }
                 sum.AutoKnown = true; sum.AutoClean = autoClean; sum.AutoAlert = autoAlert; sum.AutoDay = autoDay ?? "";
+
                 try { sum.Drives = DrivesOverride != null ? DrivesOverride() : OtherDrives(rep); } catch { sum.Drives = new List<DriveRow>(); }
                 var own = Activity.Read();
                 var cleans = own.Where(x => x.Kind == "clean").Select(x => Tuple.Create(x.Time, x.Bytes, false))
@@ -982,7 +1021,7 @@ namespace CDriveCleaner
 
             // tiles
             Action<int, string, string, Color> tile = (i, v, sub, c) => { tiles[i].Value = Lang.T(v); tiles[i].Sub = Lang.T(sub); tiles[i].Accent = c; tiles[i].Invalidate(); };
-            if (!Win.IsWindows) tile(0, m.TrashBytes <= 0 ? "Empty" : Fs.Fmt(m.TrashBytes), m.TrashBytes <= 0 ? "Nothing waiting in the Trash" : "Click to look inside", m.TrashBytes > (1L << 30) ? CautionColor : Theme.Accent);
+            if (LinuxUi) tile(0, m.TrashBytes <= 0 ? "Empty" : Fs.Fmt(m.TrashBytes), m.TrashBytes <= 0 ? "Nothing waiting in the Trash" : "Click to look inside", m.TrashBytes > (1L << 30) ? CautionColor : Theme.Accent);
             else if (!m.DiskChecked) tile(0, "Not checked yet", "Click to check your drives", Theme.Accent);
             else tile(0, m.Disk == HealthLevel.Failing ? "Back up now!" : m.Disk == HealthLevel.Warning ? "Needs a look" : m.Disk == HealthLevel.Healthy ? "Healthy" : "Unknown",
                       m.DiskCount == 1 ? "1 drive checked" : m.DiskCount + " drives checked",
@@ -1005,10 +1044,11 @@ namespace CDriveCleaner
             else tile(2, Ui.Ago(m.LastClean.Value, m.Now), "Freed " + Fs.Fmt(m.LastCleanBytes) + (m.LastCleanAuto ? " (weekly clean)" : ""),
                       (m.Now - m.LastClean.Value).TotalDays > 30 ? CautionColor : SafeColor);
 
-            if (!Win.IsWindows || testMode) tile(3, m.AutoClean ? "Weekly clean on" : "Off", m.AutoClean ? "Every " + m.AutoDay : "Set it up in Automation", m.AutoClean ? SafeColor : Theme.Accent);
-            else if (m.AutoClean) tile(3, "Weekly clean on", m.AutoDay.Length > 0 ? "Every " + m.AutoDay + (m.AutoAlert ? ", with low-space alerts" : "") : "Every week", SafeColor);
-            else if (m.AutoAlert) tile(3, "Alerts only", "Low-space alerts are on", Theme.Accent);
-            else tile(3, "Off", "Set it up in Automation", CautionColor);
+            if (LinuxUi) tile(3, m.AutoClean ? "Weekly clean on" : "Off", m.AutoClean ? "Every " + m.AutoDay : "Set it up in Automation", m.AutoClean ? SafeColor : Theme.Accent);
+            else if (m.TidyOn)
+                tile(3, "On", m.TidyDays > 0 ? (m.TidyLow ? "Old trash (" + m.TidyDays + "+ days) and a clean when C: is low" : "Recycle Bin items over " + m.TidyDays + " days old") : "A clean when C: is low", SafeColor);
+            else tile(3, "Off", "Switch on to empty old trash by itself", Theme.Accent);
+            if (tiles[3].HasSwitch && !tiles[3].SwitchBusy) tiles[3].SwitchOn = m.TidyOn;
 
             if (m.MailEmail == null) tile(4, "Not connected", "Connect your email in Settings", Theme.Accent);
             else if (m.MailLevel == 2) tile(4, "Signed out", "Connect again in Settings", CriticalColor);
@@ -1016,9 +1056,9 @@ namespace CDriveCleaner
             else tile(4, m.MailReports ? "On" : "Connected", m.MailEmail, SafeColor);
             if (m.MailEmail != null) tiles[4].Sub = m.MailLevel == 2 ? Lang.T("Connect again in Settings") : m.MailEmail;   // the address is never translated
 
-            if (!Win.IsWindows) tile(5, m.AptBytes <= 0 ? "Clean" : Fs.Fmt(m.AptBytes), m.AptBytes <= 0 ? "No downloaded update packages" : "Downloaded update packages, safe to clean", m.AptBytes > (256L << 20) ? CautionColor : SafeColor);
-            else if (m.UndoCount == 0) tile(5, "Empty", "Moved items are kept here for 7 days", Theme.Accent);
-            else tile(5, Fs.Fmt(m.UndoBytes), (m.UndoCount == 1 ? "1 item" : m.UndoCount + " items") + ", kept for 7 days", Theme.Accent);
+            if (LinuxUi) tile(5, m.AptBytes <= 0 ? "Clean" : Fs.Fmt(m.AptBytes), m.AptBytes <= 0 ? "No downloaded update packages" : "Downloaded update packages, safe to clean", m.AptBytes > (256L << 20) ? CautionColor : SafeColor);
+            else if (m.UndoCount == 0) tile(5, "Empty", "Removed items wait here before they are deleted for good", Theme.Accent);
+            else tile(5, Fs.Fmt(m.UndoBytes), (m.UndoCount == 1 ? "1 item" : m.UndoCount + " items") + ", Tools > Undo puts them back", Theme.Accent);
 
             // quick wins
             long max = m.TopSafe.Count > 0 ? Math.Max(1, m.TopSafe.Max(i => i.Size)) : 1;

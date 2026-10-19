@@ -18,7 +18,7 @@ namespace CDriveCleaner
         FlowLayoutPanel pnlGoogle, pnlMicrosoft, pnlOther, pnlConnected, pnlChoose, pnlReports;
         Button btnMailSignIn, btnMailSetup, btnMsSignIn, btnMsSetup, btnOtherConnect, btnMailTest, btnMailOut, btnMailSave, btnMailCleanOn;
         TextBox txtOtherEmail, txtOtherPass, txtOtherImap, txtOtherSmtp;
-        CheckBox chkMailClean, chkMailAlerts, chkMailSummary; ComboBox cmbMailDay; DateTimePicker timeMail;
+        CheckBox chkMailClean, chkMailAlerts, chkMailSummary; ComboBox cmbMailDay; TimeBox timeMail;
         CancellationTokenSource mailCts;
 
         Control BuildEmailBox()
@@ -79,7 +79,7 @@ namespace CDriveCleaner
             chkMailSummary = new CheckBox { AutoSize = true, Checked = p.Summary, Text = "Weekly summary every", Margin = new Padding(S(3), S(5), S(4), 0) };
             cmbMailDay = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(110) };
             cmbMailDay.Items.AddRange(Automation.Days); cmbMailDay.SelectedIndex = Math.Max(0, Array.IndexOf(Automation.Days, p.Day));
-            timeMail = new DateTimePicker { Format = DateTimePickerFormat.Custom, CustomFormat = "HH:mm", ShowUpDown = true, Width = S(70) };
+            timeMail = new TimeBox { Width = S(80) };
             DateTime tm; timeMail.Value = DateTime.TryParse(p.Time, out tm) ? DateTime.Today.Add(tm.TimeOfDay) : DateTime.Today.AddHours(9);
             var at = new Label { AutoSize = true, Text = "at", Margin = new Padding(S(4), S(6), S(4), 0) };
             var also = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "(alerts are checked daily at this time too)", Margin = new Padding(S(6), S(6), 0, 0) };

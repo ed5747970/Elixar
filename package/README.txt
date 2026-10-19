@@ -1,7 +1,15 @@
-ELIXAR  (version 2.2.4)
+ELIXAR  (version 2.2.5)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2.5
+- Dashboard: the Auto-delete tile has an on/off switch. On: every day old
+  Recycle Bin items (30+ days by default) and expired Undo items are deleted,
+  and the Safe clean runs when C: is low. Elixar asks once before turning it
+  on. The details stay in Automation.
+- Dark theme: no white frames; list headers, tabs, boxes, drop-downs and
+  disabled buttons are dark; coloured text is easier to read.
 
 NEW IN 2.2.4
 - Files you remove yourself (Smart scan, Duplicates) go to Elixar's Undo
