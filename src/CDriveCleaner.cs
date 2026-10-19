@@ -27,8 +27,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("2.2.6.0")]
-[assembly: AssemblyFileVersion("2.2.6.0")]
+[assembly: AssemblyVersion("2.2.7.0")]
+[assembly: AssemblyFileVersion("2.2.7.0")]
 
 namespace CDriveCleaner
 {

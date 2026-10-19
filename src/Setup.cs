@@ -68,7 +68,7 @@ namespace CDriveCleaner
         // removes the schedules, Start menu entry, apps-list entry and the Program Files copy; your Undo backups stay until they expire
         public static int Uninstall(bool quiet)
         {
-            if (!quiet && System.Windows.Forms.MessageBox.Show("Remove Elixar from this PC?\n\nThe schedules, the Start menu entry and the copy in Program Files are removed. Undo backups are kept until their 7 days are up.",
+            if (!quiet && Lang.Box(null, "Remove Elixar from this PC?\n\nThe schedules, the Start menu entry and the copy in Program Files are removed. Undo backups are kept until their 7 days are up.",
                     "Elixar", System.Windows.Forms.MessageBoxButtons.OKCancel, System.Windows.Forms.MessageBoxIcon.Question) != System.Windows.Forms.DialogResult.OK) return 1;
             string o;
             foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask, Automation.TidyTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
@@ -86,7 +86,7 @@ namespace CDriveCleaner
                 Process.Start(new ProcessStartInfo(cmd, RemoveFolderArgs(ping, Install.Dir)) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sys });
             }
             catch { }
-            if (!quiet) System.Windows.Forms.MessageBox.Show("Elixar was removed.", "Elixar");
+            if (!quiet) Lang.Box(null, "Elixar was removed.", "Elixar");
             return 0;
         }
     }

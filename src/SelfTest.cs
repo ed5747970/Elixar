@@ -1385,6 +1385,24 @@ namespace CDriveCleaner
                         }
                         finally { Theme.Dark = wasDark; }
                     }
+                    // ---- Elixar's own pop-up ----
+                    {
+                        NiceBox seen = null; string defText = "", cancelText = "";
+                        NiceBox.TestHook = f => { seen = f; defText = ((Button)f.AcceptButton).Text; cancelText = f.CancelButton == null ? "" : ((Button)f.CancelButton).Text; return DialogResult.Cancel; };
+                        try
+                        {
+                            var r1 = Lang.Box(null, "Delete these 3 items?\n\n  - Thumbnail cache  (30 MB)\n  - Windows temp files  (12 MB)\n  - Your temp files  (varies)\n\nEstimated space freed: 50 MB\n\nThis cannot be undone.",
+                                              "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
+                            bool okDelete = seen != null && (Lang.Hebrew || seen.TitleText == "Delete these 3 items?") && seen.Bullets.Count == 3 && seen.DangerStyle && seen.ButtonsShown.Count == 2 &&
+                                            defText == Lang.T("OK") && cancelText == Lang.T("Cancel") && r1 == DialogResult.Cancel;
+                            Lang.BoxNo(null, "Run it from Elixar anyway?", "Elixar");
+                            bool okNo = seen.ButtonsShown.Count == 2 && defText == Lang.T("No") && cancelText == Lang.T("No") && seen.DangerStyle;
+                            Lang.Box(null, "Saved.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            bool okInfo = seen.ButtonsShown.Count == 1 && defText == Lang.T("OK") && cancelText == Lang.T("OK") && !seen.DangerStyle && seen.TitleText == (Lang.Hebrew ? Lang.T("Saved.") : "Saved.");
+                            check(okDelete && okNo && okInfo, "Pop-ups: Elixar's own look, with the list in a card, a red button for deleting, and Enter/Esc on the safe button where it matters");
+                        }
+                        finally { NiceBox.TestHook = null; }
+                    }
                     // ---- Recycle Bin: only what was deleted long ago ----
                     {
                         string bin = Path.Combine(root, "rb", "S-1-5-21-1"); Directory.CreateDirectory(bin);

@@ -212,7 +212,7 @@ namespace CDriveCleaner
             string err = "not tried";
             for (int i = 0; i < 20 && err != null; i++) { err = Install.Ensure(); if (err != null) Thread.Sleep(500); }
             if (err == null) { try { Process.Start(new ProcessStartInfo(Install.Exe) { UseShellExecute = false }); } catch { } return 0; }
-            System.Windows.Forms.MessageBox.Show("The update could not be installed: " + err, "Elixar");
+            Lang.Box(null, "The update could not be installed: " + err, "Elixar");
             return 1;
         }
     }

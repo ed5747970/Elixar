@@ -87,6 +87,13 @@ namespace CDriveCleaner
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr hwnd, string app, string idList);
         [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wp, IntPtr lp);
 
+        // the dark title bar for a window (Windows 10 2004+ / 11) when the dark theme is on
+        public static void DarkTitle(Form f)
+        {
+            if (!Dark || !Win.IsWindows) return;
+            try { int on = 1; if (DwmSetWindowAttribute(f.Handle, 20, ref on, 4) != 0) DwmSetWindowAttribute(f.Handle, 19, ref on, 4); } catch { }
+        }
+
         public static void Apply(Control root)
         {
             if (!Dark) return;

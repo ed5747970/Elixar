@@ -858,6 +858,14 @@ namespace CDriveCleaner
             d["Auto-delete is on: every day, old Recycle Bin items and expired Undo items are deleted."] = "המחיקה האוטומטית פועלת: בכל יום נמחקים פריטים ישנים מסל המיחזור ופריטי ביטול שהזמן שלהם נגמר.";
             d["Auto-delete is off."] = "המחיקה האוטומטית כבויה.";
             d["Removed items wait here before they are deleted for good"] = "פריטים שהוסרו מחכים כאן לפני שהם נמחקים לצמיתות";
+            d["OK"] = "אישור";
+            d["Yes"] = "כן";
+            d["No"] = "לא";
+            d["Retry"] = "נסה שוב";
+            d["Abort"] = "עצירה";
+            d["Ignore"] = "התעלמות";
+            d["This cannot be undone."] = "אי אפשר לבטל את זה.";
+            d["varies"] = "משתנה";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["7 days"] = "7 ימים";
@@ -1047,6 +1055,8 @@ namespace CDriveCleaner
             Pat(@"Auto-delete could not be changed: (.+)", m => "לא ניתן היה לשנות את המחיקה האוטומטית: " + m.Groups[1].Value);
             Pat(@"1 item, Tools > Undo puts them back", m => "פריט אחד, כלים > ביטול מחזיר אותו");
             Pat(@"(\d+) items, Tools > Undo puts them back", m => m.Groups[1].Value + " פריטים, כלים > ביטול מחזיר אותם");
+            Pat(@"Delete these (\d+) items\?", m => "למחוק את " + m.Groups[1].Value + " הפריטים האלה?");
+            Pat(@"Estimated space freed: (.+)", m => "מקום שיתפנה בערך: " + m.Groups[1].Value);
             Pat(@"(\d+) s", m => m.Groups[1].Value + " שנ׳");
             Pat(@"(\d+) selected", m => m.Groups[1].Value + " נבחרו");
             Pat(@"Checking (.+)", m => "בודק " + m.Groups[1].Value);

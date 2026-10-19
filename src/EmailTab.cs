@@ -246,8 +246,7 @@ namespace CDriveCleaner
                          "• " + Lang.T("Starred, flagged and Important emails are never touched.") + "\n" +
                          "• " + Lang.T("You can turn it off any time here in Settings.") +
                          (kind == "other" ? "" : "\n\n" + Lang.T("The sign-in screen will describe this permission in broader words than what Elixar does with it.")) + "\n\n" + Lang.T("Continue?");
-            if (MessageBox.Show(this, ask, "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2,
-                                Lang.Hebrew ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0) != DialogResult.Yes) return;
+            if (NiceBox.Show(this, ask, "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question, 1) != DialogResult.Yes) return;
             if (kind == "other")
             {
                 var s3 = OtherMail.Load(); s3.Clean = true; OtherMail.Save(s3);

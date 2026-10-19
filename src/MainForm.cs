@@ -927,9 +927,9 @@ namespace CDriveCleaner
             if (testMode || cleaningNow || !ready || sel.Count == 0) return;
 
             long est = sel.Where(i => !i.SizeUnknown).Sum(i => i.Size);
-            var lines = sel.Select(i => "  - " + i.Name + "  (" + (i.SizeUnknown ? "varies" : Fs.Fmt(i.Size)) + ")");
-            string msg = "Delete these " + sel.Count + " items?\n\n" + string.Join("\n", lines) +
-                         "\n\nEstimated space freed: " + Fs.Fmt(est) + "\n\nThis cannot be undone.";
+            var lines = sel.Select(i => "  - " + Lang.T(i.Name) + "  (" + (i.SizeUnknown ? Lang.T("varies") : Fs.Fmt(i.Size)) + ")");
+            string msg = Lang.T("Delete these " + sel.Count + " items?") + "\n\n" + string.Join("\n", lines) +
+                         "\n\n" + Lang.T("Estimated space freed: " + Fs.Fmt(est)) + "\n\n" + Lang.T("This cannot be undone.");
             if (Lang.Box(this, msg, "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
 
             // apps that must be closed first

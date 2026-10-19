@@ -70,16 +70,14 @@ namespace CDriveCleaner
         // a warning with Yes / No where No is the button Enter presses
         public static DialogResult BoxNo(IWin32Window owner, string text, string caption)
         {
-            var opt = Hebrew ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0;
-            return MessageBox.Show(owner, T(text), T(caption), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2, opt);
+            return NiceBox.Show(owner, T(text), T(caption), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, 1);
         }
         public static DialogResult Box(IWin32Window owner, string text, string caption) { return Box(owner, text, caption, MessageBoxButtons.OK, MessageBoxIcon.None); }
 
-        // MessageBox with the right direction and the text translated where known
+        // Elixar's own pop-up (in the app's look and direction), with the text translated where known
         public static DialogResult Box(IWin32Window owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i)
         {
-            if (!Hebrew) return MessageBox.Show(owner, text, caption, b, i);
-            return MessageBox.Show(owner, T(text), T(caption), b, i, MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            return NiceBox.Show(owner, Hebrew ? T(text) : text, Hebrew ? T(caption) : caption, b, i, 0);
         }
     }
 }

@@ -101,7 +101,7 @@ namespace CDriveCleaner
                 var inAccount = EnvGuard.InAccount();
                 if (inAccount.Count > 0)
                 {
-                    if (MessageBox.Show("Before Elixar asks for administrator rights:\n\nThese settings for your Windows account make every .NET program load extra code:\n\n" +
+                    if (Lang.Box(null, "Before Elixar asks for administrator rights:\n\nThese settings for your Windows account make every .NET program load extra code:\n\n" +
                             string.Join("\n", inAccount) + "\n\nWith administrator rights, that code would get them too. Developer tools sometimes add these settings, and so does malware.\n\n" +
                             "Remove them and continue? (No closes Elixar.)", "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return 0;
                     EnvGuard.RemoveFromAccount(inAccount);
@@ -124,7 +124,7 @@ namespace CDriveCleaner
                 }
                 catch (Win32Exception)
                 {
-                    MessageBox.Show("Elixar needs administrator rights to clean Windows folders.\n\nStart it again and click Yes on the Windows prompt.",
+                    Lang.Box(null, "Elixar needs administrator rights to clean Windows folders.\n\nStart it again and click Yes on the Windows prompt.",
                         "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 return 0;
@@ -134,7 +134,7 @@ namespace CDriveCleaner
             {
                 // started as administrator with .NET switches already in place: their code may be running inside Elixar
                 var inAccount = EnvGuard.InAccount();
-                if (MessageBox.Show("Elixar was started with settings that make .NET load extra code:\n\n" + string.Join("\n", droppedEnv) +
+                if (Lang.Box(null, "Elixar was started with settings that make .NET load extra code:\n\n" + string.Join("\n", droppedEnv) +
                         "\n\nThat code may already be running inside Elixar with administrator rights, so Elixar closes now." +
                         (inAccount.Count > 0 ? "\n\nRemove these settings from your Windows account? Then start Elixar again." : "\n\nCheck how Elixar was started, then start it again normally."),
                         "Elixar", inAccount.Count > 0 ? MessageBoxButtons.YesNo : MessageBoxButtons.OK, MessageBoxIcon.Warning) == DialogResult.Yes)
@@ -149,7 +149,7 @@ namespace CDriveCleaner
             {
                 Application.EnableVisualStyles();
                 string err = Setup.InstallHere(null);
-                MessageBox.Show(err == null ? "Elixar is installed: find it in the Start menu. It also appears in Windows' installed apps list." : "Could not install Elixar: " + err, "Elixar",
+                Lang.Box(null, err == null ? "Elixar is installed: find it in the Start menu. It also appears in Windows' installed apps list." : "Could not install Elixar: " + err, "Elixar",
                     MessageBoxButtons.OK, err == null ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
                 if (err == null) try { Process.Start(new ProcessStartInfo(Install.Exe) { UseShellExecute = false }); } catch { }
                 return err == null ? 0 : 1;

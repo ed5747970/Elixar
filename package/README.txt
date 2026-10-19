@@ -1,7 +1,13 @@
-ELIXAR  (version 2.2.6)
+ELIXAR  (version 2.2.7)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2.7
+- Every question and message appears in Elixar's own look instead of the
+  grey Windows box: light or dark, right to left in Hebrew, lists in a card
+  with sizes on the right, a red button when something is deleted, and the
+  safe choice on Enter/Esc. Ctrl+C still copies the text.
 
 NEW IN 2.2.6
 - Dark theme: no light lines left around lists, at the end of list headers
