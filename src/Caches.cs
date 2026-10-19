@@ -74,7 +74,7 @@ namespace CDriveCleaner
             return vers.OrderByDescending(x => x.Item1).Skip(1).Select(x => x.Item2).ToList();
         }
 
-        static string SteamPath()
+        public static string SteamPath()
         {
             try
             {

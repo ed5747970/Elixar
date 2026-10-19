@@ -27,8 +27,8 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Elixar - the cure for a full C: drive. Made by Elisar.")]
 [assembly: AssemblyCompany("Elisar")]
 [assembly: AssemblyCopyright("Made by Elisar (c) 2026")]
-[assembly: AssemblyVersion("2.2.0.0")]
-[assembly: AssemblyFileVersion("2.2.0.0")]
+[assembly: AssemblyVersion("2.3.0.0")]
+[assembly: AssemblyFileVersion("2.3.0.0")]
 
 namespace CDriveCleaner
 {
@@ -48,6 +48,7 @@ namespace CDriveCleaner
         public bool SizeUnknown;
         public bool Privacy;               // traces of what you did, not disk space
         public string RootScript;          // Linux: fixed commands run as root after one password prompt (null: runs as you)
+        public string Drive;               // "D:" for items on another drive (null: C: and the system)
     }
 
     // ---------------- file helpers ----------------
@@ -465,7 +466,7 @@ namespace CDriveCleaner
                     Info = "The old Windows kept after a big upgrade, so you can go back for 10 days. Removing it means you can no longer go back. Windows' own Disk Cleanup removes it (10-30 minutes). Too big for Undo.",
                     Measure = WindowsOld.Size,
                     Clean = WindowsOld.Clean },
-            }.Concat(Caches.Items()).Concat(Privacy.Items()).ToList();
+            }.Concat(Caches.Items()).Concat(Privacy.Items()).Concat(DriveClean.Items(Caches.SteamPath())).ToList();
         }
     }
 
@@ -1119,6 +1120,13 @@ namespace CDriveCleaner
             var gCaution = new ListViewGroup("Caution - leftovers, read the note first", HorizontalAlignment.Left);
             var gPrivacy = new ListViewGroup("Privacy - traces of what you did (never ticked for you)", HorizontalAlignment.Left);
             list.Groups.AddRange(new[] { gSafe, gReview, gCaution, gPrivacy });
+            var driveGroups = new Dictionary<string, ListViewGroup>();
+            Func<string, ListViewGroup> DriveGroup = d =>
+            {
+                ListViewGroup g;
+                if (!driveGroups.TryGetValue(d, out g)) { g = new ListViewGroup("Drive " + d + " - your other drive (nothing is ticked for you)", HorizontalAlignment.Left); driveGroups[d] = g; list.Groups.Add(g); }
+                return g;
+            };
 
             foreach (var it in items)
             {
@@ -1129,7 +1137,7 @@ namespace CDriveCleaner
                 lvi.SubItems.Add("");
                 var locSub = lvi.SubItems.Add(it.Where);
                 locSub.ForeColor = Color.DimGray;
-                lvi.Group = it.Privacy ? gPrivacy : it.Tier == Tier.Safe ? gSafe : it.Tier == Tier.Review ? gReview : gCaution;
+                lvi.Group = it.Drive != null ? DriveGroup(it.Drive) : it.Privacy ? gPrivacy : it.Tier == Tier.Safe ? gSafe : it.Tier == Tier.Review ? gReview : gCaution;
                 if (it.Privacy) tierSub.Text = Lang.T("Privacy");
                 list.Items.Add(lvi);
                 rows[it] = lvi;
@@ -3189,6 +3197,46 @@ namespace CDriveCleaner
                           OsInfo.FromWindows("Windows 10 Home", "22H2", 19045, 0).Name == "Windows 10 Home 22H2 (build 19045)",
                           "System: tells Windows 11 from Windows 10 by its build number (Windows still calls 11 \"Windows 10\")");
                     check(OsInfo.Current.Name.Length > 0, "System: this PC runs " + OsInfo.Current.Name);
+                    {
+                        string dr = Path.Combine(root, "drv"); Directory.CreateDirectory(dr);
+                        foreach (var n in new[] { "found.000", "found.001", "found.abc", "found.0001", "foundling" }) Directory.CreateDirectory(Path.Combine(dr, n));
+                        var lo = DriveClean.CheckDiskLeftovers(dr).Select(Path.GetFileName).OrderBy(x => x).ToList();
+                        bool steamOk = true;
+                        if (win)
+                        {
+                            string steam = Path.Combine(dr, "Steam"); Directory.CreateDirectory(Path.Combine(steam, "steamapps"));
+                            string lib = Path.Combine(dr, "Games"); Directory.CreateDirectory(Path.Combine(lib, "steamapps"));
+                            string other = Path.Combine(root, "elsewhere"); Directory.CreateDirectory(Path.Combine(other, "steamapps"));
+                            File.WriteAllText(Path.Combine(Path.Combine(steam, "steamapps"), "libraryfolders.vdf"),
+                                "\"libraryfolders\" { \"0\" { \"path\" \"" + steam.Replace("\\", "\\\\") + "\" } \"1\" { \"path\" \"" + lib.Replace("\\", "\\\\") + "\" } \"2\" { \"path\" \"" + other.Replace("\\", "\\\\") + "\" } \"3\" { \"path\" \"C:\\\\Windows\" } }");
+                            var libs = DriveClean.SteamLibrariesOn(dr + "\\", steam);
+                            steamOk = libs.Count == 1 && libs[0] == lib;
+                        }
+                        check(lo.SequenceEqual(new[] { "found.000", "found.001" }) && steamOk &&
+                              !Duplicates.Allowed(@"D:\SteamLibrary\steamapps\common\Game") && !Duplicates.Allowed(@"D:\Windows.old\x") && !Duplicates.Allowed(@"E:\Epic Games\Fortnite") &&
+                              Duplicates.Allowed(@"D:\Photos\2024") && (!win || (Duplicates.SearchRoot(@"C:\")[0] == UserDirs.Home && Duplicates.SearchRoot(@"D:\")[0] == @"D:\")),
+                              "Other drives: finds disk-check leftovers and Steam libraries on that drive only; duplicates skip game folders" + (win ? "" : " (Steam part on Windows only)"));
+                        check(Catalog.Build().Where(i => i.Drive != null).All(i => !i.DefaultOn && i.Info.Length > 0) && Automation.AutoItems().All(i => i.Drive == null),
+                              "Other drives: nothing there is ticked for you, and the weekly clean never touches other drives");
+                    }
+                    {
+                        string sm = Path.Combine(root, "smart"); Directory.CreateDirectory(Path.Combine(sm, "Photos")); Directory.CreateDirectory(Path.Combine(sm, "Backup"));
+                        Directory.CreateDirectory(Path.Combine(sm, "SteamLibrary", "steamapps", "common")); Directory.CreateDirectory(Path.Combine(sm, "Old Windows", "Windows", "System32"));
+                        var pic = new byte[(3 << 19)]; new Random(9).NextBytes(pic);                 // 1.5 MB photo, twice
+                        File.WriteAllBytes(Path.Combine(sm, "Photos", "IMG_1.jpg"), pic); File.WriteAllBytes(Path.Combine(sm, "Backup", "IMG_1 (copy).jpg"), pic);
+                        var big = new byte[11 << 20];
+                        string oldF = Path.Combine(sm, "Backup", "old-movie.mkv"), newF = Path.Combine(sm, "Photos", "new-movie.mp4"), game = Path.Combine(sm, "SteamLibrary", "steamapps", "common", "game.pak");
+                        File.WriteAllBytes(oldF, big); big[0] = 1; File.WriteAllBytes(newF, big); big[0] = 2; File.WriteAllBytes(game, big);
+                        File.SetCreationTime(oldF, DateTime.Now.AddYears(-2)); File.SetLastWriteTime(oldF, DateTime.Now.AddYears(-2)); File.SetLastAccessTime(oldF, DateTime.Now.AddYears(-2));
+                        var sr = SmartScan.Run(sm, null, System.Threading.CancellationToken.None, true);
+                        var olds = sr.OlderThan(DateTime.Now.AddMonths(-6), SmartScan.OldMin);
+                        var g0 = sr.Dups.FirstOrDefault();
+                        check(sr.Dups.Count == 1 && g0.Files.Count == 2 && olds.Count == 1 && olds[0].File.Name == "old-movie.mkv" && olds[0].Kind == "Video" &&
+                              !sr.Candidates.Any(c => c.File.Name == "game.pak") && SmartScan.HasWindows(Path.Combine(sm, "Old Windows")) && !SmartScan.HasWindows(sm) &&
+                              SmartScan.KindOf("a.ISO") == "Disk image" && SmartScan.KindOf("x.unknown") == "Other" &&
+                              SmartScan.Keeper(g0, SmartScan.Keep.ShortestPath).Name == "IMG_1.jpg",
+                              "Smart scan: finds duplicates and big files unused for 6+ months in one pass, skips game folders, and knows a drive with its own Windows");
+                    }
                     check(DiskNumber.DiskOfDevice("/dev/nvme0n1p2") == "nvme0n1" && DiskNumber.DiskOfDevice("/dev/sda1") == "sda" && DiskNumber.DiskOfDevice("/dev/mmcblk0p1") == "mmcblk0" &&
                           DiskNumber.DiskOfDevice("/dev/mapper/vg-root") == "" && DiskNumber.Host.Length > 0 && !DiskNumber.Host.Contains(" ") &&
                           (!win || System.Text.RegularExpressions.Regex.IsMatch(DiskNumber.Of("C"), "^[0-9]+$")) && DiskNumber.Tag(win ? "C" : "/").EndsWith(" of " + DiskNumber.Host) == (DiskNumber.Of(win ? "C" : "/").Length > 0),

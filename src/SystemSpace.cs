@@ -170,7 +170,10 @@ namespace CDriveCleaner
     public static class Duplicates
     {
         // never scanned, even if inside a chosen folder
-        static readonly string[] Blocked = { @"\windows\", @"\program files", @"\programdata\", @"\appdata\", @"\$recycle.bin\", @"\system volume information\", @"\.git\", @"\node_modules\" };
+        // (games are left alone too: game folders share many identical files, and deleting one breaks the game)
+        static readonly string[] Blocked = { @"\windows\", @"\program files", @"\programdata\", @"\appdata\", @"\$recycle.bin\", @"\system volume information\", @"\.git\", @"\node_modules\",
+                                             @"\steamapps\", @"\windowsapps\", @"\xboxgames\", @"\epic games\", @"\gog games\", @"\ea games\", @"\ubisoft game launcher\", @"\riot games\",
+                                             @"\windows.old\", @"\$windows.~bt\", @"\$windows.~ws\", @"\$winreagent\", @"\recovery\", @"\msocache\", @"\$sysreset\", @"\elixar undo\" };
 
         public static bool Allowed(string path)
         {
@@ -189,6 +192,39 @@ namespace CDriveCleaner
             string dl = Path.Combine(UserDirs.Home, "Downloads");
             if (Directory.Exists(dl)) list.Add(dl);
             return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        // every drive you can search: C: means your own folders (your profile); other drives are searched whole
+        public static List<string> DriveRoots()
+        {
+            var roots = new List<string>();
+            if (!Win.IsWindows) return roots;
+            roots.Add(UserDirs.Home);
+            foreach (var d in DriveClean.Others()) roots.Add(d.RootDirectory.FullName);
+            return roots;
+        }
+
+        public static List<string> SearchRoot(string root)
+        {
+            if (!Win.IsWindows || root.StartsWith("C", StringComparison.OrdinalIgnoreCase)) return Win.IsWindows ? new List<string> { UserDirs.Home } : new List<string> { root };
+            return new List<string> { root };
+        }
+
+        public static string DriveLabel(string root)
+        {
+            if (string.Equals(root, UserDirs.Home, StringComparison.OrdinalIgnoreCase)) return "C:  your folders (" + root + ")";
+            try
+            {
+                var d = new DriveInfo(root);
+                string lbl = d.VolumeLabel ?? "";
+                return root.Substring(0, 2) + (lbl.Length > 0 ? "  " + lbl : "") + "  (" + Fs.Fmt(d.TotalSize - d.TotalFreeSpace) + " used" + (d.DriveType == DriveType.Removable ? ", USB" : "") + ")";
+            }
+            catch { return root; }
+        }
+
+        public static bool OnUsb(string path)
+        {
+            try { return Win.IsWindows && new DriveInfo(Path.GetPathRoot(path)).DriveType == DriveType.Removable; } catch { return false; }
         }
 
         static string Hash(string path, long maxBytes)
@@ -241,6 +277,25 @@ namespace CDriveCleaner
                 }
             }
 
+            return Group(bySize, status, ct);
+        }
+
+        // files already listed (the smart scan walks a drive once): same size -> same first 64 KB -> same full SHA-256
+        public static List<DupGroup> Group(IEnumerable<FileInfo> files, long minSize, Action<string> status, CancellationToken ct)
+        {
+            var bySize = new Dictionary<long, List<FileInfo>>();
+            foreach (var f in files)
+            {
+                if (f.Length < minSize) continue;
+                List<FileInfo> l;
+                if (!bySize.TryGetValue(f.Length, out l)) bySize[f.Length] = l = new List<FileInfo>();
+                l.Add(f);
+            }
+            return Group(bySize, status, ct);
+        }
+
+        static List<DupGroup> Group(Dictionary<long, List<FileInfo>> bySize, Action<string> status, CancellationToken ct)
+        {
             var groups = new List<DupGroup>();
             foreach (var kv in bySize.Where(k => k.Value.Count > 1))
             {

@@ -353,17 +353,18 @@ namespace CDriveCleaner
             var t = Page(5);
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            dupStatus = Note("Finds files with exactly the same content in your own folders (compared byte for byte by fingerprint). Windows, apps and AppData are never searched. Extra copies go to the Recycle Bin.");
+            dupStatus = Note("Finds files with exactly the same content in your own folders, on any drive and across drives (compared byte for byte by fingerprint). Windows, apps and AppData are never searched. Extra copies go to the Recycle Bin.");
             var top = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Margin = new Padding(0, 0, 0, S(6)) };
             top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             dupFolders = new ListBox { Dock = DockStyle.Fill, Height = S(96), IntegralHeight = false };
             foreach (var f in Duplicates.DefaultFolders()) dupFolders.Items.Add(f);
             var side = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(S(6), 0, 0, 0) };
             var btnAdd = MakeButton("Add folder..."); var btnRemove = MakeButton("Remove folder");
+            var btnDrive = MakeButton("Add a whole drive...");
             cmbDupMin = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(130) };
             cmbDupMin.Items.AddRange(new object[] { "Files over 1 MB", "Files over 10 MB", "Files over 100 MB" });
             cmbDupMin.SelectedIndex = 1;
-            side.Controls.AddRange(new Control[] { btnAdd, btnRemove, cmbDupMin });
+            side.Controls.AddRange(new Control[] { btnAdd, btnDrive, btnRemove, cmbDupMin });
             top.Controls.Add(dupFolders, 0, 0); top.Controls.Add(side, 1, 0);
 
             dupList = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
@@ -391,11 +392,40 @@ namespace CDriveCleaner
                     }
             };
             btnRemove.Click += (o, e) => { if (dupFolders.SelectedItem != null) dupFolders.Items.Remove(dupFolders.SelectedItem); };
+            btnDrive.Click += (o, e) =>
+            {
+                var menu = new ContextMenuStrip();
+                foreach (var r in Duplicates.DriveRoots())
+                {
+                    string root = r;
+                    menu.Items.Add(Lang.T(Duplicates.DriveLabel(root)), null, (o2, e2) => AddDupFolder(root));
+                }
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add(Lang.T("All drives"), null, (o2, e2) => { dupFolders.Items.Clear(); foreach (var r in Duplicates.DriveRoots()) AddDupFolder(r); });
+                Lang.Menu(menu);
+                menu.Show(btnDrive, new Point(0, btnDrive.Height));
+            };
             btnDupFind.Click += (o, e) => FindDuplicates();
             btnDupStop.Click += (o, e) => { if (dupCts != null) dupCts.Cancel(); };
             btnDupSelect.Click += (o, e) => { foreach (ListViewItem r in dupList.Items) r.Checked = !"keep".Equals(r.SubItems[3].Tag); };
             btnDupRecycle.Click += (o, e) => RecycleDuplicates();
         }
+
+        void AddDupFolder(string p)
+        {
+            if (!dupFolders.Items.Cast<string>().Any(x => string.Equals(x, p, StringComparison.OrdinalIgnoreCase))) dupFolders.Items.Add(p);
+        }
+
+        // from the Dashboard: "Find duplicates" on one drive (for C:, your own folders)
+        public void FindDuplicatesOn(string root)
+        {
+            ShowTools(pageDups);
+            if (dupCts != null) return;
+            dupFolders.Items.Clear();
+            foreach (var f in Duplicates.SearchRoot(root)) AddDupFolder(f);
+            FindDuplicates();
+        }
+        public List<string> DupFolderList { get { return dupFolders.Items.Cast<string>().ToList(); } }   // self-test
 
         void UpdateDupButton()
         {
@@ -459,8 +489,11 @@ namespace CDriveCleaner
                 Lang.Box(this, "Keep at least one copy in each set. Untick one file in:\n\n" + string.Join("\n", blocked), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            if (Lang.Box(this, "Move " + sel.Count + " files (" + Fs.Fmt(sel.Sum(r => ((FileInfo)r.Tag).Length)) + ") to the Recycle Bin?\n\nYou can get them back from the Recycle Bin.",
-                    "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            // a USB stick has no Recycle Bin: Windows deletes from it for good
+            var usb = sel.Where(r => Duplicates.OnUsb(((FileInfo)r.Tag).FullName)).ToList();
+            string usbNote = usb.Count == 0 ? "" : "\n\n" + Lang.T(usb.Count + " of them are on a USB drive, which has no Recycle Bin: those are deleted for good.");
+            if (Lang.Box(this, Lang.T("Move " + sel.Count + " files (" + Fs.Fmt(sel.Sum(r => ((FileInfo)r.Tag).Length)) + ") to the Recycle Bin?") + "\n\n" + Lang.T("You can get them back from the Recycle Bin.") + usbNote,
+                    "Elixar", MessageBoxButtons.OKCancel, usb.Count > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question) != DialogResult.OK) return;
             int ok = 0;
             foreach (var r in sel)
             {

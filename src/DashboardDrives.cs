@@ -112,7 +112,7 @@ namespace CDriveCleaner
         // how a drive is named: "D:" on Windows; on Linux its name ("Home", "Backup") or the folder it is mounted at
         string DT(string key)
         {
-            if (Win.IsWindows) return key + ":";
+            if (!LinuxUi) return key + ":";
             if (key == "C") return Lang.T("System disk");
             var d = knownDrives.FirstOrDefault(x => x.Letter == key);
             return d != null && d.Label.Length > 0 ? d.Label : key;
@@ -120,7 +120,7 @@ namespace CDriveCleaner
         // "D:  Data" on Windows; "Backup  (/media/you/Backup)" on Linux
         string DriveName(DriveRow r)
         {
-            if (Win.IsWindows) return r.Letter + ":" + (r.Label.Length > 0 ? "  " + r.Label : "");
+            if (!LinuxUi) return r.Letter + ":" + (r.Label.Length > 0 ? "  " + r.Label : "");
             return r.Letter == "C" ? Lang.T("System disk") + "  (/)" : DT(r.Letter) + (r.Root.Length > 0 && r.Root != DT(r.Letter) ? "  (" + r.Root + ")" : "");
         }
 
@@ -167,8 +167,9 @@ namespace CDriveCleaner
             dashDrive.AutoScrollMinSize = new Size(0, S(560));
             dHero = hero_();
             dHero.PrimaryOn = true;
-            dHero.PrimaryClicked += () => OpenDrill(CurRoot());
-            dHero.SecondaryClicked += () => OpenMap(CurRoot());
+            dHero.PrimaryClicked += () => OpenSmartScan(curDrive);
+            dHero.SecondaryClicked += () => { if (DriveItemsOf(curDrive).Count > 0 && !LinuxUi) CleanDrive(curDrive); else OpenDrill(CurRoot()); };
+            dHero.ThirdClicked += () => OpenDrill(CurRoot());
             dFolders = new ListCard { Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, TitleFont = titleFont, SmallFont = small, Footer = Lang.T("Open the folder map") };
             dFiles = new ListCard { Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, TitleFont = titleFont, SmallFont = small };
             dFolders.ActionClicked += r => { var n = (Treemap.Node)r.Tag; if (n.IsDir) OpenDrill(n.Path); else if (!n.Group) ShowInFolder(n.Path); else OpenDrill(n.Path); };
@@ -238,6 +239,39 @@ namespace CDriveCleaner
             RefreshOverview();   // reads the drives again, then redraws this view
         }
 
+        List<CleanItem> DriveItemsOf(string letter) { string d = letter + ":"; return items.Where(i => string.Equals(i.Drive, d, StringComparison.OrdinalIgnoreCase)).ToList(); }
+
+        // the Smart scan window for one drive (C: means your own folders)
+        public SmartScanForm OpenSmartScan(string letter)
+        {
+            string root = letter == "C" ? (Win.IsWindows ? UserDirs.Home : Lx.Home) : RootOf(letter);
+            string name = letter == "C" ? Lang.T("your folders on C:") : DT(letter);
+            var f = new SmartScanForm(this, root, name, s, testMode);
+            f.Shown += (o, e) => { Theme.Apply(f); Lang.Apply(f); };
+            f.Show(this);
+            return f;
+        }
+
+        // "Clean D:": the Cleaner, scrolled to D:'s own group (nothing is ticked for you)
+        public void CleanDrive(string letter)
+        {
+            var mine = DriveItemsOf(letter);
+            if (LinuxUi || mine.Count == 0) { OpenDrill(RootOf(letter)); return; }
+            tabs.SelectedTab = pageClean;
+            ListViewItem first = null;
+            list.SelectedItems.Clear();
+            foreach (ListViewItem r in list.Items)
+                if (mine.Contains(r.Tag as CleanItem)) { r.Selected = true; if (first == null) first = r; }
+            if (first != null)
+            {
+                // the whole group in view: its last row first, then its first row
+                var last = list.Items.Cast<ListViewItem>().LastOrDefault(r => mine.Contains(r.Tag as CleanItem));
+                if (last != null) last.EnsureVisible();
+                first.Focused = true; first.EnsureVisible(); list.Focus();
+            }
+            Log(Lang.T("Drive " + letter + ": tick what you want removed, then click \"Clean selected\"."));
+        }
+
         // the choices: C:, each other drive, All drives
         void UpdateDrivePicker(List<DriveRow> others)
         {
@@ -283,13 +317,21 @@ namespace CDriveCleaner
             dHero.BigSub = Lang.T("free of " + Fs.Fmt(d.Total));
             dHero.Headline = Lang.T(DT(letter) + " " + (level == 2 ? "is almost full" : level == 1 ? "is getting full" : "has plenty of room"));
             var lines = new List<string> { KindText(d) + "." };
+            if (!LinuxUi) lines.Add(Lang.T(SmartScan.HasWindows(RootOf(letter)) ? "It has its own Windows installation." : "A data drive: no Windows on it."));
+            lines.Add(Lang.T("Smart scan finds duplicate files and files you haven't used for months."));
             if (d.Health == HealthLevel.Failing) lines.Add(Lang.T("This drive may fail soon: back up what is on it."));
             else if (level == 0) lines.Add(Lang.T("Room to spare: a good place for big folders moved off C:."));
             else lines.Add(Lang.T("The biggest folders below show what fills it."));
             if (folderMeasuring != null) lines.Add(Lang.T("Measuring " + folderMeasuring + "..."));
             dHero.Sub = string.Join(" ", lines);
-            dHero.Primary = Lang.T("Explore " + DT(letter));
-            dHero.Secondary = Lang.T("Folder map");
+            // what can be cleaned on this drive (measured with the Cleaner's list)
+            var mine = DriveItemsOf(letter);
+            long can = mine.Where(i => !i.SizeUnknown).Sum(i => Math.Max(0, i.Size));
+            dHero.Primary = Lang.T("Smart scan " + DT(letter));
+            dHero.PrimaryOn = true;
+            bool cleanable = !LinuxUi && mine.Count > 0;
+            dHero.Secondary = Lang.T(cleanable ? (can >= (1L << 20) ? "Clean " + DT(letter) + " (" + Fs.Fmt(can) + ")" : "Clean " + DT(letter)) : "Explore");
+            dHero.Third = cleanable ? Lang.T("Explore") : "";
             dHero.BreakTitle = Lang.T("What fills " + DT(letter));
             List<Treemap.Node> nodes;
             dHero.Break = new List<Tuple<string, long, Color>>();

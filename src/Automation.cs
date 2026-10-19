@@ -219,7 +219,7 @@ namespace CDriveCleaner
         {
             long total = Sys.Total(), free = Sys.Free();
             SpaceHistory.Record(free, total);   // one reading a day for the space trend
-            if (Win.IsWindows) CheckDisks(); else CheckSnaps(total);
+            if (Win.IsWindows) { CheckDisks(); CheckOtherDrives(percent); } else CheckSnaps(total);
             if (!ShouldWarn(free, total, percent))
             {
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");
@@ -230,6 +230,23 @@ namespace CDriveCleaner
                 "Only " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / total) + "%). Click to open Elixar.",
                 ToolTipIcon.Warning, true);
             return 0;
+        }
+
+        // your other internal drives (D:, E:...) with the same limit; USB drives are left out (they come and go)
+        static void CheckOtherDrives(int percent)
+        {
+            try
+            {
+                foreach (var d in DriveClean.Others().Where(x => x.DriveType == DriveType.Fixed))
+                {
+                    long f = d.AvailableFreeSpace, t = d.TotalSize;
+                    string letter = d.RootDirectory.FullName.Substring(0, 2);
+                    if (!ShouldWarn(f, t, percent)) { Log("Space check " + letter + " " + Fs.Fmt(f) + " free."); continue; }
+                    Log("Space check: " + letter + " has only " + Fs.Fmt(f) + " free. Showing the alert.");
+                    Notify("Drive " + letter + " is almost full", "Only " + Fs.Fmt(f) + " free (" + Math.Round(f * 100.0 / t) + "%). Click to open Elixar.", ToolTipIcon.Warning, true);
+                }
+            }
+            catch (Exception e) { Log("Other drives check failed: " + e.Message); }
         }
 
         // Linux: Snap apps taking far more than usual (at most one reminder a week)
@@ -340,7 +357,7 @@ namespace CDriveCleaner
             var gAlert = new GroupBox { Text = "Low-space alert", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Anchor = AnchorStyles.Left | AnchorStyles.Top, Padding = new Padding(S(12), S(8), S(12), S(10)), Margin = new Padding(0, 0, 0, S(12)), MinimumSize = new Size(S(760), 0) };
             var fa = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false };
             var r1 = Row();
-            chkAlert = new CheckBox { AutoSize = true, Text = Win.IsWindows ? "Warn me when C: has less than" : "Warn me when the system disk has less than", Margin = new Padding(0, S(4), S(4), 0) };
+            chkAlert = new CheckBox { AutoSize = true, Text = Win.IsWindows ? "Warn me when C: (or another internal drive) has less than" : "Warn me when the system disk has less than", Margin = new Padding(0, S(4), S(4), 0) };
             numPercent = new NumericUpDown { Minimum = 5, Maximum = 50, Value = 15, Width = S(56) };
             r1.Controls.AddRange(new Control[] { chkAlert, numPercent, Lbl("% free") });
             var r2 = Row();

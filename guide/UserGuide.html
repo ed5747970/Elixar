@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.0</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.3.0</p></div>
 </div></header>
 <main class="wrap">
 
@@ -87,6 +87,14 @@
 <h3>Choosing a drive</h3>
 <p>The switch at the top left lists <strong>C: Windows</strong>, every other drive in the PC (and USB drives), and <strong>All drives</strong>. Refresh (F5), Explore and Folder map work on the drive you picked.</p>
 <p>Under the switch, Elixar shows which physical disk the drive is on and this PC's name, for example <strong>Disk 0 of ELISAR-PC</strong>. The number is the one Windows' Disk Management shows (it starts at 0); two drives on the same disk show the same number. In All drives, every card has its own line.</p>
+<h3>Your other drives (D:, E:, USB)</h3>
+<p>Pick a drive in the switch. Its page shows how full it is, whether it is a <strong>data drive</strong> (no Windows on it) or has its own Windows installation, its biggest folders and largest files, and three buttons:</p>
+<ul>
+  <li><strong>Smart scan:</strong> reads the drive once and finds <strong>duplicate files</strong> (exactly the same content, compared by fingerprint) and big files <strong>not used for 6 months</strong> (or a year, or 2 years). For duplicates you choose which copy stays: the oldest, the newest or the one with the shortest path. Nothing is ticked for you; what you pick goes to the Recycle Bin. Windows, apps, games and AppData are never listed. On C:, Smart scan looks at your own folders.</li>
+  <li><strong>Clean D:</strong> opens the Cleaner at that drive's own group: its Recycle Bin, pieces left by a disk check (found.000), and Steam's shader cache and unfinished downloads in game libraries there. Nothing is ticked for you, and the weekly clean never touches other drives.</li>
+  <li><strong>Explore:</strong> the folder drill-down for that drive.</li>
+</ul>
+<p>A USB stick has no Recycle Bin: files removed from it are deleted for good, and Elixar warns you first. In Tools &rsaquo; Duplicates, <strong>Add a whole drive&hellip;</strong> searches any drive, or all of them at once (it also finds copies spread across drives). The low-space alert now covers C: and every internal drive.</p>
 <h3>The tabs</h3>
 <p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> on the right (the gear). A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
 <h3>C: Overview</h3>
@@ -318,6 +326,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>2.3.0</td><td>Your other drives: Smart scan (duplicates with your choice of which copy stays, big files not used for 6+ months), Clean D: (Recycle Bin, disk-check leftovers, Steam caches), duplicates on any or all drives, low-space alerts for every internal drive; data drives and drives with their own Windows are told apart</td></tr>
   <tr><td>2026-10-18</td><td>2.2.0</td><td>&ldquo;Disk 0 of your PC&rdquo; on the Dashboard and on every drive card; tabs with Settings on the right (other-system tabs greyed); 11 Windows security fixes (see Security)</td></tr>
   <tr><td>2026-10-18</td><td>2.1.0</td><td>New Dashboard: a ring for how full C: is, &ldquo;Free &hellip; safely&rdquo;, six status tiles, quick wins, other drives and recent activity; a drive switcher (C:, any other drive, All drives); Overview and Details; 14 security, privacy and stability fixes (see Security)</td></tr>
   <tr><td>2026-10-17</td><td>2.0.0</td><td>Email account in Settings for Gmail, Outlook/Hotmail (Microsoft sign-in) and any other email (Yahoo, iCloud, AOL... with an app password). Email reports: sign in with Google; weekly clean report, alerts and weekly summary (with a space-trend chart) by email, with a reminder if Google signs Elixar out. Optional Email cleaning (Email tab): old ads, social notifications, mailing lists, spam and large old emails moved to Gmail's Trash, off until you turn it on</td></tr>

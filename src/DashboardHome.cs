@@ -345,13 +345,13 @@ namespace CDriveCleaner
     {
         public double UsedShare = -1;
         public Color LevelColor = Color.Gray;
-        public string Big = "", BigSub = "", Headline = "", Sub = "", Primary = "", Secondary = "", BreakTitle = "";
+        public string Big = "", BigSub = "", Headline = "", Sub = "", Primary = "", Secondary = "", Third = "", BreakTitle = "";
         public bool PrimaryOn;
         public List<Tuple<string, long, Color>> Break = new List<Tuple<string, long, Color>>();
         public long BreakTotal;
         public Font HeadFont, BigFont, BoldFont, SmallFont;
-        public event Action PrimaryClicked, SecondaryClicked;
-        Rectangle pRect, sRect;
+        public event Action PrimaryClicked, SecondaryClicked, ThirdClicked;
+        Rectangle pRect, sRect, tRect;
         int hover;   // 0 none, 1 primary, 2 secondary
 
         static Color A { get { return Theme.Dark ? Color.FromArgb(50, 44, 82) : Color.FromArgb(243, 240, 255); } }
@@ -402,14 +402,17 @@ namespace CDriveCleaner
             Txt(g, Headline, hf, new Rectangle(x0, y, textW, hf.Height + S(2)), Theme.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine);
             y += hf.Height + S(6);
             int bH = S(36), by = Height - pad - bH;
-            bool buttons = Primary.Length > 0 || Secondary.Length > 0;
+            bool buttons = Primary.Length > 0 || Secondary.Length > 0 || Third.Length > 0;
             Txt(g, Sub, Font, new Rectangle(x0, y, textW, Math.Max(sh, (buttons ? by - S(12) : Height - pad) - y)), Theme.Ink, TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
 
             int pw = Primary.Length > 0 ? W(g, Primary, bold) + S(40) : 0, sw = Secondary.Length > 0 ? W(g, Secondary, bold) + S(36) : 0;
             pRect = pw > 0 ? M(new Rectangle(x0, by, pw, bH)) : Rectangle.Empty;
             sRect = sw > 0 ? M(new Rectangle(x0 + (pw > 0 ? pw + S(10) : 0), by, sw, bH)) : Rectangle.Empty;
+            int tw = Third.Length > 0 ? W(g, Third, bold) + S(36) : 0;
+            tRect = tw > 0 ? M(new Rectangle(x0 + (pw > 0 ? pw + S(10) : 0) + (sw > 0 ? sw + S(10) : 0), by, tw, bH)) : Rectangle.Empty;
             if (pw > 0) Pill(g, pRect, Primary, bold, true, PrimaryOn, hover == 1);
             if (sw > 0) Pill(g, sRect, Secondary, bold, false, true, hover == 2);
+            if (tw > 0) Pill(g, tRect, Third, bold, false, true, hover == 3);
 
             if (showBreak)
             {
@@ -437,7 +440,7 @@ namespace CDriveCleaner
             }
         }
 
-        int Hit(Point p) { return pRect.Contains(p) ? 1 : sRect.Contains(p) ? 2 : 0; }
+        int Hit(Point p) { return pRect.Contains(p) ? 1 : sRect.Contains(p) ? 2 : tRect.Contains(p) ? 3 : 0; }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
@@ -455,6 +458,7 @@ namespace CDriveCleaner
             int h = Hit(e.Location);
             if (h == 1 && PrimaryOn && PrimaryClicked != null) PrimaryClicked();
             else if (h == 2 && SecondaryClicked != null) SecondaryClicked();
+            else if (h == 3 && ThirdClicked != null) ThirdClicked();
         }
     }
 
@@ -825,7 +829,7 @@ namespace CDriveCleaner
             {
                 var safe = SafeToFree();
                 sum.Safe = safe.Sum(i => i.Size); sum.SafeCount = safe.Count;
-                sum.TopSafe = items.Where(i => i.Tier == Tier.Safe && !i.Privacy && !i.SizeUnknown && i.Size >= (1L << 20)).OrderByDescending(i => i.Size).Take(5).ToList();
+                sum.TopSafe = items.Where(i => i.Tier == Tier.Safe && !i.Privacy && i.Drive == null && !i.SizeUnknown && i.Size >= (1L << 20)).OrderByDescending(i => i.Size).Take(5).ToList();
             }
             if (dashLocs != null && DashboardFilled()) sum.Tiers = DashData.Totals(dashLocs);
             var rep = lastDiskReport;

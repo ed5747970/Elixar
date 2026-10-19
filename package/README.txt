@@ -1,7 +1,20 @@
-ELIXAR  (version 2.2.0)
+ELIXAR  (version 2.3.0)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.3
+- Your other drives (D:, E:, USB): pick one on the Dashboard.
+  * Smart scan: reads the drive once and finds duplicate files (you choose
+    which copy stays: oldest, newest or shortest path) and big files not used
+    for 6 months, a year or 2 years. Nothing is ticked for you; what you pick
+    goes to the Recycle Bin. Windows, apps, games and AppData are never listed.
+  * Clean D:: its Recycle Bin, disk-check leftovers (found.000), Steam shader
+    cache and unfinished downloads. Nothing ticked; never in the weekly clean.
+  * Elixar tells a data drive (no Windows on it) from one with its own Windows.
+- Duplicates (Tools): "Add a whole drive..." searches any drive, or all.
+- Low-space alerts cover C: and every internal drive.
+- A USB stick has no Recycle Bin: Elixar warns before deleting there.
 
 NEW IN 2.2
 - Dashboard: shows which disk each drive is on and this PC's name, for
