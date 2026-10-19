@@ -219,7 +219,7 @@ namespace CDriveCleaner
         {
             long total = Sys.Total(), free = Sys.Free();
             SpaceHistory.Record(free, total);   // one reading a day for the space trend
-            if (Win.IsWindows) { CheckDisks(); CheckOtherDrives(percent); } else CheckSnaps(total);
+            if (Win.IsWindows) { CheckDisks(); CheckOtherDrives(percent); SmartReminder(DateTime.Today); } else CheckSnaps(total);
             if (!ShouldWarn(free, total, percent))
             {
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");
@@ -230,6 +230,25 @@ namespace CDriveCleaner
                 "Only " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / total) + "%). Click to open Elixar.",
                 ToolTipIcon.Warning, true);
             return 0;
+        }
+
+        // once a month at most: a nudge to run Smart scan on your other drives (never runs it by itself)
+        public static bool SmartReminderDue(string lastScan, string lastReminder, DateTime today)
+        {
+            Func<string, bool> recent = v => { DateTime d; return DateTime.TryParseExact(v ?? "", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out d) && (today - d).TotalDays < 30; };
+            return !recent(lastScan) && !recent(lastReminder);
+        }
+
+        static void SmartReminder(DateTime today)
+        {
+            try
+            {
+                var drives = DriveClean.Others().Where(d => d.DriveType == DriveType.Fixed).Select(d => d.RootDirectory.FullName.Substring(0, 2)).ToList();
+                if (drives.Count == 0 || !SmartReminderDue(Settings.Get("SmartScanAt", ""), Settings.Get("SmartRemindAt", ""), today)) return;
+                Settings.Set("SmartRemindAt", today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
+                Notify("Time for a Smart scan", "Check " + string.Join(", ", drives) + " for duplicate files and files you haven't used for months: Dashboard > pick the drive > Smart scan. Click to open Elixar.", ToolTipIcon.Info, true);
+            }
+            catch (Exception e) { Log("Smart scan reminder: " + e.Message); }
         }
 
         // your other internal drives (D:, E:...) with the same limit; USB drives are left out (they come and go)

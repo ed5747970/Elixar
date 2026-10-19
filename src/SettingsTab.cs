@@ -63,7 +63,7 @@ namespace CDriveCleaner
             var pcButtons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
             var btnInstall = MakeButton(!Win.IsWindows ? "How to install Elixar" : Setup.IsRegistered() ? "Repair the installation" : "Install Elixar on this PC");
             var btnUpdate = MakeButton("Check for updates");
-            pcButtons.Controls.Add(btnInstall); pcButtons.Controls.Add(btnUpdate);
+            pcButtons.Controls.Add(btnInstall); pcButtons.Controls.Add(btnUpdate); pcButtons.Controls.Add(TrayOption());
             var pcInfo = Note(Win.IsWindows ? "Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it."
                                             : "On Linux, Elixar is installed with its .deb package: it goes in /usr/lib/elixar (only root can change it), appears in your apps menu, and \"sudo apt remove elixar\" removes it.");
             pcInfo.Margin = new Padding(S(2), S(6), 0, 0);

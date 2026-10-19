@@ -133,6 +133,7 @@ namespace CDriveCleaner
             nav.Items.Add(item("Tools", pageTools, true, ""));
             nav.Items.Add(item("Phone", pagePhone, !lx, "Only on Windows for now."));
             nav.Items.Add(item("Email", pageEmail, true, ""));
+            if (OneDriveShown) nav.Items.Add(item("OneDrive", pageOneDrive, true, ""));
             nav.Items.Add(item("Automation", pageAuto, true, ""));
             nav.Items.Add(item("Linux", pageLinux, lx, "Only on Linux: this PC runs " + OsInfo.Current.Name + "."));
             nav.Items.Add(new NavBar.Item { Text = "Settings", Page = pageSettings, Right = true, Glyph = "gear" });

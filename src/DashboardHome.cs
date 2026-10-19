@@ -87,7 +87,8 @@ namespace CDriveCleaner
         public bool AutoKnown, AutoClean, AutoAlert; public string AutoDay = "";
         public string MailEmail; public bool MailReports; public int MailLevel;
         public long UndoBytes; public int UndoCount;
-        public long TrashBytes = -1, AptBytes = -1, SnapBytes = -1;   // Linux tiles and the Snap warning
+        public long TrashBytes = -1, AptBytes = -1, SnapBytes = -1, OneDriveFree = -1;
+        public List<Growth.Change> Grew = new List<Growth.Change>();   // what grew this week   // Linux tiles and the Snap warning
         public List<DriveRow> Drives = new List<DriveRow>();
         public List<Activity.Entry> Recent = new List<Activity.Entry>();
         public List<CleanItem> TopSafe = new List<CleanItem>();
@@ -138,6 +139,10 @@ namespace CDriveCleaner
                 else l.Add(Win.IsWindows ? "The safe items are already clean. The Details view shows what else fills C:." : "The safe items are already clean. The Details view shows what else fills the disk.");
                 if (Forecast != null && Forecast.FullOn.HasValue && (Forecast.FullOn.Value - Now).TotalDays < 365)
                     l.Add((Win.IsWindows ? "At this pace C: is full around " : "At this pace your system disk is full around ") + Ui.Month(Forecast.FullOn.Value) + ".");
+                if (Grew.Count > 0 && Grew[0].Bytes >= (1L << 30))
+                    l.Add(Grew[0].Name + " grew " + Fs.Fmt(Grew[0].Bytes) + " this week.");
+                if (OneDriveFree >= (1L << 30))
+                    l.Add("OneDrive: " + Fs.Fmt(OneDriveFree) + " of files you haven't used for 3 months could be online-only (see the OneDrive tab).");
                 if (SnapBytes > 0 && LxSystem.SnapsLarge(SnapBytes, Total))
                     l.Add("Snap apps take " + Fs.Fmt(SnapBytes) + ", more than usual: the Linux tab shows which ones.");
                 return l;
@@ -799,7 +804,7 @@ namespace CDriveCleaner
             switch (k)
             {
                 case 0: ShowDiskHealth(); break;
-                case 1: using (var tf = new TrendForm(s, SpaceHistory.Read())) { tf.Shown += (o2, e2) => { Theme.Apply(tf); Lang.Apply(tf); }; tf.ShowDialog(this); } break;
+                case 1: using (var tf = new TrendForm(s, SpaceHistory.Read(), Win.IsWindows || Growth.OverrideFile != null ? Growth.Grew(DateTime.Today, 7, 100L << 20) : null)) { tf.Shown += (o2, e2) => { Theme.Apply(tf); Lang.Apply(tf); }; tf.ShowDialog(this); } break;
                 case 2: tabs.SelectedTab = pageClean; break;
                 case 3: tabs.SelectedTab = pageAuto; break;
                 case 4: ShowSettings(); break;
@@ -843,6 +848,8 @@ namespace CDriveCleaner
                 var undo = new List<UndoBatch>();
                 try { undo = Quarantine.List(); } catch { }
                 sum.UndoCount = undo.Count; sum.UndoBytes = undo.Sum(b => Math.Max(0, b.Bytes));
+                if (Win.IsWindows || Growth.OverrideFile != null) try { sum.Grew = Growth.Grew(DateTime.Today, 7, 256L << 20); } catch { }
+                if (odAccounts.Count > 0 && !LinuxUi) try { sum.OneDriveFree = OneDrive.QuickFreeable(); } catch { }
                 if (Lx.On)
                 {
                     sum.TrashBytes = Fs.SizeOf(Path.Combine(Path.Combine(Lx.DataHome, "Trash"), "files"));
@@ -949,6 +956,7 @@ namespace CDriveCleaner
         void ShowSummary(DashSummary m)
         {
             dashSum = m;
+            UpdateTray();
             lastOverview = DateTime.Now;
             // the ring and the sentence
             hero.UsedShare = m.Total > 0 ? 1 - m.FreeShare : -1;

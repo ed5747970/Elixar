@@ -1,7 +1,25 @@
-ELIXAR  (version 2.2.1)
+ELIXAR  (version 2.2.2)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2.2
+- OneDrive tab: appears only when OneDrive is signed in on this PC with your
+  account email (Elixar connects to nothing; it reads OneDrive's settings).
+  Lists files you haven't opened for 1-12 months and makes the ones you pick
+  online-only, like OneDrive's own "Free up space": nothing is deleted, they
+  stay in OneDrive and File Explorer. "Always keep on this device" files are
+  left alone. The Dashboard suggests it when 1 GB or more could be freed.
+- Smart scan: similar photos (resized, edited, burst shots), empty folders,
+  and "Compress selected (keep them)" for files you rarely open.
+- Tools > Leftovers: folders of apps you removed (AppData, ProgramData), 3
+  months untouched. Nothing ticked; what you pick goes to Undo for 7 days.
+- Dashboard: what grew this week. Footer: Export report (print to PDF).
+- Settings: minimize Elixar to the icon next to the clock (shows C: free).
+- A monthly reminder to Smart scan your other drives.
+- Security: OneDrive files are checked by OneDrive's own cloud mark; empty
+  folders are removed one at a time only if still empty; hard-linked files
+  are never compressed; huge pictures are skipped; report text is web-safe.
 
 NEW IN 2.2.1
 - Your other drives (D:, E:, USB): pick one on the Dashboard.

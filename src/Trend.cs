@@ -103,7 +103,8 @@ namespace CDriveCleaner
         readonly SpaceHistory.Forecast fc;
         readonly Label lead;
 
-        public TrendForm(float scale, List<SpaceHistory.Point> points)
+        public TrendForm(float scale, List<SpaceHistory.Point> points) : this(scale, points, null) { }
+        public TrendForm(float scale, List<SpaceHistory.Point> points, List<Growth.Change> grew)
         {
             Func<int, int> S = px => (int)Math.Round(px * scale);
             pts = points; fc = SpaceHistory.Predict(points, DateTime.Today);
@@ -116,6 +117,15 @@ namespace CDriveCleaner
             chart.Resize += (o, e) => chart.Invalidate();
             typeof(Panel).GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).SetValue(chart, true, null);
             Controls.Add(chart); Controls.Add(lead);
+            if (grew != null)
+            {
+                // what grew in the last week (places on the Dashboard map), biggest first
+                var lines = grew.Take(5).Select(c => "  \u2022  " + Lang.T(c.Name) + ":  +" + Fs.Fmt(c.Bytes) + "   (" + Lang.T("now") + " " + Fs.Fmt(c.Now) + ")").ToList();
+                var box = new Label { Dock = DockStyle.Bottom, AutoSize = false, Height = S(36) + S(20) * Math.Max(1, lines.Count), Padding = new Padding(S(12), S(8), S(12), S(6)),
+                    Text = Lang.T("What grew in the last 7 days") + "\n" + (lines.Count == 0 ? "  " + Lang.T("Nothing grew by more than 100 MB (or there aren't a week of readings yet).") : string.Join("\n", lines)) };
+                Controls.Add(box);
+                Height += box.Height;
+            }
         }
 
         void Draw(Graphics g, Rectangle r, Func<int, int> S)

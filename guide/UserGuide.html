@@ -44,7 +44,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.1</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a full C: drive &middot; made by Elisar &middot; version 2.2.2</p></div>
 </div></header>
 <main class="wrap">
 
@@ -54,7 +54,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -90,11 +90,13 @@
 <h3>Your other drives (D:, E:, USB)</h3>
 <p>Pick a drive in the switch. Its page shows how full it is, whether it is a <strong>data drive</strong> (no Windows on it) or has its own Windows installation, its biggest folders and largest files, and three buttons:</p>
 <ul>
-  <li><strong>Smart scan:</strong> reads the drive once and finds <strong>duplicate files</strong> (exactly the same content, compared by fingerprint) and big files <strong>not used for 6 months</strong> (or a year, or 2 years). For duplicates you choose which copy stays: the oldest, the newest or the one with the shortest path. Nothing is ticked for you; what you pick goes to the Recycle Bin. Windows, apps, games and AppData are never listed. On C:, Smart scan looks at your own folders.</li>
+  <li><strong>Smart scan:</strong> reads the drive once and finds <strong>duplicate files</strong> (exactly the same content, compared by fingerprint) and big files <strong>not used for 6 months</strong> (or a year, or 2 years). For duplicates you choose which copy stays: the oldest, the newest or the one with the shortest path. Nothing is ticked for you; what you pick goes to the Recycle Bin. Windows, apps, games and AppData are never listed. On C:, Smart scan looks at your own folders. It also lists <strong>empty folders</strong> (removed only if they are still empty, one at a time, so nothing put there since is lost), can <strong>compress</strong> files you keep but rarely open (Windows' own NTFS compression: the files stay where they are and open as usual; not offered for videos, photos, music or archives, which don't get smaller), and, if you tick <strong>Also look for similar photos</strong>, finds photos that look alike but aren't exact copies (resized, edited or burst shots), keeping the biggest of each set.</li>
   <li><strong>Clean D:</strong> opens the Cleaner at that drive's own group: its Recycle Bin, pieces left by a disk check (found.000), and Steam's shader cache and unfinished downloads in game libraries there. Nothing is ticked for you, and the weekly clean never touches other drives.</li>
   <li><strong>Explore:</strong> the folder drill-down for that drive.</li>
 </ul>
 <p>A USB stick has no Recycle Bin: files removed from it are deleted for good, and Elixar warns you first. In Tools &rsaquo; Duplicates, <strong>Add a whole drive&hellip;</strong> searches any drive, or all of them at once (it also finds copies spread across drives). The low-space alert now covers C: and every internal drive.</p>
+<h3>What grew this week, and the report</h3>
+<p>Once a day Elixar writes down the size of each place on the Dashboard map (sizes only, on this PC). After a week the Dashboard says what grew the most, for example &ldquo;Downloads folder grew 4.4 GB this week&rdquo;, and the Space trend window lists it. <strong>Export report</strong> in the footer saves a one-page summary (drives, what fills C:, what can be cleaned, what grew) as a web page; press Ctrl+P and choose &ldquo;Microsoft Print to PDF&rdquo; to keep it as a PDF. It holds sizes and folder names only, never your file names or email address.</p>
 <h3>The tabs</h3>
 <p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> on the right (the gear). A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
 <h3>C: Overview</h3>
@@ -194,6 +196,8 @@
 <p>Moves Downloads, Documents, Pictures, Videos, Music and Desktop to your second drive the way Windows does it (Properties &rsaquo; Location): every file is copied and checked, then Windows is pointed at the new place, then the old copies are deleted. &ldquo;Move back to C:&rdquo; undoes it. Folders kept in sync by OneDrive are left to OneDrive. Steam games on C: are listed by size; Steam moves them itself (Settings &rsaquo; Storage &rsaquo; Move). Buttons open Windows&rsquo; settings for moving Store apps and for saving new files on another drive.</p>
 <h3>Duplicates</h3>
 <p>Finds files with exactly the same content in Documents, Pictures, Videos, Music, Desktop, Downloads or folders you add. Windows, apps and AppData are never searched. Extra copies go to the Recycle Bin and at least one copy of each file is always kept.</p>
+<h3>Leftovers</h3>
+<p>Folders in AppData and ProgramData left behind by apps you removed. A folder is listed only when no installed app, publisher, service, program that starts with Windows or running program matches its name, nothing in it changed for 3 months, and it holds at least 1 MB. Folders of Windows, drivers, browsers, games platforms and security programs are never listed, and neither are folders named with a code instead of a name. These are guesses, so nothing is ticked: look first (double-click opens a folder). What you pick goes to Undo for 7 days, so you can put it back.</p>
 <h3>Undo</h3>
 <p>Caution items, removed drivers and removed startup entries are kept here for 7 days, on your second drive when there is one, so C: space is freed right away. Restore puts them back exactly where they were; after 7 days they are deleted for good.</p>
 
@@ -251,6 +255,10 @@
   <li>Turn it off in Settings. With Gmail and Outlook this signs Elixar out so the permission is taken back; connect again to keep the reports (send only).</li>
 </ul>
 
+<h2 id="onedrive">OneDrive</h2>
+<p>The <strong>OneDrive</strong> tab appears only when OneDrive is signed in on this PC with your account email. Elixar doesn't sign in or connect to anything: it reads OneDrive's own settings on this PC. The Dashboard also suggests it when files you haven't used for 3 months add up to 1 GB or more.</p>
+<p>It lists files of 1 MB and up that are on this PC and that you haven't opened for 1, 3, 6 or 12 months. <strong>Make selected online-only</strong> does the same as OneDrive's own &ldquo;Free up space&rdquo;: the files stay in OneDrive and in File Explorer, but take no space here until you open one (OneDrive then downloads it, which needs internet). Nothing is deleted. Files marked &ldquo;Always keep on this device&rdquo; are left alone, nothing is ticked for you, and reading the folder never downloads anything. Elixar changes only real OneDrive files inside your OneDrive folder (each must carry OneDrive's own cloud mark), so even a changed OneDrive setting can't point it at other files.</p>
+
 <h2 id="security">Security</h2>
 <p>Elixar runs as administrator, so since 1.7 it guards against a virus with normal rights tricking it into doing admin work.</p>
 <table>
@@ -272,6 +280,16 @@
   <tr><td>A link leads diskpart to a different disk image; a Steam file points a game outside its library</td><td>Both are refused</td></tr>
   <tr><td>An email server that never stops answering; a stalled connection during sign-in</td><td>Replies are capped at 64 MB; sign-in ignores the bad connection and waits for the real one</td></tr>
   <tr><td>Your email address in the log every account on this PC can read; a USB drive name with hidden text-direction tricks</td><td>Addresses are shortened (e***@gmail.com); drive names are shown as plain text</td></tr>
+</table>
+<h3>What 2.2.2 added</h3>
+<table>
+  <tr><th>Risk</th><th>Protection</th></tr>
+  <tr><td>OneDrive's folder setting can be changed by any program, to point at other files</td><td>Only files carrying OneDrive's own cloud mark, inside that folder, and not &ldquo;Always keep&rdquo;, are changed; links to other folders are never followed</td></tr>
+  <tr><td>A file is saved into an &ldquo;empty&rdquo; folder just before it is removed</td><td>Each folder is removed on its own with Windows' &ldquo;remove empty folder&rdquo;, which fails if anything is inside; a folder holding a link is left alone</td></tr>
+  <tr><td>A file to compress is a second name (hard link) of a Windows file</td><td>Files with more than one name, links and protected folders are never compressed</td></tr>
+  <tr><td>A small picture file that unpacks into gigabytes (similar photos)</td><td>Pictures over 80 MB or 100 million pixels are skipped</td></tr>
+  <tr><td>A removed app's folder is still used by something</td><td>Installed apps, publishers, services, startup programs and running programs all count; code-named and platform folders are never listed; 3 months quiet; Undo for 7 days</td></tr>
+  <tr><td>A folder name in the report could change the page</td><td>Every name and value in the report is made web-safe</td></tr>
 </table>
 <h3>What 2.2 added</h3>
 <p>All of these are ways a program running with normal rights could have used Elixar's administrator rights. They are closed now.</p>
@@ -305,7 +323,7 @@
 <table>
   <tr><th>Where</th><th>What</th></tr>
   <tr><td>Elixar folder</td><td>Elixar.exe, &ldquo;Run self-test (safe).bat&rdquo;, README.txt, UserGuide.html, SHA256.txt, source code, selftest-report.txt</td></tr>
-  <tr><td>C:\ProgramData\Elixar</td><td>cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt</td></tr>
+  <tr><td>C:\ProgramData\Elixar</td><td>cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt, growth.txt (daily sizes of the Dashboard places, 90 days)</td></tr>
   <tr><td>C:\Program Files\Elixar</td><td>The protected copy used by the schedules, and the Android tools</td></tr>
   <tr><td>X:\Elixar Undo (second drive) or C:\ProgramData\Elixar Undo</td><td>Undo backups, kept 7 days, locked to admins</td></tr>
   <tr><td>Phone backup (second drive or Pictures)</td><td>Files copied or moved from your phone</td></tr>
@@ -326,6 +344,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-19</td><td>2.2.2</td><td>OneDrive tab (only when OneDrive is signed in): make files you don't use online-only; Smart scan finds similar photos and empty folders and can compress rarely used files; Leftovers of removed apps (Tools); what grew this week; Export report (print to PDF); icon next to the clock; a monthly Smart scan reminder for other drives; 6 security protections (see Security)</td></tr>
   <tr><td>2026-10-19</td><td>2.2.1</td><td>Your other drives: Smart scan (duplicates with your choice of which copy stays, big files not used for 6+ months), Clean D: (Recycle Bin, disk-check leftovers, Steam caches), duplicates on any or all drives, low-space alerts for every internal drive; data drives and drives with their own Windows are told apart</td></tr>
   <tr><td>2026-10-18</td><td>2.2.0</td><td>&ldquo;Disk 0 of your PC&rdquo; on the Dashboard and on every drive card; tabs with Settings on the right (other-system tabs greyed); 11 Windows security fixes (see Security)</td></tr>
   <tr><td>2026-10-18</td><td>2.1.0</td><td>New Dashboard: a ring for how full C: is, &ldquo;Free &hellip; safely&rdquo;, six status tiles, quick wins, other drives and recent activity; a drive switcher (C:, any other drive, All drives); Overview and Details; 14 security, privacy and stability fixes (see Security)</td></tr>

@@ -48,10 +48,11 @@ namespace CDriveCleaner
             pageMove = new TabPage("Move off C:") { BackColor = pageTools.BackColor };
             pageDups = new TabPage("Duplicates") { BackColor = pageTools.BackColor };
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
+            pageLeft = new TabPage("Leftovers") { BackColor = pageTools.BackColor };
             if (LinuxUi) toolsTabs.TabPages.Add(pageDups);   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageUndo });
+            else toolsTabs.TabPages.AddRange(new[] { pageDisk, pageDrivers, pageStartup, pageSys, pageMove, pageDups, pageLeft, pageUndo });
             pageTools.Controls.Add(toolsTabs);
-            BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildUndo();
+            BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();
         }
 

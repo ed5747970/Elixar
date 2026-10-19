@@ -11,6 +11,17 @@ The full user guide is in `guide/UserGuide.html` (also built into the app: press
 On any Windows 10/11 PC: `powershell -ExecutionPolicy Bypass -File build.ps1 -SelfTest`
 (uses the C# compiler that comes with Windows; the result is `out\Elixar.exe`).
 
+## Release checklist (in this order)
+
+1. **Put the code on GitHub** (a new repository, then push this folder). From then on every push is built and
+   self-tested on a real Windows machine; the report is attached to each run under *Actions*.
+2. **Signed updates**: run `tools\new-signing-key.ps1`, commit `update-key.pub.xml`, add the `ELIXAR_SIGNING_KEY` secret.
+3. **One-click email sign-in**: add `ELIXAR_GOOGLE_ID` / `ELIXAR_GOOGLE_SECRET` and `ELIXAR_MS_ID` (see below).
+4. **No blue SmartScreen box**: buy a code-signing certificate and add `CODESIGN_PFX` / `CODESIGN_PASSWORD`.
+   (An OV certificate from a public CA; Microsoft's Trusted Signing service also works with the signing step.)
+5. **Release**: change `AssemblyVersion` in `src/CDriveCleaner.cs`, then push a tag like `v2.2.2`.
+   The release workflow builds, tests, signs, packages and publishes; Elixar's *Check for updates* finds it.
+
 ## Automatic testing and releases (GitHub Actions)
 
 - **Every push** builds Elixar on a real Windows machine and runs the full self-test as administrator
