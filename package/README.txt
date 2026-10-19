@@ -1,9 +1,14 @@
-ELIXAR  (version 2.2.7)
+ELIXAR  (version 1.2.27)
 The cure for a full C: drive
 Made by Elisar
 =======================
 
-NEW IN 2.2.7
+NEW IN 1.2.27
+- New version numbers: 1.2.27 is the release after 2.2.7. Elixar knows it is
+  newer than every earlier version.
+- Start the new version once: if an older Elixar is installed on this PC, it
+  offers to update that copy in place. Nothing is uninstalled, so your
+  settings, schedules and email sign-in stay as they are.
 - Every question and message appears in Elixar's own look instead of the
   grey Windows box: light or dark, right to left in Hebrew, lists in a card
   with sizes on the right, a red button when something is deleted, and the

@@ -1385,6 +1385,14 @@ namespace CDriveCleaner
                         }
                         finally { Theme.Dark = wasDark; }
                     }
+                    // ---- version numbers started again at 1.2.27 ----
+                    {
+                        Func<string, Version> V = x => new Version(x);
+                        check(Updates.IsNewer(V("1.2.27.1"), V("2.2.7.0")) && Updates.IsNewer(V("1.2.27.1"), V("1.9.1.0")) && Updates.IsNewer(V("1.2.28"), V("1.2.27.1")) &&
+                              !Updates.IsNewer(V("1.2.27"), V("1.2.27.1")) && !Updates.IsNewer(V("2.2.7.0"), V("1.2.27.1")) && Updates.IsNewer(V("1.3.0.1"), V("1.2.27.1")) &&
+                              Updates.Current.Revision == 1,
+                              "Version 1.2.27: counts as newer than every 2.x and older 1.x copy (so an older installed copy never takes over), and later 1.x releases count as newer still");
+                    }
                     // ---- Elixar's own pop-up ----
                     {
                         NiceBox seen = null; string defText = "", cancelText = "";

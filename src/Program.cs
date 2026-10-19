@@ -114,7 +114,7 @@ namespace CDriveCleaner
                     try
                     {
                         if (Install.IsInstalled && !Install.RunningInstalled && Locked.IsLocked(Install.Exe) &&
-                            new Version(FileVersionInfo.GetVersionInfo(Install.Exe).FileVersion) >= new Version(FileVersionInfo.GetVersionInfo(self).FileVersion))
+                            Updates.Compare(new Version(FileVersionInfo.GetVersionInfo(Install.Exe).FileVersion), new Version(FileVersionInfo.GetVersionInfo(self).FileVersion)) >= 0)
                             self = Install.Exe;
                     }
                     catch { }
@@ -162,8 +162,31 @@ namespace CDriveCleaner
             Application.ThreadException += (o, e) => ShowCrash(e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (o, e) => ShowCrash(e.ExceptionObject as Exception);
 
+            if (!testUi) OfferInstalledUpdate();
             Application.Run(new MainForm(testUi));
             return 0;
+        }
+
+        // An older Elixar is installed on this PC (in Program Files, used by the Start menu and the schedules) and this newer
+        // download was started: offer to update that copy in place. Nothing is uninstalled, so your settings, schedules and
+        // email sign-in stay as they are; the schedules simply run the new version from now on.
+        static void OfferInstalledUpdate()
+        {
+            try
+            {
+                if (!Win.IsWindows || !Sys.IsAdmin() || !Install.IsInstalled || Install.RunningInstalled || Install.Matches) return;
+                var installed = new Version(FileVersionInfo.GetVersionInfo(Install.Exe).FileVersion);
+                if (!Updates.IsNewer(Updates.Current, installed)) return;
+                string was = installed.ToString(3), now = Updates.Current.ToString(3);
+                if (Lang.Box(null, Lang.T("Update the installed Elixar to " + now + "?") + "\n\n" +
+                        Lang.T("Elixar " + was + " is installed on this PC (Start menu and schedules). This version replaces it in place: your settings, schedules and email sign-in stay as they are.") ,
+                        "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+                string err = Install.Ensure();
+                if (err == null) { try { Automation.UpgradeElevatedTasks(); } catch { } try { Automation.Log("Updated the installed Elixar from " + was + " to " + now + "."); } catch { } }
+                Lang.Box(null, Lang.T(err == null ? "Done: the installed Elixar is now " + now + "." : "The installed Elixar could not be updated: " + err), "Elixar",
+                         MessageBoxButtons.OK, err == null ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            }
+            catch { }
         }
 
         static void ShowCrash(Exception ex)

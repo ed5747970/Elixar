@@ -365,7 +365,7 @@ namespace CDriveCleaner
                 Settings.Set("LastUpdateCheck", DateTime.Now.ToString("s", System.Globalization.CultureInfo.InvariantCulture));
                 var r = t.IsFaulted ? null : t.Result.Item1;
                 string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result.Item2;
-                bool newer = r != null && r.Version != null && r.Version > Updates.Current;
+                bool newer = r != null && r.Version != null && Updates.IsNewer(r.Version, Updates.Current);
                 lnkUpdate.Visible = newer;
                 if (newer) { lnkUpdate.Text = Lang.T("Update available") + ": " + r.Version.ToString(3); Log("Elixar " + r.Version.ToString(3) + " is available."); }
                 if (!interactive) return;

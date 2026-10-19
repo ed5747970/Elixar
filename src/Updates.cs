@@ -48,6 +48,18 @@ namespace CDriveCleaner
 
         public static Version Current { get { return typeof(Updates).Assembly.GetName().Version; } }
 
+        // Version numbers started again at 1.2.27 (the release after 2.2.7). Builds from before carry a 0 as the last part
+        // of their version (2.2.7.0, 1.9.1.0); the new numbering carries 1 (1.2.27.1), and release tags have no last part
+        // (v1.2.28). So any new-numbering version counts as newer than any old one, whatever the digits.
+        static int Era(Version v) { return v.Revision == 0 ? 0 : 1; }
+        public static int Compare(Version a, Version b)
+        {
+            if (a == null || b == null) return a == null ? (b == null ? 0 : -1) : 1;
+            if (Era(a) != Era(b)) return Era(a).CompareTo(Era(b));
+            return new Version(a.Major, a.Minor, Math.Max(0, a.Build)).CompareTo(new Version(b.Major, b.Minor, Math.Max(0, b.Build)));
+        }
+        public static bool IsNewer(Version a, Version than) { return Compare(a, than) > 0; }
+
         public class Release { public Version Version; public string Tag = "", ZipUrl = "", ManifestUrl = "", SigUrl = "", Page = "", Notes = ""; }
         public class Manifest { public Version Version; public string ZipSha256 = "", ExeSha256 = ""; }
 
@@ -181,7 +193,7 @@ namespace CDriveCleaner
                 try { sigBytes = Convert.FromBase64String(Encoding.ASCII.GetString(sig).Trim()); } catch { sigBytes = sig; }
                 if (!VerifySignature(manifest, sigBytes, PublicKey)) { error = "The update is not signed by Elisar's key, so Elixar did not install it."; return null; }
                 var m = ParseManifest(Encoding.UTF8.GetString(manifest));
-                if (m.Version == null || m.Version <= Current) { error = "No newer version."; return null; }
+                if (m.Version == null || !IsNewer(m.Version, Current)) { error = "No newer version."; return null; }
                 if (log != null) log("Downloading Elixar " + m.Version + "...");
                 string zip = Path.Combine(dir, "Elixar.zip");
                 using (var fs = new FileStream(zip, FileMode.CreateNew, FileAccess.Write)) Download(r.ZipUrl, fs, MaxZip);
