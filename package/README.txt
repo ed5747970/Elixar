@@ -1,7 +1,11 @@
-ELIXAR  (version 2.2.5)
+ELIXAR  (version 2.2.6)
 The cure for a full C: drive
 Made by Elisar
 =======================
+
+NEW IN 2.2.6
+- Dark theme: no light lines left around lists, at the end of list headers
+  or under group titles (like "3 similar photos").
 
 NEW IN 2.2.5
 - Dashboard: the Auto-delete tile has an on/off switch. On: every day old

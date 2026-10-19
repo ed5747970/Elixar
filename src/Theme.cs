@@ -80,6 +80,7 @@ namespace CDriveCleaner
             return Color.FromArgb(a.A, (int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t));
         }
         static Color HeaderBack { get { return Color.FromArgb(48, 48, 58); } }
+        static Color GroupInk { get { return Color.FromArgb(150, 150, 170); } }   // a list's own colour in the dark theme: group titles and their line
         static Color DisabledBack { get { return Color.FromArgb(40, 40, 48); } }
 
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
@@ -106,8 +107,9 @@ namespace CDriveCleaner
             if (c is ListView)
             {
                 var lv = (ListView)c;
-                lv.BackColor = Panel; lv.ForeColor = Ink;
-                if (lv.BorderStyle == BorderStyle.Fixed3D) lv.BorderStyle = BorderStyle.FixedSingle;
+                // no light border; group titles and their line in a soft grey (items keep their own bright colour)
+                lv.BackColor = Panel; lv.ForeColor = GroupInk;
+                lv.BorderStyle = BorderStyle.None;
                 if (Win.IsWindows) try { SetWindowTheme(lv.Handle, "DarkMode_Explorer", null); } catch { }
                 DarkHeaders(lv);
                 FixItems(lv);
@@ -203,16 +205,25 @@ namespace CDriveCleaner
             if (!painted.Add(lv) || lv.View != View.Details) return;
             if (Win.IsWindows)
                 try { IntPtr h = SendMessage(lv.Handle, 0x101F /* LVM_GETHEADER */, IntPtr.Zero, IntPtr.Zero); if (h != IntPtr.Zero) SetWindowTheme(h, "DarkMode_ItemsView", null); } catch { }
+            if (Win.IsWindows) try { new GroupPainter(lv); } catch { }
             lv.OwnerDraw = true;
             lv.DrawItem += (o, e) =>
             {
                 // items added after the theme was applied: their colours are made readable on the dark background here
                 var it = e.Item;
-                var f = MapFore(it.ForeColor == Color.Empty ? Ink : it.ForeColor); if (it.ForeColor != f) it.ForeColor = f;
+                var cur = it.ForeColor;
+                var f = cur == Color.Empty || cur == GroupInk ? Ink : MapFore(cur);   // inherited from the list: full text colour
+                if (cur != f) it.ForeColor = f;
                 foreach (ListViewItem.ListViewSubItem si in it.SubItems) { var sf = MapFore(si.ForeColor); if (si.ForeColor != sf) si.ForeColor = sf; }
                 e.DrawDefault = true;
             };
             lv.DrawSubItem += (o, e) => e.DrawDefault = true;
+            EventHandler fill = (o, e) =>
+            {
+                try { if (lv.Columns.Count > 0 && lv.View == View.Details) { var last = lv.Columns[lv.Columns.Count - 1]; int used = 0; for (int i = 0; i < lv.Columns.Count - 1; i++) used += lv.Columns[i].Width; int want = lv.ClientSize.Width - used; if (want > 40 && last.Width != want) last.Width = want; } } catch { }
+            };
+            lv.Resize += fill; lv.HandleCreated += fill;
+            fill(lv, EventArgs.Empty);
             lv.DrawColumnHeader += (o, e) =>
             {
                 using (var b = new SolidBrush(HeaderBack)) e.Graphics.FillRectangle(b, e.Bounds);
@@ -225,6 +236,72 @@ namespace CDriveCleaner
                 var align = e.Header.TextAlign == HorizontalAlignment.Right ? TextFormatFlags.Right : e.Header.TextAlign == HorizontalAlignment.Center ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left;
                 TextRenderer.DrawText(e.Graphics, e.Header.Text, lv.Font, r, Ink, align | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             };
+        }
+
+        // Windows draws a list's group titles ("3 similar photos") with a bright line under them, whatever the theme.
+        // In the dark theme Elixar draws them itself: the title in the accent colour and a soft grey line. If anything
+        // about the message isn't as expected, Windows draws them as usual.
+        class GroupPainter : NativeWindow
+        {
+            [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+            [StructLayout(LayoutKind.Sequential)] struct NMHDR { public IntPtr hwndFrom; public IntPtr idFrom; public int code; }
+            [StructLayout(LayoutKind.Sequential)]
+            struct NMLVCUSTOMDRAW
+            {
+                public NMHDR hdr; public int dwDrawStage; public IntPtr hdc; public RECT rc; public IntPtr dwItemSpec; public int uItemState; public IntPtr lItemlParam;
+                public int clrText, clrTextBk, iSubItem, dwItemType, clrFace, iIconEffect, iIconPhase, iPartId, iStateId; public RECT rcText; public int uAlign;
+            }
+            static readonly PropertyInfo GroupId = typeof(ListViewGroup).GetProperty("ID", BindingFlags.NonPublic | BindingFlags.Instance);
+            readonly ListView lv;
+
+            public GroupPainter(ListView lv)
+            {
+                this.lv = lv;
+                if (GroupId == null) return;
+                if (lv.IsHandleCreated) AssignHandle(lv.Handle);
+                lv.HandleCreated += (o, e) => { try { AssignHandle(lv.Handle); } catch { } };
+                lv.HandleDestroyed += (o, e) => { try { ReleaseHandle(); } catch { } };
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == 0x204E /* the list's own WM_NOTIFY, reflected */ && Dark && lv.ShowGroups)
+                {
+                    try
+                    {
+                        var h = (NMHDR)Marshal.PtrToStructure(m.LParam, typeof(NMHDR));
+                        if (h.code == -12 /* NM_CUSTOMDRAW */)
+                        {
+                            var cd = (NMLVCUSTOMDRAW)Marshal.PtrToStructure(m.LParam, typeof(NMLVCUSTOMDRAW));
+                            if (cd.dwItemType == 1 /* a group */ && (cd.dwDrawStage == 0x1 || cd.dwDrawStage == 0x10001) && cd.hdc != IntPtr.Zero)
+                            {
+                                int id = cd.dwItemSpec.ToInt32();
+                                ListViewGroup g = null;
+                                foreach (ListViewGroup x in lv.Groups) if ((int)GroupId.GetValue(x, null) == id) { g = x; break; }
+                                if (g != null)
+                                {
+                                    var r = Rectangle.FromLTRB(cd.rc.Left, cd.rc.Top, cd.rc.Right, cd.rc.Bottom);
+                                    using (var gr = Graphics.FromHdc(cd.hdc))
+                                    {
+                                        using (var b = new SolidBrush(Panel)) gr.FillRectangle(b, r);
+                                        var font = new Font(lv.Font, FontStyle.Bold);
+                                        var size = TextRenderer.MeasureText(gr, g.Header, font);
+                                        var tr = new Rectangle(r.Left + 6, r.Top + (r.Height - size.Height) / 2, size.Width, size.Height);
+                                        TextRenderer.DrawText(gr, g.Header, font, tr, Accent, TextFormatFlags.NoPrefix | TextFormatFlags.Left);
+                                        int y = r.Top + r.Height / 2;
+                                        using (var p = new Pen(Grid)) gr.DrawLine(p, tr.Right + 8, y, r.Right - 6, y);
+                                        font.Dispose();
+                                    }
+                                    m.Result = new IntPtr(4);   // CDRF_SKIPDEFAULT: drawn
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                base.WndProc(ref m);
+            }
         }
 
         static void DarkDisabled(Button b)
@@ -248,7 +325,7 @@ namespace CDriveCleaner
             if (!Dark) return;
             foreach (ListViewItem it in lv.Items)
             {
-                it.ForeColor = MapFore(it.ForeColor == Color.Empty ? Ink : it.ForeColor);
+                it.ForeColor = it.ForeColor == Color.Empty || it.ForeColor == GroupInk ? Ink : MapFore(it.ForeColor);
                 if (it.BackColor != Color.Empty) it.BackColor = MapBack(it.BackColor);
                 foreach (ListViewItem.ListViewSubItem s in it.SubItems) s.ForeColor = MapFore(s.ForeColor);
             }
