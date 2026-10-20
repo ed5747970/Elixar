@@ -8,6 +8,12 @@ NEW IN 1.2.31
   month, what to do, and how often to look at them (every week, 2 weeks or
   month). "I checked it" keeps a folder quiet until its next look is due.
   The weekly email and the report list them too. Sizes only, never names.
+- Windows' update leftovers ($GetCurrent, $WinREAgent) are now ticked by
+  themselves when no update or upgrade is running and nothing waits for a
+  restart, and the weekly clean removes them too (to Undo first). Their
+  protected parts are moved with Windows' backup rights (no permissions are
+  changed), and anything that can't be removed is reported instead of
+  being skipped silently. Windows.old says plainly if Windows kept it.
 - New slogan: "The cure for a cluttered PC".
 - Dashboard header tidied: drives and tools on one line, the status line
   never wraps, Overview | Details next to it. The Auto-delete switch no

@@ -308,11 +308,15 @@ namespace CDriveCleaner
             catch (Exception e) { Log("Disk health check failed: " + e.Message); }
         }
 
+        public static readonly string[] AutoLeftovers = { "Windows upgrade media ($GetCurrent)", "Recovery update leftovers ($WinREAgent)" };
+
         public static List<CleanItem> AutoItems()
         {
-            // only the Safe items that are ticked by default; never Caution, Review, DISM or browser caches
+            // only the Safe items that are ticked by default; never Review, DISM or browser caches. Of the Caution items only
+            // Windows' own update leftovers ($GetCurrent, $WinREAgent), and only when they are ticked: no update or upgrade is
+            // running and nothing waits for a restart. They go to Undo first.
             // (Linux: only what runs as you; the system parts need your password, so they're never done unattended)
-            return Catalog.Build().Where(i => i.Tier == Tier.Safe && i.DefaultOn && i.RootScript == null).ToList();
+            return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name))).ToList();
         }
 
         public static int AutoClean(bool notify)

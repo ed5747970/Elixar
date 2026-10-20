@@ -154,17 +154,18 @@ namespace CDriveCleaner
                     Measure = () => Fs.MeasureIn(recycle),
                     Clean = log => Sys.EmptyRecycleBin() },
 
+                // ticked by themselves when no update or upgrade is running and nothing waits for a restart
                 new CleanItem {
-                    Name = "Windows upgrade media ($GetCurrent)", Tier = Tier.Caution, DefaultOn = false, Where = getCurrent,
-                    Info = "Setup files left from a past Windows upgrade. Delete only if no Windows version upgrade is in progress right now. Moved to Undo for 7 days first.",
-                    Measure = () => Fs.SizeOf(getCurrent),
-                    Clean = log => Quarantine.MoveToUndo("Windows upgrade media ($GetCurrent)", new[] { getCurrent }, log) },
+                    Name = "Windows upgrade media ($GetCurrent)", Tier = Tier.Caution, DefaultOn = WinLeftovers.NotNow(getCurrent) == null, Where = getCurrent,
+                    Info = "Setup files left from a past Windows upgrade. Removed only when no update or upgrade is running and nothing waits for a restart. Moved to Undo for 7 days first.",
+                    Measure = () => WinLeftovers.MeasureProtected(getCurrent),
+                    Clean = log => WinLeftovers.Remove("Windows upgrade media ($GetCurrent)", getCurrent, log) },
 
                 new CleanItem {
-                    Name = "Recovery update leftovers ($WinREAgent)", Tier = Tier.Caution, DefaultOn = false, Where = winReAgent,
-                    Info = "Leftovers from updating the Windows recovery environment. Delete after updates have finished and you have restarted. Moved to Undo for 7 days first.",
-                    Measure = () => Fs.SizeOf(winReAgent),
-                    Clean = log => Quarantine.MoveToUndo("Recovery update leftovers ($WinREAgent)", new[] { winReAgent }, log) },
+                    Name = "Recovery update leftovers ($WinREAgent)", Tier = Tier.Caution, DefaultOn = WinLeftovers.NotNow(winReAgent) == null, Where = winReAgent,
+                    Info = "Leftovers from updating the Windows recovery environment. Removed only when no update is running and nothing waits for a restart. Moved to Undo for 7 days first.",
+                    Measure = () => WinLeftovers.MeasureProtected(winReAgent),
+                    Clean = log => WinLeftovers.Remove("Recovery update leftovers ($WinREAgent)", winReAgent, log) },
 
                 new CleanItem {
                     Name = "Adobe Reader old updates", Tier = Tier.Caution, DefaultOn = false, Where = adobeArm + @"\Reader_*  and  Acrobat_*",

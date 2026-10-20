@@ -22,7 +22,12 @@ namespace CDriveCleaner
         public const int Slot = 4242;   // cleanmgr /sagerun:4242 uses only what Elixar ticks here
         public static string FlagName { get { return "StateFlags" + Slot.ToString("0000", CultureInfo.InvariantCulture); } }
 
-        public static long Size() { return Folders.Sum(f => Fs.SizeOf(f)); }
+        public static long Size()
+        {
+            long n = 0; bool unknown = false;
+            foreach (var f in Folders) { long m = WinLeftovers.Measure(f); if (m < 0) unknown = true; else n += m; }
+            return n == 0 && unknown ? -1 : n;
+        }
 
         public static void Clean(Action<string> log)
         {
@@ -36,6 +41,11 @@ namespace CDriveCleaner
                             if (k != null) { k.SetValue(FlagName, 2, RegistryValueKind.DWord); set.Add(h); }
                 if (log != null) log("  Windows Disk Cleanup is removing the previous Windows installation (" + string.Join(", ", set) + "). This can take 10-30 minutes...");
                 string o = Sys.Run("cleanmgr.exe", "/sagerun:" + Slot, 2 * 60 * 60 * 1000);
+                var left = Folders.Where(Directory.Exists).ToList();
+                if (log != null)
+                    log(left.Count == 0 ? "  The previous Windows installation is removed."
+                                        : "  Still there: " + string.Join(", ", left) + ". Windows keeps it while it can still go back, or while an upgrade runs. " +
+                                          "Remove it in Settings > System > Storage > Temporary files > Previous Windows installation(s), or restart and clean again.");
             }
             finally
             {
@@ -48,6 +58,122 @@ namespace CDriveCleaner
                                 if (k != null) k.DeleteValue(FlagName, false);
                 }
                 catch { }
+            }
+        }
+    }
+
+    // ============================ leftovers of Windows updates and upgrades ($GetCurrent, $WinREAgent) ============================
+    // Windows makes these and doesn't always remove them. They are safe to delete once no update or upgrade is running and
+    // nothing waits for a restart. Some of their folders are protected (only Windows may open them), so they are moved
+    // with Windows' backup rights switched on for just that time (see BackupRights), never by changing permissions.
+    public static class WinLeftovers
+    {
+        public static string GetCurrent { get { return SysRoot + "$GetCurrent"; } }
+        public static string WinREAgent { get { return SysRoot + "$WinREAgent"; } }
+        static string SysRoot { get { try { string w = Environment.GetFolderPath(Environment.SpecialFolder.Windows); return string.IsNullOrEmpty(w) ? @"C:\" : Path.GetPathRoot(w); } catch { return @"C:\"; } } }
+        public static bool Allowed(string path)
+        {
+            string p; try { p = Path.GetFullPath(path).TrimEnd('\\'); } catch { return false; }
+            return new[] { GetCurrent, WinREAgent }.Concat(WindowsOld.Folders).Any(x => string.Equals(x.TrimEnd('\\'), p, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // pure: whether it is safe to remove them now, and why not
+        public static string NotNowReason(bool restartPending, bool setupRunning, DateTime lastChange, DateTime now)
+        {
+            if (setupRunning) return "A Windows update or upgrade is running right now.";
+            if (restartPending) return "Windows is waiting for a restart to finish an update.";
+            if ((now - lastChange).TotalHours < 24) return "Windows changed it in the last day: an update may still be using it.";
+            return null;
+        }
+
+        public static string NotNow(string path)
+        {
+            if (!Win.IsWindows) return null;
+            bool restart = false, setup = false;
+            try
+            {
+                using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                using (var a = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
+                using (var b = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
+                    restart = a != null || b != null;
+            }
+            catch { }
+            try { setup = Process.GetProcesses().Any(p => { try { var n = p.ProcessName.ToLowerInvariant(); return n == "setuphost" || n == "setupprep" || n == "windows10upgraderapp" || n == "windowsupdatebox" || n == "mediacreationtool"; } catch { return false; } }); } catch { }
+            DateTime changed = DateTime.MinValue;
+            try { if (Directory.Exists(path)) changed = Directory.GetLastWriteTime(path); } catch { }
+            return NotNowReason(restart, setup, changed, DateTime.Now);
+        }
+
+        // a size even when part of it can't be read: -1 (shown as "size known after it runs") instead of a wrong 0
+        public static long Measure(string path)
+        {
+            if (!Directory.Exists(path)) return 0;
+            long n = Fs.SizeOf(path);
+            if (n > 0) return n;
+            try { return Directory.EnumerateFileSystemEntries(path).Any() ? n : 0; } catch { return -1; }
+        }
+
+        // counted with the backup rights on, so the protected parts are counted too
+        public static long MeasureProtected(string path)
+        {
+            if (!Directory.Exists(path)) return 0;
+            long n = 0; BackupRights.With(() => n = Measure(path), null); return n;
+        }
+
+        public static void Remove(string label, string path, Action<string> log)
+        {
+            if (!Directory.Exists(path)) return;
+            string why = NotNow(path);
+            if (why != null) { if (log != null) log("  Skipped " + path + ": " + why + " Clean it again later."); return; }
+            if (string.Equals(path, WinREAgent, StringComparison.OrdinalIgnoreCase))
+            {
+                // a recovery image left mounted inside it keeps its files locked: Microsoft's tool releases it
+                try { Sys.Run("dism.exe", "/Cleanup-Mountpoints", 10 * 60 * 1000); } catch { }
+            }
+            // with Windows' backup rights, so its protected parts can be moved too (permissions stay as they are)
+            BackupRights.With(() => Quarantine.MoveToUndo(label, new[] { path }, log), log);
+            if (Left(path) && log != null) log("  Still there: part of " + path + " couldn't be removed (in use or protected by Windows). Restart the PC and clean it again.");
+        }
+
+        static bool Left(string path) { try { return Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any(); } catch { return Directory.Exists(path); } }
+    }
+
+    // Administrators hold Windows' backup and restore rights, switched off by default. Switched on, they let Elixar open
+    // files that only Windows may open, for reading and moving, without changing anyone's permissions. Elixar switches
+    // them on only while it removes Windows' own leftovers, and off again right after. Its file moves work by handle and
+    // never follow links, so the rights reach nothing outside those folders.
+    public static class BackupRights
+    {
+        [StructLayout(LayoutKind.Sequential)] struct Luid { public uint Low; public int High; }
+        [StructLayout(LayoutKind.Sequential)] struct TokenPriv { public int Count; public Luid Luid; public int Attr; }
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr process, int access, out IntPtr token);
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool LookupPrivilegeValue(string system, string name, out Luid luid);
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TokenPriv state, int len, IntPtr prev, IntPtr retLen);
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+        static readonly object gate = new object();
+
+        static bool Set(string name, bool on)
+        {
+            IntPtr tok;
+            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x28 /* adjust + query */, out tok)) return false;
+            try
+            {
+                Luid l; if (!LookupPrivilegeValue(null, name, out l)) return false;
+                var tp = new TokenPriv { Count = 1, Luid = l, Attr = on ? 2 : 0 };
+                return AdjustTokenPrivileges(tok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero) && Marshal.GetLastWin32Error() == 0;
+            }
+            finally { CloseHandle(tok); }
+        }
+
+        public static void With(Action work, Action<string> log)
+        {
+            if (!Win.IsWindows) { work(); return; }
+            lock (gate)
+            {
+                bool b = Set("SeBackupPrivilege", true), r = Set("SeRestorePrivilege", true);
+                if (!(b && r) && log != null) log("  Windows' backup rights aren't available (Elixar isn't running as administrator?): protected files stay.");
+                try { work(); }
+                finally { Set("SeBackupPrivilege", false); Set("SeRestorePrivilege", false); }
             }
         }
     }

@@ -64,7 +64,7 @@ namespace CDriveCleaner
             string full = Path.GetFullPath(path);
             if (!Win.IsWindows) return new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (!SafeDelete.NoLinks(Path.GetDirectoryName(full))) throw InTheWay(full);
-            var h = CreateFileW(SafeDelete.Long(full), GENERIC_READ, SHARE_READ, IntPtr.Zero, OPEN_EXISTING, FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
+            var h = CreateFileW(SafeDelete.Long(full), GENERIC_READ, SHARE_READ, IntPtr.Zero, OPEN_EXISTING, FLAG_BACKUP_SEMANTICS | FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
             if (h.IsInvalid) throw new IOException("could not open " + full + " (error " + Marshal.GetLastWin32Error() + ")");
             uint a = Attributes(h);
             if (a == uint.MaxValue || (a & (ATTR_DIRECTORY | ATTR_REPARSE)) != 0 || !SafeDelete.Same(SafeDelete.Final(h), SafeDelete.LongName(full))) { h.Dispose(); throw InTheWay(full); }
@@ -116,7 +116,8 @@ namespace CDriveCleaner
             if (name.IndexOfAny(new[] { '\\', '/', ':' }) >= 0 || name == "." || name == "..") throw new ArgumentException("bad file name: " + name);
             if (!Win.IsWindows) { File.Move(full, Path.Combine(dir, name)); return true; }
             if (!SafeDelete.NoLinks(Path.GetDirectoryName(full)) || !SafeDelete.NoLinks(dir)) throw InTheWay(full);
-            using (var h = CreateFileW(SafeDelete.Long(full), DELETE | FILE_READ_ATTRIBUTES | SYNCHRONIZE, SHARE_READ | SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FLAG_OPEN_REPARSE_POINT, IntPtr.Zero))
+            // backup semantics: only matters while Windows' backup rights are switched on (BackupRights), otherwise the normal checks apply
+            using (var h = CreateFileW(SafeDelete.Long(full), DELETE | FILE_READ_ATTRIBUTES | SYNCHRONIZE, SHARE_READ | SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FLAG_BACKUP_SEMANTICS | FLAG_OPEN_REPARSE_POINT, IntPtr.Zero))
             using (var dh = CreateFileW(SafeDelete.Long(dir), FILE_LIST_DIRECTORY | FILE_ADD_FILE | FILE_TRAVERSE | SYNCHRONIZE, SHARE_READ | SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING,
                                         FLAG_BACKUP_SEMANTICS | FLAG_OPEN_REPARSE_POINT, IntPtr.Zero))
             {

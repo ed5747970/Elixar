@@ -212,8 +212,25 @@ namespace CDriveCleaner
                     var ts = Automation.ParseTaskXml(xml);
                     check(ts.Exists && ts.Day == "Sunday" && ts.Start.HasValue && ts.Start.Value.Hour == 20 && ts.Arguments == "--auto-clean" && ts.Enabled, "Weekly clean: reads the saved schedule back");
                     var auto = Automation.AutoItems();
-                    check(auto.Count > 0 && auto.All(i => i.Tier == Tier.Safe && i.DefaultOn) && !auto.Any(i => i.Name.Contains("DISM") || i.Name.Contains("Recycle")),
-                          "Weekly clean: only default Safe items, never Caution, Recycle Bin or DISM");
+                    check(auto.Count > 0 && auto.All(i => i.DefaultOn && (i.Tier == Tier.Safe || Automation.AutoLeftovers.Contains(i.Name))) && !auto.Any(i => i.Name.Contains("DISM") || i.Name.Contains("Recycle") || i.Name.Contains("Windows.old")),
+                          "Weekly clean: only default Safe items (and Windows' update leftovers when nothing is running), never other Caution items, Recycle Bin or DISM");
+                    // Windows' update leftovers: removed only when it's safe, measured honestly, and only these exact folders
+                    {
+                        var now = new DateTime(2026, 10, 20, 12, 0, 0);
+                        bool lo = WinLeftovers.NotNowReason(false, false, now.AddDays(-30), now) == null &&
+                                  WinLeftovers.NotNowReason(true, false, now.AddDays(-30), now) != null &&
+                                  WinLeftovers.NotNowReason(false, true, now.AddDays(-30), now) != null &&
+                                  WinLeftovers.NotNowReason(false, false, now.AddHours(-2), now) != null;
+                        lo &= !WinLeftovers.Allowed(@"C:\Windows") && !WinLeftovers.Allowed(@"C:\$GetCurrent\..\Windows") || !Win.IsWindows;
+                        string lroot = Path.Combine(root, "leftover-test");
+                        Directory.CreateDirectory(lroot);
+                        lo &= WinLeftovers.Measure(lroot) == 0 && WinLeftovers.Measure(Path.Combine(root, "no-such-folder")) == 0;
+                        File.WriteAllBytes(Path.Combine(lroot, "a.bin"), new byte[5000]);
+                        lo &= WinLeftovers.Measure(lroot) == 5000;
+                        int ran = 0; BackupRights.With(() => ran++, null);
+                        lo &= ran == 1;
+                        check(lo, "Windows update leftovers ($GetCurrent, $WinREAgent): removed only when no update runs and nothing waits for a restart, measured honestly, nothing else is touched");
+                    }
                     string hf = Path.Combine(root, "hist.txt");
                     File.WriteAllText(hf, "2026-10-18T20:00:05\t1288490188\nbad line\n");
                     var h = Automation.ReadHistory(hf);
@@ -398,7 +415,7 @@ namespace CDriveCleaner
                     var oldV = Caches.OldVersionFolders(vers).Select(Path.GetFileName).OrderBy(x => x).ToList();
                     check(oldV.Count == 2 && oldV.Contains("2.0.9") && oldV.Contains("2.1.287"), "Caches: keeps the newest app version, ignores other folders");
                     var cat = Catalog.Build();
-                    check(cat.Where(i => Caches.Items().Any(c => c.Name == i.Name)).All(i => !i.DefaultOn) && Automation.AutoItems().Count == 11,
+                    check(cat.Where(i => Caches.Items().Any(c => c.Name == i.Name)).All(i => !i.DefaultOn) && Automation.AutoItems().Count(i => !Automation.AutoLeftovers.Contains(i.Name)) == 11,
                           "Caches: none are ticked by default and the weekly clean is unchanged");
                 } catch (Exception ex) { check(false, "Cache tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
 
