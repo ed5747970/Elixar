@@ -26,7 +26,12 @@ namespace CDriveCleaner
             UpdateTray();
         }
 
-        void RestoreFromTray() { Show(); if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal; Activate(); }
+        // from the icon next to the clock: anyone at the PC could click it, so the PIN is asked again when one is set
+        void RestoreFromTray()
+        {
+            if (!Visible && !testMode && !PinLock.Unlock(null)) return;
+            Show(); if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal; Activate();
+        }
 
         // "Elixar - C: 29.4 GB free" (Windows allows 63 characters)
         public static string TrayLine(long free, long total)

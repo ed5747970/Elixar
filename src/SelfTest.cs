@@ -937,6 +937,36 @@ namespace CDriveCleaner
                           OtherMail.PresetFor("a@walla.co.il").Imap == "imap.walla.co.il" && OtherMail.BetterChoice("x@gmail.com", true) == "google" && OtherMail.BetterChoice("x@gmail.com", false) == null && OtherMail.BetterChoice("x@hotmail.com") == "microsoft" &&
                           OtherMail.BetterChoice("x@yahoo.com") == null && OtherMail.PresetFor("me@gmail.com").Imap == "imap.gmail.com" && OtherMail.PresetFor("me@gmail.com").Smtp == "smtp.gmail.com",
                           "Other email: servers filled in for Gmail, Yahoo, iCloud, AOL and more; Gmail uses Sign in with Google when this copy has it (otherwise an app password), Hotmail always signs in with Microsoft");
+                    // ---- PIN lock ----
+                    {
+                        string pdir = Path.Combine(root, "pin"); Directory.CreateDirectory(pdir);
+                        PinLock.OverrideDir = pdir;
+                        DateTime clock = new DateTime(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc);
+                        PinLock.NowOverride = () => clock;
+                        try
+                        {
+                            bool pk = !PinLock.IsSet && PinLock.Check("1234") == PinLock.Result.Ok &&
+                                      PinLock.ValidPin("1234") && PinLock.ValidPin("12345678") && !PinLock.ValidPin("123") && !PinLock.ValidPin("123456789") && !PinLock.ValidPin("12a4");
+                            string code = PinLock.Set("482916");
+                            string raw = File.ReadAllText(Path.Combine(pdir, "pin.dat"));
+                            pk &= PinLock.IsSet && System.Text.RegularExpressions.Regex.IsMatch(code, "^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$") && !raw.Contains("482916") && !raw.Contains(PinLock.NormalizeCode(code));
+                            pk &= PinLock.Check("482916") == PinLock.Result.Ok && PinLock.Check("000000") == PinLock.Result.Wrong && PinLock.TriesLeft() == 4;
+                            for (int i = 0; i < 4; i++) PinLock.Check("111111");
+                            pk &= PinLock.Check("482916") == PinLock.Result.Wait && PinLock.SecondsLeft() == 30;   // even the right PIN waits
+                            clock = clock.AddSeconds(31);
+                            pk &= PinLock.Check("222222") == PinLock.Result.Wrong && PinLock.SecondsLeft() == 60;     // the wait doubles
+                            clock = clock.AddSeconds(61);
+                            pk &= PinLock.Check("482916") == PinLock.Result.Ok && PinLock.TriesLeft() == 5;          // a right PIN starts over
+                            pk &= PinLock.WaitFor(4) == 0 && PinLock.WaitFor(5) == 30 && PinLock.WaitFor(30) == 900;
+                            pk &= PinLock.Recover("WRONG-CODE-1234-5678") == PinLock.Result.Wrong && PinLock.IsSet;
+                            pk &= PinLock.Recover(code.ToLowerInvariant().Replace("-", " ")) == PinLock.Result.Ok && !PinLock.IsSet;   // the code removes the PIN
+                            PinLock.WriteTicket(); pk &= PinLock.TakeTicket() && !PinLock.TakeTicket();                            // once only
+                            PinLock.WriteTicket(); clock = clock.AddMinutes(5); pk &= !PinLock.TakeTicket();                       // and not later
+                            foreach (var m in new[] { PinForm.Mode.Enter, PinForm.Mode.Recover, PinForm.Mode.Set }) using (var pf = new PinForm(m)) pk &= pf.Text == "Elixar";
+                            check(pk, "PIN: kept only as a slow salted hash, wrong PINs wait longer each time (also after a restart), the recovery code removes it, and Elixar restarting itself doesn't ask twice");
+                        }
+                        finally { PinLock.OverrideDir = null; PinLock.NowOverride = null; }
+                    }
                     {
                         var d0 = new DateTime(2026, 10, 1);
                         string st1 = MailNudge.After("", DialogResult.No, d0), st3 = MailNudge.After(MailNudge.After(st1, DialogResult.No, d0.AddDays(14)), DialogResult.No, d0.AddDays(28));

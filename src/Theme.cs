@@ -259,7 +259,19 @@ namespace CDriveCleaner
                 public int clrText, clrTextBk, iSubItem, dwItemType, clrFace, iIconEffect, iIconPhase, iPartId, iStateId; public RECT rcText; public int uAlign;
             }
             static readonly PropertyInfo GroupId = typeof(ListViewGroup).GetProperty("ID", BindingFlags.NonPublic | BindingFlags.Instance);
+            [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, ref RECT r);
             readonly ListView lv;
+
+            // the group's title line only. The rectangle Windows passes for a group can be the whole group (title and its rows):
+            // drawing the title in the middle of that put it over a row. LVM_GETGROUPRECT with LVGGR_HEADER gives just the title.
+            Rectangle HeaderRect(int id, RECT whole, RECT text)
+            {
+                var hr = new RECT { Top = 1 /* LVGGR_HEADER */ };
+                if (SendMessage(lv.Handle, 0x1062 /* LVM_GETGROUPRECT */, new IntPtr(id), ref hr) != IntPtr.Zero && hr.Bottom > hr.Top)
+                    return Rectangle.FromLTRB(hr.Left, hr.Top, hr.Right, hr.Bottom);
+                if (text.Bottom > text.Top) return Rectangle.FromLTRB(whole.Left, text.Top - 2, whole.Right, text.Bottom + 2);   // the title's text line
+                return Rectangle.Empty;
+            }
 
             public GroupPainter(ListView lv)
             {
@@ -285,11 +297,12 @@ namespace CDriveCleaner
                                 int id = cd.dwItemSpec.ToInt32();
                                 ListViewGroup g = null;
                                 foreach (ListViewGroup x in lv.Groups) if ((int)GroupId.GetValue(x, null) == id) { g = x; break; }
-                                if (g != null)
+                                var r = g == null ? Rectangle.Empty : HeaderRect(id, cd.rc, cd.rcText);
+                                if (g != null && r.Width > 0 && r.Height > 0)
                                 {
-                                    var r = Rectangle.FromLTRB(cd.rc.Left, cd.rc.Top, cd.rc.Right, cd.rc.Bottom);
                                     using (var gr = Graphics.FromHdc(cd.hdc))
                                     {
+                                        gr.SetClip(r);   // never paint outside the title line
                                         using (var b = new SolidBrush(Panel)) gr.FillRectangle(b, r);
                                         var font = new Font(lv.Font, FontStyle.Bold);
                                         var size = TextRenderer.MeasureText(gr, g.Header, font);

@@ -211,6 +211,7 @@ namespace CDriveCleaner
         // the new version waits for this one to close, puts itself in place and starts
         public static void Launch(string newExe)
         {
+            PinLock.WriteTicket();   // the new version opens without asking for the PIN again
             Process.Start(new ProcessStartInfo(newExe, "--apply-update \"" + Install.Current + "\" " + Process.GetCurrentProcess().Id) { UseShellExecute = false });
         }
 

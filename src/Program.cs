@@ -162,6 +162,8 @@ namespace CDriveCleaner
             Application.ThreadException += (o, e) => ShowCrash(e.Exception);
             AppDomain.CurrentDomain.UnhandledException += (o, e) => ShowCrash(e.ExceptionObject as Exception);
 
+            // the PIN, when one is set (Elixar restarting itself a moment ago doesn't ask again)
+            if (!testUi && !PinLock.TakeTicket() && !PinLock.Unlock(null)) return 0;
             if (!testUi) OfferInstalledUpdate();
             Application.Run(new MainForm(testUi));
             return 0;
