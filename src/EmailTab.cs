@@ -16,6 +16,7 @@ namespace CDriveCleaner
         Label mailStatus, mailCleanState, mailNote, otherWarn, otherHelp;
         RadioButton rbGmail, rbOutlook, rbOther;
         FlowLayoutPanel pnlGoogle, pnlMicrosoft, pnlOther, pnlConnected, pnlChoose, pnlReports;
+        Button btnGmailApp;
         Button btnMailSignIn, btnMailSetup, btnMsSignIn, btnMsSetup, btnOtherConnect, btnMailTest, btnMailOut, btnMailSave, btnMailCleanOn;
         TextBox txtOtherEmail, txtOtherPass, txtOtherImap, txtOtherSmtp;
         CheckBox chkMailClean, chkMailAlerts, chkMailSummary; ComboBox cmbMailDay; TimeBox timeMail;
@@ -38,7 +39,9 @@ namespace CDriveCleaner
             pnlGoogle = Row(); pnlGoogle.Margin = new Padding(0, S(6), 0, 0);
             btnMailSignIn = MakeButton("Sign in with Google"); btnMailSignIn.Font = new Font("Segoe UI Semibold", 9f);
             btnMailSetup = MakeButton("Set up Google sign-in (one time)...");
-            pnlGoogle.Controls.AddRange(new Control[] { btnMailSignIn, btnMailSetup });
+            // without Google's sign-in keys in this copy: a Gmail app password works right away
+            btnGmailApp = MakeButton("Use a Gmail app password instead..."); btnGmailApp.Font = new Font("Segoe UI Semibold", 9f);
+            pnlGoogle.Controls.AddRange(new Control[] { btnMailSignIn, btnGmailApp, btnMailSetup });
 
             pnlMicrosoft = Row(); pnlMicrosoft.Margin = new Padding(0, S(6), 0, 0);
             btnMsSignIn = MakeButton("Sign in with Microsoft"); btnMsSignIn.Font = new Font("Segoe UI Semibold", 9f);
@@ -100,6 +103,14 @@ namespace CDriveCleaner
             btnMailSignIn.Click += (o, e) => SignInMail("google", false);
             btnMsSignIn.Click += (o, e) => SignInMail("microsoft", false);
             btnOtherConnect.Click += (o, e) => ConnectOther();
+            btnGmailApp.Click += (o, e) =>
+            {
+                rbOther.Checked = true;
+                if (!txtOtherEmail.Text.Contains("@")) txtOtherEmail.Text = "@gmail.com";
+                FillOtherServers(true);
+                txtOtherEmail.Focus(); txtOtherEmail.SelectionStart = 0; txtOtherEmail.SelectionLength = 0;
+                UpdateMailUi();
+            };
             btnMailOut.Click += (o, e) => DisconnectMail();
             btnMailTest.Click += (o, e) => RunMail("Sending a test email...", () => MailReports.Test().Send(), "Test email sent to " + MailAccount.Email + ".");
             btnMailSave.Click += (o, e) => SaveMail();
@@ -139,6 +150,8 @@ namespace CDriveCleaner
             btnMailSignIn.Text = Lang.T(busy ? "Cancel sign-in" : "Sign in with Google");
             btnMailSignIn.Enabled = (GoogleAuth.HasClient || busy) && !testMode;
             btnMailSetup.Visible = GoogleAuth.BuiltInClient == null;   // the GitHub build has the Google app built in
+            btnGmailApp.Visible = !GoogleAuth.HasClient;
+            btnGmailApp.Enabled = !busy && !testMode;
             btnMsSignIn.Text = Lang.T(busy ? "Cancel sign-in" : "Sign in with Microsoft");
             btnMsSignIn.Enabled = (MicrosoftAuth.ClientId != null || busy) && !testMode;
             btnMsSetup.Visible = !MicrosoftAuth.BuiltIn;
@@ -188,11 +201,13 @@ namespace CDriveCleaner
         void ConnectOther()
         {
             var st = new OtherMail.Settings_ { Email = txtOtherEmail.Text.Trim(), Password = txtOtherPass.Text.Trim(), Imap = txtOtherImap.Text.Trim(), Smtp = txtOtherSmtp.Text.Trim() };
+            // Google shows app passwords in groups of four ("abcd efgh ijkl mnop"); the spaces aren't part of it
+            if (OtherMail.PresetFor(st.Email).Name == "Gmail") st.Password = st.Password.Replace(" ", "");
             string better = OtherMail.BetterChoice(st.Email);
             if (better != null)
             {
                 Lang.Box(this, better == "google" ? "This is a Gmail address: choose \"Gmail\" above. Sign in with Google is safer than an app password."
-                                                  : "This is a Microsoft address: choose \"Outlook / Hotmail / Live\" above. Sign in with Microsoft is safer than an app password.",
+                                                  : "This is a Microsoft address: choose \"Outlook / Hotmail / Live\" above. Outlook.com no longer accepts app passwords: it needs Sign in with Microsoft.",
                          "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 (better == "google" ? rbGmail : rbOutlook).Checked = true;
                 return;

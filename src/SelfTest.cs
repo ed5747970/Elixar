@@ -934,8 +934,9 @@ namespace CDriveCleaner
                           MicrosoftAuth.ValidId("00000000-1111-2222-3333-444444444444") && !MicrosoftAuth.ValidId("not-an-id") && new MicrosoftAuth.Account { Scopes = "Mail.Send Mail.ReadWrite" }.Clean,
                           "Outlook: Sign in with Microsoft asks only to send, plus Mail.ReadWrite only when you turn on Email cleaning");
                     check(OtherMail.PresetFor("me@yahoo.com").Imap == "imap.mail.yahoo.com" && OtherMail.PresetFor("x@icloud.com").Smtp == "smtp.mail.me.com" && OtherMail.PresetFor("a@aol.com").Imap == "imap.aol.com" &&
-                          OtherMail.PresetFor("a@walla.co.il").Imap == "imap.walla.co.il" && OtherMail.BetterChoice("x@gmail.com") == "google" && OtherMail.BetterChoice("x@hotmail.com") == "microsoft" &&
-                          OtherMail.BetterChoice("x@yahoo.com") == null, "Other email: servers filled in for Yahoo, iCloud, AOL and more; Gmail and Hotmail are sent to their safer sign-in");
+                          OtherMail.PresetFor("a@walla.co.il").Imap == "imap.walla.co.il" && OtherMail.BetterChoice("x@gmail.com", true) == "google" && OtherMail.BetterChoice("x@gmail.com", false) == null && OtherMail.BetterChoice("x@hotmail.com") == "microsoft" &&
+                          OtherMail.BetterChoice("x@yahoo.com") == null && OtherMail.PresetFor("me@gmail.com").Imap == "imap.gmail.com" && OtherMail.PresetFor("me@gmail.com").Smtp == "smtp.gmail.com",
+                          "Other email: servers filled in for Gmail, Yahoo, iCloud, AOL and more; Gmail uses Sign in with Google when this copy has it (otherwise an app password), Hotmail always signs in with Microsoft");
                     var okS = new OtherMail.Settings_ { Email = "me@example.com", Password = "abcd efgh", Imap = "imap.example.com", Smtp = "smtp.example.com" };
                     bool qBad = false; try { Imap.Q("a\r\nE9 DELETE INBOX"); } catch (IOException) { qBad = true; }
                     check(OtherMail.Check(okS) == null && OtherMail.Check(new OtherMail.Settings_ { Email = "me@example.com", Password = "p", Imap = "imap.example.com", Smtp = "smtp.example.com", ImapPort = 143 }) != null &&

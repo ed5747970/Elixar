@@ -14,6 +14,9 @@ NEW IN 1.2.31
   protected parts are moved with Windows' backup rights (no permissions are
   changed), and anything that can't be removed is reported instead of
   being skipped silently. Windows.old says plainly if Windows kept it.
+- Email: Gmail can connect with an app password (Settings > Email account >
+  Gmail > "Use a Gmail app password instead"), for copies without Google's
+  sign-in built in. Needs 2-Step Verification on the Google account.
 - New slogan: "The cure for a cluttered PC".
 - Dashboard header tidied: drives and tools on one line, the status line
   never wraps, Overview | Details next to it. The Auto-delete switch no

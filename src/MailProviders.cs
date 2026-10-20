@@ -364,6 +364,9 @@ namespace CDriveCleaner
         public static Preset PresetFor(string email)
         {
             string d = (email ?? "").Split('@').Last().Trim().ToLowerInvariant();
+            // Gmail with an app password: for copies of Elixar that don't have Google's sign-in built in
+            if (d == "gmail.com" || d == "googlemail.com")
+                return new Preset { Name = "Gmail", Imap = "imap.gmail.com", Smtp = "smtp.gmail.com", Help = "Gmail: turn on 2-Step Verification (myaccount.google.com > Security), then open myaccount.google.com/apppasswords, make one named Elixar and paste its 16 letters here." };
             if (d.StartsWith("yahoo.") || d == "ymail.com" || d == "rocketmail.com")
                 return new Preset { Name = "Yahoo Mail", Imap = "imap.mail.yahoo.com", Smtp = "smtp.mail.yahoo.com", Help = "Yahoo: login.yahoo.com > Account info > Account security > Generate app password." };
             if (d == "icloud.com" || d == "me.com" || d == "mac.com")
@@ -385,10 +388,14 @@ namespace CDriveCleaner
         }
 
         // the address belongs to Gmail or Microsoft: their own safer sign-in is used instead
-        public static string BetterChoice(string email)
+        // the safer sign-in for this address, when this copy of Elixar can do it. Gmail: Sign in with Google when it is
+        // set up, otherwise an app password works too. Outlook.com no longer accepts app passwords, so it always needs
+        // Sign in with Microsoft.
+        public static string BetterChoice(string email) { return BetterChoice(email, GoogleAuth.HasClient); }
+        public static string BetterChoice(string email, bool googleSignIn)
         {
             string d = (email ?? "").Split('@').Last().Trim().ToLowerInvariant();
-            if (d == "gmail.com" || d == "googlemail.com") return "google";
+            if (d == "gmail.com" || d == "googlemail.com") return googleSignIn ? "google" : null;
             if (d == "outlook.com" || d == "hotmail.com" || d == "live.com" || d == "msn.com" || d.StartsWith("hotmail.") || d.StartsWith("outlook.") || d.StartsWith("live.")) return "microsoft";
             return null;
         }
