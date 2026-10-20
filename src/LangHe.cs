@@ -1163,6 +1163,16 @@ namespace CDriveCleaner
             d["Use a Gmail app password instead..."] = "שימוש בסיסמת אפליקציה של Gmail...";
             d["Gmail: turn on 2-Step Verification (myaccount.google.com > Security), then open myaccount.google.com/apppasswords, make one named Elixar and paste its 16 letters here."] = "Gmail: הפעילו אימות דו-שלבי (myaccount.google.com > אבטחה), ואז פתחו את myaccount.google.com/apppasswords, צרו סיסמה בשם Elixar והדביקו כאן את 16 האותיות שלה.";
             d["This is a Microsoft address: choose \"Outlook / Hotmail / Live\" above. Outlook.com no longer accepts app passwords: it needs Sign in with Microsoft."] = "זו כתובת של Microsoft: בחרו למעלה \"Outlook / Hotmail / Live\". ‏Outlook.com כבר לא מקבל סיסמאות אפליקציה: צריך התחברות עם Microsoft.";
+            d["Get more from Elixar"] = "להפיק יותר מ-Elixar";
+            d["Connect email..."] = "חיבור דוא\"ל...";
+            d["Not now"] = "לא עכשיו";
+            d["Don't ask again"] = "לא לשאול שוב";
+            d["Connect your email to get:"] = "חברו את הדוא\"ל שלכם כדי לקבל:";
+            d["A weekly summary of your PC's space"] = "סיכום שבועי של השטח במחשב";
+            d["An alert before the system drive gets full"] = "התראה לפני שכונן המערכת מתמלא";
+            d["A report after each automatic clean"] = "דוח אחרי כל ניקוי אוטומטי";
+            d["Email cleaning: old ads, social updates and spam (only if you turn it on)"] = "ניקוי דוא\"ל: פרסומות ישנות, עדכונים מרשתות חברתיות וספאם (רק אם תפעילו)";
+            d["Elixar emails only you, never puts a link in an email, and can't read your mailbox unless you turn on Email cleaning. You can disconnect any time in Settings."] = "Elixar שולח מיילים רק אליכם, אף פעם לא שם קישור במייל, ולא יכול לקרוא את תיבת הדואר שלכם אלא אם תפעילו ניקוי דוא\"ל. אפשר להתנתק בכל עת בהגדרות.";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["7 days"] = "7 ימים";

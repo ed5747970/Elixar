@@ -38,6 +38,17 @@ namespace CDriveCleaner
 
         int S(int v) { return (int)Math.Round(v * sc); }
 
+        // the same box with its own button names (for example "Connect email...", "Not now", "Don't ask again")
+        [ThreadStatic] static string[] nextLabels;
+        public string[] Labels { get; private set; }
+        public static DialogResult ShowWith(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, int defaultButton, string[] labels)
+        {
+            if (!Enabled) return Show(owner, text, caption, buttons, icon, defaultButton);
+            nextLabels = labels;
+            try { return Show(owner, text, caption, buttons, icon, defaultButton); }
+            finally { nextLabels = null; }
+        }
+
         public static DialogResult Show(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, int defaultButton)
         {
             if (!Enabled) return MessageBox.Show(owner, text, caption, buttons, icon, defaultButton == 1 ? MessageBoxDefaultButton.Button2 : MessageBoxDefaultButton.Button1,
@@ -150,6 +161,10 @@ namespace CDriveCleaner
             // the button bar
             var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(pad, S(12), pad - S(6), S(12)), BackColor = Theme.Dark ? Color.FromArgb(36, 36, 44) : Theme.Back, AutoSize = true, WrapContents = false };
             var defs = ButtonsFor(buttons);
+            Labels = nextLabels; nextLabels = null;
+            if (Labels != null)
+                for (int i = 0; i < defs.Count && i < Labels.Length; i++)
+                    if (!string.IsNullOrEmpty(Labels[i])) defs[i] = Tuple.Create(Labels[i], defs[i].Item2);
             int def = Math.Max(0, Math.Min(defs.Count - 1, defaultButton));
             Button cancel = null;
             for (int k = defs.Count - 1; k >= 0; k--)
@@ -194,11 +209,12 @@ namespace CDriveCleaner
             var card = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(0, S(2), 0, S(10)),
                                               Padding = new Padding(S(12), S(8), S(12), S(8)), BackColor = Theme.Dark ? Color.FromArgb(52, 52, 62) : Theme.Back, MinimumSize = new Size(w, 0), MaximumSize = new Size(w, 0) };
             card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            bool sizes = items.Take(40).Any(i => Sized.IsMatch(i));   // no sizes: the text gets the whole width
             foreach (var it in items.Take(40))
             {
                 var m = Sized.Match(it);
                 string name = m.Success ? m.Groups[1].Value : it, size = m.Success ? m.Groups[2].Value : "";
-                card.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(w - S(110), 0), Text = "•  " + name, ForeColor = Theme.Ink, Margin = new Padding(0, S(3), S(8), S(3)), UseMnemonic = false });
+                card.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(w - S(sizes ? 110 : 30), 0), Text = "•  " + name, ForeColor = Theme.Ink, Margin = new Padding(0, S(3), S(8), S(3)), UseMnemonic = false });
                 card.Controls.Add(new Label { AutoSize = true, Text = size, ForeColor = Theme.Quiet, Font = new Font("Segoe UI Semibold", 9.25f), Margin = new Padding(0, S(3), 0, S(3)), Anchor = AnchorStyles.Right, UseMnemonic = false });
             }
             if (items.Count > 40) card.Controls.Add(new Label { AutoSize = true, Text = "+ " + (items.Count - 40), ForeColor = Theme.Quiet, Margin = new Padding(0, S(3), 0, 0) });

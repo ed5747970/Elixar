@@ -937,6 +937,20 @@ namespace CDriveCleaner
                           OtherMail.PresetFor("a@walla.co.il").Imap == "imap.walla.co.il" && OtherMail.BetterChoice("x@gmail.com", true) == "google" && OtherMail.BetterChoice("x@gmail.com", false) == null && OtherMail.BetterChoice("x@hotmail.com") == "microsoft" &&
                           OtherMail.BetterChoice("x@yahoo.com") == null && OtherMail.PresetFor("me@gmail.com").Imap == "imap.gmail.com" && OtherMail.PresetFor("me@gmail.com").Smtp == "smtp.gmail.com",
                           "Other email: servers filled in for Gmail, Yahoo, iCloud, AOL and more; Gmail uses Sign in with Google when this copy has it (otherwise an app password), Hotmail always signs in with Microsoft");
+                    {
+                        var d0 = new DateTime(2026, 10, 1);
+                        string st1 = MailNudge.After("", DialogResult.No, d0), st3 = MailNudge.After(MailNudge.After(st1, DialogResult.No, d0.AddDays(14)), DialogResult.No, d0.AddDays(28));
+                        bool nOk = MailNudge.Due("", d0, false) && !MailNudge.Due("", d0, true) && !MailNudge.Due("never", d0, false) &&
+                                   !MailNudge.Due(st1, d0.AddDays(13), false) && MailNudge.Due(st1, d0.AddDays(14), false) && !MailNudge.Due(st3, d0.AddDays(90), false) &&
+                                   MailNudge.After(st1, DialogResult.Cancel, d0) == "never";
+                        string[] seen = null;
+                        var oldHook = NiceBox.TestHook;
+                        NiceBox.TestHook = nb => { seen = nb.ButtonsShown.Select(b => b.Text).ToArray(); return DialogResult.No; };
+                        try { NiceBox.ShowWith(null, MailNudge.Text(x => x), "Get more from Elixar", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information, 0, new[] { "Connect email...", "Not now", "Don't ask again" }); }
+                        finally { NiceBox.TestHook = oldHook; }
+                        nOk &= seen != null && seen.Length == 3 && seen[0] == "Connect email..." && seen[1] == "Not now" && seen[2] == "Don't ask again";
+                        check(nOk, "Email invitation: asked once after the first scan, \"Not now\" waits 14 days (3 times at most), \"Don't ask again\" never asks, and nothing connects by itself");
+                    }
                     var okS = new OtherMail.Settings_ { Email = "me@example.com", Password = "abcd efgh", Imap = "imap.example.com", Smtp = "smtp.example.com" };
                     bool qBad = false; try { Imap.Q("a\r\nE9 DELETE INBOX"); } catch (IOException) { qBad = true; }
                     check(OtherMail.Check(okS) == null && OtherMail.Check(new OtherMail.Settings_ { Email = "me@example.com", Password = "p", Imap = "imap.example.com", Smtp = "smtp.example.com", ImapPort = 143 }) != null &&

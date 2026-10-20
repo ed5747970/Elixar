@@ -1021,6 +1021,7 @@ namespace CDriveCleaner
         void ShowSummary(DashSummary m)
         {
             dashSum = m;
+            MaybeNudgeMail(m);
             UpdateTray();
             lastOverview = DateTime.Now;
             // the ring and the sentence

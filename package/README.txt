@@ -17,6 +17,10 @@ NEW IN 1.2.31
 - Email: Gmail can connect with an app password (Settings > Email account >
   Gmail > "Use a Gmail app password instead"), for copies without Google's
   sign-in built in. Needs 2-Step Verification on the Google account.
+- After the first scan Elixar invites you once to connect your email
+  (weekly summary, low-space alerts, clean reports). "Not now" asks again
+  after 14 days, 3 times at most; "Don't ask again" never asks. Elixar works
+  fully without email, and nothing connects unless you choose to.
 - New slogan: "The cure for a cluttered PC".
 - Dashboard header tidied: drives and tools on one line, the status line
   never wraps, Overview | Details next to it. The Auto-delete switch no
