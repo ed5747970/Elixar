@@ -1,9 +1,9 @@
-ELIXAR  (version 1.2.31)
+ELIXAR  (version 1.2.40)
 The cure for a cluttered PC
 Made by Elisar
 =======================
 
-NEW IN 1.2.31
+NEW IN 1.2.40
 - Policy manager (next to Logs): the rules for what Elixar may change on
   this PC. Default = Elixar's own rules (works exactly as before); Custom =
   your copy, kept when you switch back. Presets (Careful, Deep clean,
@@ -22,6 +22,8 @@ NEW IN 1.2.31
   save as .csv or .txt. "Undo this change..." puts a registry value back
   exactly as it was. "Open the log file" opens changes.txt, the same log
   in plain words, in Notepad. Passwords are never written there.
+
+NEW IN 1.2.31
 - Dashboard > Watch: the folders that always grow or grow fast, how much a
   month, what to do, and how often to look at them (every week, 2 weeks or
   month). "I checked it" keeps a folder quiet until its next look is due.
