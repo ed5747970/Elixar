@@ -21,6 +21,8 @@ namespace CDriveCleaner
         Label logsCount;
         Button btnLogsUndo, btnLogsCopy, btnLogsFile, btnLogsText, btnLogsExport, btnLogsRefresh;
         List<ChangeLog.Entry> logsAll = new List<ChangeLog.Entry>();
+        ListBox logsSections; string logsSection = "*"; bool logsSyncing;
+        class Rubric { public string Key = "", Name = ""; public int Count; public override string ToString() { return Name; } }
         public static Func<string, DialogResult> LogsConfirmHook;   // self-test: answers the undo question
 
         static readonly string[] LogKinds = { "All changes", "Registry", "Files", "Cleaning", "Windows command", "Apps", "Phone", "Security", "Email", "Settings", "Undo" };
@@ -36,16 +38,21 @@ namespace CDriveCleaner
         public void ShowLogs() { tabs.SelectedTab = pageLogs; }
         public void LogsClickUndo() { LogsUndo(); }
         public void LogsFocus() { logsList.Focus(); }
+        public List<string> LogsSections { get { return logsSections.Items.Cast<Rubric>().Select(r => r.Key + ":" + r.Count).ToList(); } }
+        public void LogsPickSection(string key) { logsSection = key; LogsFill(); }
 
         void BuildLogsTab()
         {
             pageLogs = new TabPage("Logs") { BackColor = Color.FromArgb(246, 248, 251) };
             var t = Page(6);
+            t.ColumnCount = 2; t.ColumnStyles.Clear();
+            t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(220))); t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 68)); t.RowStyles.Add(new RowStyle(SizeType.Percent, 32)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            t.Controls.Add(Title("Change log"), 0, 0);
-            t.Controls.Add(Note("Every change Elixar makes to this PC: registry values (with the value before and after), files moved to Undo or deleted, Windows commands, apps, startup, security and settings. " +
-                                "If something stops working after a change, find it here: registry values can be put back with one click, files from Tools > Undo. Passwords are never written here."), 0, 1);
+            var title = Title("Change log"); t.Controls.Add(title, 0, 0); t.SetColumnSpan(title, 2);
+            Control note = Note("Every change Elixar makes to this PC: registry values (with the value before and after), files moved to Undo or deleted, Windows commands, apps, startup, security and settings. " +
+                                "If something stops working after a change, find it here: registry values can be put back with one click, files from Tools > Undo. Passwords are never written here.");
+            t.Controls.Add(note, 0, 1); t.SetColumnSpan(note, 2);
 
             var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, S(6)) };
             Func<string, Label> lab = s => new Label { AutoSize = true, Text = s, Margin = new Padding(S(2), S(6), S(4), 0) };
@@ -55,15 +62,40 @@ namespace CDriveCleaner
             logsPeriod.Items.AddRange(LogPeriods); logsPeriod.SelectedIndex = 1;
             logsSearch = new TextBox { Width = S(240), Margin = new Padding(0, S(2), S(14), 0) };
             logsCount = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(2), S(6), 0, 0) };
-            bar.Controls.AddRange(new Control[] { lab("Show:"), logsKind, lab("When:"), logsPeriod, lab("Search:"), logsSearch, logsCount });
-            t.Controls.Add(bar, 0, 2);
+            bar.Controls.AddRange(new Control[] { lab("Type:"), logsKind, lab("When:"), logsPeriod, lab("Search:"), logsSearch, logsCount });
+            t.Controls.Add(bar, 0, 2); t.SetColumnSpan(bar, 2);
+
+            // the sections: which part of Elixar made the change (Cleaner, Duplicates, Startup...), each with how many
+            logsSections = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = S(26), BorderStyle = BorderStyle.FixedSingle, Margin = new Padding(0, 0, S(8), S(4)) };
+            logsSections.DrawItem += (o, e) =>
+            {
+                if (e.Index < 0) return;
+                var r = (Rubric)logsSections.Items[e.Index];
+                bool sel = (e.State & DrawItemState.Selected) != 0;
+                bool head = r.Key.StartsWith("*") || r.Key.StartsWith("#");
+                Color back = sel ? Theme.Accent : logsSections.BackColor, ink = sel ? Color.White : head ? Theme.Ink : Theme.Ink;
+                using (var b = new SolidBrush(back)) e.Graphics.FillRectangle(b, e.Bounds);
+                var rect = new Rectangle(e.Bounds.X + S(8), e.Bounds.Y, e.Bounds.Width - S(16), e.Bounds.Height);
+                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | (Lang.Hebrew ? TextFormatFlags.RightToLeft : 0);
+                using (var f = head ? new Font(logsSections.Font, FontStyle.Bold) : new Font(logsSections.Font, FontStyle.Regular))
+                    TextRenderer.DrawText(e.Graphics, Lang.T(r.Name), f, rect, ink, flags | (Lang.Hebrew ? TextFormatFlags.Right : TextFormatFlags.Left));
+                TextRenderer.DrawText(e.Graphics, r.Count.ToString(CultureInfo.CurrentCulture), logsSections.Font, rect, sel ? Color.White : Theme.Quiet, flags | (Lang.Hebrew ? TextFormatFlags.Left : TextFormatFlags.Right));
+                if (r.Key == "#deleted")   // a line under the three summaries, before the sections
+                    using (var p = new Pen(Theme.Grid)) e.Graphics.DrawLine(p, e.Bounds.X + S(6), e.Bounds.Bottom - 1, e.Bounds.Right - S(6), e.Bounds.Bottom - 1);
+            };
+            logsSections.SelectedIndexChanged += (o, e) =>
+            {
+                if (logsSyncing || logsSections.SelectedItem == null) return;
+                logsSection = ((Rubric)logsSections.SelectedItem).Key; LogsFill();
+            };
+            t.Controls.Add(logsSections, 0, 3); t.SetRowSpan(logsSections, 2);
 
             logsList = new ListView { View = View.Details, FullRowSelect = true, Dock = DockStyle.Fill, HideSelection = false, MultiSelect = false, GridLines = false };
-            logsList.Columns.Add("Time", S(70)); logsList.Columns.Add("Kind", S(130)); logsList.Columns.Add("What happened", S(300));
+            logsList.Columns.Add("Time", S(70)); logsList.Columns.Add("Section", S(120)); logsList.Columns.Add("What happened", S(300));
             logsList.Columns.Add("Where", S(360)); logsList.Columns.Add("Before", S(150)); logsList.Columns.Add("After", S(150)); logsList.Columns.Add("Status", S(110));
-            t.Controls.Add(logsList, 0, 3);
+            t.Controls.Add(logsList, 1, 3);
             logsDetail = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Font = new Font("Consolas", 9f), Margin = new Padding(0, S(6), 0, S(4)), RightToLeft = Lang.Hebrew ? RightToLeft.Yes : RightToLeft.No };
-            t.Controls.Add(logsDetail, 0, 4);
+            t.Controls.Add(logsDetail, 1, 4);
 
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0) };
             btnLogsUndo = MakeButton("Undo this change..."); btnLogsUndo.Font = new Font("Segoe UI Semibold", 9f); btnLogsUndo.Enabled = false;
@@ -73,7 +105,7 @@ namespace CDriveCleaner
             btnLogsText = MakeButton("Open the activity log");
             btnLogsRefresh = MakeButton("Refresh");
             buttons.Controls.AddRange(new Control[] { btnLogsUndo, btnLogsCopy, btnLogsExport, btnLogsFile, btnLogsText, btnLogsRefresh });
-            t.Controls.Add(buttons, 0, 5);
+            t.Controls.Add(buttons, 0, 5); t.SetColumnSpan(buttons, 2);
             pageLogs.Controls.Add(t);
 
             var typing = new Timer { Interval = 300 };
@@ -142,9 +174,30 @@ namespace CDriveCleaner
             string kind = logsKind.SelectedIndex <= 0 ? null : LogKinds[logsKind.SelectedIndex];
             DateTime from = logsPeriod.SelectedIndex == 0 ? DateTime.Now.AddDays(-7) : logsPeriod.SelectedIndex == 1 ? DateTime.Now.AddDays(-30) : DateTime.MinValue;
             string q = (logsSearch.Text ?? "").Trim();
-            var shown = logsAll.Where(e => (kind == null || e.Kind == kind) && e.When >= from &&
+            var pre = logsAll.Where(e => (kind == null || e.Kind == kind) && e.When >= from &&
                                            (q.Length == 0 || new[] { e.Action, e.Target, e.Before, e.After, e.Detail, e.Kind, Lang.T(e.Action ?? ""), Lang.T(e.Kind ?? ""), Lang.T(ChangeLog.Summary(e)) }
-                                                .Any(s => (s ?? "").IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0))).Take(5000).ToList();
+                                                .Any(s => (s ?? "").IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0))).ToList();
+            // the sections on the left, with how many changes each has under the other filters
+            var rubrics = new List<Rubric>
+            {
+                new Rubric { Key = "*", Name = "All changes", Count = pre.Count },
+                new Rubric { Key = "#undo", Name = "Can be undone", Count = pre.Count(e => ChangeLog.StatusOf(e, logsAll) == "Can be undone") },
+                new Rubric { Key = "#deleted", Name = "Deleted", Count = pre.Count(ChangeLog.IsDeletion) },
+            };
+            foreach (var sec in ChangeLog.Sections)
+            {
+                int n = pre.Count(e => ChangeLog.SectionOf(e) == sec);
+                if (n > 0 || sec == logsSection || logsAll.Any(e => ChangeLog.SectionOf(e) == sec)) rubrics.Add(new Rubric { Key = sec, Name = sec, Count = n });
+            }
+            if (!rubrics.Any(r => r.Key == logsSection)) logsSection = "*";
+            logsSyncing = true;
+            logsSections.BeginUpdate(); logsSections.Items.Clear();
+            foreach (var r in rubrics) logsSections.Items.Add(r);
+            logsSections.SelectedIndex = rubrics.FindIndex(r => r.Key == logsSection);
+            logsSections.EndUpdate();
+            logsSyncing = false;
+            var shown = pre.Where(e => logsSection == "*" || (logsSection == "#undo" ? ChangeLog.StatusOf(e, logsAll) == "Can be undone" :
+                                                              logsSection == "#deleted" ? ChangeLog.IsDeletion(e) : ChangeLog.SectionOf(e) == logsSection)).Take(5000).ToList();
             var selE = LogsSelected(); string sel = selE == null ? null : selE.Id;
             logsList.BeginUpdate();
             logsList.Items.Clear();
@@ -156,7 +209,7 @@ namespace CDriveCleaner
                 var day = e.When.Date; ListViewGroup grp;
                 if (!groups.TryGetValue(day, out grp)) { grp = new ListViewGroup(LogDay(day, DateTime.Today)); groups[day] = grp; logsList.Groups.Add(grp); }
                 string time = e.When == DateTime.MinValue ? e.Time : e.When.ToString("HH:mm", CultureInfo.InvariantCulture);
-                var r = new ListViewItem(new[] { time, Lang.T(e.Kind ?? ""), Lang.T(ChangeLog.Summary(e)), LogWhere(e), Lang.T(Brief(e.Before)), Lang.T(Brief(e.After)), Lang.T(status) }) { Tag = e, UseItemStyleForSubItems = false, Group = grp };
+                var r = new ListViewItem(new[] { time, Lang.T(ChangeLog.SectionOf(e)), Lang.T(ChangeLog.Summary(e)), LogWhere(e), Lang.T(Brief(e.Before)), Lang.T(Brief(e.After)), Lang.T(status) }) { Tag = e, UseItemStyleForSubItems = false, Group = grp };
                 if (status == "Failed") r.SubItems[6].ForeColor = Theme.MapFore(Color.FromArgb(190, 40, 40));
                 else if (status == "Can be undone") r.SubItems[6].ForeColor = Theme.MapFore(Theme.Accent);
                 else if (status == "Undone") r.SubItems[6].ForeColor = Theme.Quiet;
@@ -187,6 +240,7 @@ namespace CDriveCleaner
             string sum = ChangeLog.Summary(e);
             line("What happened", Lang.T(sum));
             line("When", LogLongTime(e));
+            line("Section", Lang.T(ChangeLog.SectionOf(e)) + (ChangeLog.IsDeletion(e) ? "  -  " + Lang.T("Deleted") : ""));
             line("Kind", Lang.T(e.Kind ?? "") + (sum != e.Action ? "  -  " + Lang.T(e.Action ?? "") : ""));
             line(e.Kind == "Windows command" ? "Command" : "Where", e.Target);
             if (e.Kind == "Registry" && e.CanUndo) line("Registry view", e.View == "Registry32" ? "32-bit" : e.View == "Registry64" ? "64-bit" : "default");
@@ -238,9 +292,9 @@ namespace CDriveCleaner
         public static string LogsCsv(List<ChangeLog.Entry> all)
         {
             var sb = new StringBuilder();
-            sb.Append("Time,Kind,What,Where,Before,After,Status,Details,Change ID\r\n");
+            sb.Append("Time,Section,Kind,What,Where,Before,After,Status,Details,Change ID\r\n");
             foreach (var e in all)
-                sb.Append(string.Join(",", new[] { e.Time, e.Kind, e.Action, e.Target, e.Before, e.After, ChangeLog.StatusOf(e, all), e.Detail, e.Id }.Select(Csv))).Append("\r\n");
+                sb.Append(string.Join(",", new[] { e.Time, ChangeLog.SectionOf(e), e.Kind, e.Action, e.Target, e.Before, e.After, ChangeLog.StatusOf(e, all), e.Detail, e.Id }.Select(Csv))).Append("\r\n");
             return sb.ToString();
         }
 

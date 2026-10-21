@@ -1481,6 +1481,21 @@ namespace CDriveCleaner
                                     if (!ps) why += " [settings " + (tl.Count - before) + "]";
                                 }
                                 finally { TidyPrefs.OverrideFile = keepTidy; }
+                                // sections: each change sits under the part of Elixar that made it
+                                Func<string, string, string, string> secOf = (k, a, d) => ChangeLog.Derive(new ChangeLog.Entry { Kind = k, Action = a, Detail = d });
+                                bool secOk = secOf("Files", "Moved to Undo: Duplicates (12 files)", "") == "Duplicates" && secOf("Registry", "Changed a value", "Startup: turned off Spotify") == "Startup" &&
+                                             secOf("Files", "Moved to Undo: Smart scan of Downloads (3 files)", "") == "Smart scan" && secOf("Phone", "Deleted files on the phone (4)", "") == "Phone" &&
+                                             secOf("Windows command", "Created a restore point", "") == "Restore points" && secOf("Files", "Deleted an old answer file", "Golden image: x") == "Sysprep" &&
+                                             secOf("Registry", "Emptied a key", "Privacy: cleared") == "Privacy" && secOf("Files", "Moved a personal folder: Documents", "") == "Move folders" &&
+                                             secOf("Undo", "Put back from Undo: Temp files", "") == "Undo" && secOf("Windows command", "Removed a driver package", "") == "Drivers" &&
+                                             ChangeLog.IsDeletion(new ChangeLog.Entry { Action = "Deleted from Undo for good: x" }) && !ChangeLog.IsDeletion(new ChangeLog.Entry { Action = "Moved to Undo: x" });
+                                // inside a section (the weekly clean), what it does is filed there; restore points keep their own section
+                                ChangeLog.Entry inW, rp;
+                                using (ChangeLog.In("Weekly clean")) { inW = ChangeLog.Add("Files", "Moved to Undo: Temp files", "", "", "", "", false); rp = ChangeLog.Add("Windows command", "Created a restore point", "", "", "", "", false); }
+                                var after = ChangeLog.Add("Files", "Moved to Undo: Temp files", "", "", "", "", false);
+                                secOk &= inW.Section == "Weekly clean" && rp.Section == "Restore points" && after.Section == "Cleaner" && File.ReadAllText(ChangeLog.TextFile(clf)).Contains("WEEKLY CLEAN  (Files)");
+                                if (!secOk) why += " [sections]";
+                                ps &= secOk;
                                 // a big log moves to the -old file and both are still read
                                 ChangeLog.MaxBytes = 2000;
                                 for (int i = 0; i < 30; i++) ChangeLog.Add("Cleaning", "Cleaned: item " + i, "", "", "", "rotation", false);
@@ -1503,6 +1518,9 @@ namespace CDriveCleaner
                                 bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs" }) && lf.LogsRowCount == 3;
                                 lf.LogsSetFilter(1, 2, ""); page &= lf.LogsRowCount == 2;          // Registry only
                                 lf.LogsSetFilter(0, 2, "vssadmin"); page &= lf.LogsRowCount == 1;   // search
+                                lf.LogsSetFilter(0, 2, ""); page &= lf.LogsSections.Contains("*:3") && lf.LogsSections.Contains("Restore points:1") && lf.LogsSections.Contains("#undo:2") && lf.LogsSections.Contains("#deleted:1");
+                                lf.LogsPickSection("Restore points"); page &= lf.LogsRowCount == 1;
+                                lf.LogsPickSection("*");
                                 lf.LogsSetFilter(1, 2, ""); lf.LogsSelect(0);
                                 page &= lf.LogsUndoEnabled && lf.LogsDetailText.Contains("\"light\"") && lf.LogsDetailText.Contains("\"dark\"");
                                 string asked = null; MainForm.LogsConfirmHook = q => { asked = q; return DialogResult.Yes; };
@@ -1512,7 +1530,7 @@ namespace CDriveCleaner
                                 page &= asked != null && asked.Contains("\"dark\"") && shown == "light" && lf.LogsRowCount == 3 && ChangeLog.Read().Count(e => e.Ref != null) == 1 &&
                                         ChangeLog.StatusOf(ChangeLog.Read().First(e => e.After == "\"dark\""), ChangeLog.Read()) == "Undone";
                                 string csv = MainForm.LogsCsv(ChangeLog.Read());
-                                page &= csv.StartsWith("Time,Kind,What") && csv.Split('\n').Length >= 5 && MainForm.LogsText(ChangeLog.Read()).Contains("Undo of: ui");
+                                page &= csv.StartsWith("Time,Section,Kind,What") && csv.Split('\n').Length >= 5 && MainForm.LogsText(ChangeLog.Read()).Contains("Undo of: ui");
                                 string csv2 = MainForm.LogsCsv(new List<ChangeLog.Entry> { new ChangeLog.Entry { Id = "x", Target = "=HYPERLINK(\"http://x\")", Action = "a,b" } });
                                 page &= csv2.Contains("\"'=HYPERLINK(\"\"http://x\"\")\"") && !csv2.Contains(",=HYPERLINK") && csv2.Contains(",\"a,b\",");   // no formulas run in Excel
                                 if (!page) why += " [page " + string.Join(",", lf.NavRightItems) + " rows " + lf.LogsRowCount + "]";
@@ -1527,7 +1545,7 @@ namespace CDriveCleaner
                             }
                             check(rg, "Logs: each registry value Elixar changes is written down with the value before and after (also in plain words in changes.txt), undo puts back exactly the old value (numbers, bytes, lists, %variables%) or removes an added one, and never writes outside Elixar's own keys" + why);
                             check(sec, "Logs: passwords and tokens are never written to the log, only that they were removed, and they can't be put back from it");
-                            check(cmd && ps, "Logs: Windows commands and PowerShell that change something are written down in plain words (with the app or key they changed), and so are changed settings; ones that only read are not" + (cmd && ps ? "" : why));
+                            check(cmd && ps, "Logs: Windows commands and PowerShell that change something are written down in plain words (with the app or key they changed), and so are changed settings; ones that only read are not; each change sits under the part of Elixar that made it (Cleaner, Duplicates, Startup...)" + (cmd && ps ? "" : why));
                             check(rot, "Logs: a long log moves to changes-old.jsonl and both are still shown");
                             check(ui, "Logs: the Logs page sits next to Settings, filters and searches, shows before and after, and \"Undo this change\" puts the old value back");
                         }

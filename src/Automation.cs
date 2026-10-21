@@ -320,7 +320,8 @@ namespace CDriveCleaner
             return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name))).ToList();
         }
 
-        public static int AutoClean(bool notify)
+        public static int AutoClean(bool notify) { using (ChangeLog.In("Weekly clean")) return AutoCleanIn(notify); }
+        static int AutoCleanIn(bool notify)
         {
             if (Win.IsWindows && !Sys.IsAdmin()) { Log("Weekly clean skipped: it needs administrator rights."); return 1; }
             Log("Weekly clean started.");

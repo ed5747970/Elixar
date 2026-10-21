@@ -1381,6 +1381,16 @@ namespace CDriveCleaner
             d["Sysprep: Microsoft Store app updates paused"] = "Sysprep: עדכוני אפליקציות Microsoft Store הושהו";
             d["Sysprep: Microsoft Store app updates back on"] = "Sysprep: עדכוני אפליקציות Microsoft Store חזרו לפעול";
             d["Command"] = "פקודה";
+            d["Weekly clean"] = "ניקוי שבועי";
+            d["Smart scan"] = "סריקה חכמה";
+            d["Move folders"] = "העברת תיקיות";
+            d["Sysprep"] = "Sysprep";
+            d["Schedules"] = "תזמונים";
+            d["Install and updates"] = "התקנה ועדכונים";
+            d["OneDrive"] = "OneDrive";
+            d["Deleted"] = "נמחק";
+            d["Type:"] = "סוג:";
+            d["Section"] = "מדור";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["7 days"] = "7 ימים";

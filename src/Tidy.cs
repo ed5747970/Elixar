@@ -205,7 +205,8 @@ namespace CDriveCleaner
     public static class Tidy
     {
         // once a day, with administrator rights (the "Elixar\Daily tidy" schedule)
-        public static int Daily()
+        public static int Daily() { using (ChangeLog.In("Daily tidy")) return DailyIn(); }
+        static int DailyIn()
         {
             if (Win.IsWindows && !Sys.IsAdmin()) { Automation.Log("Daily tidy skipped: it needs administrator rights."); return 1; }
             var p = TidyPrefs.Load();

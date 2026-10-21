@@ -5,7 +5,9 @@ Made by Elisar
 
 NEW IN 1.2.31
 - Logs (next to Settings): every change Elixar makes to this PC, newest
-  first, grouped by day, each in plain words ("Startup: turned off
+  first, grouped by day, each under its own section on the left (Cleaner,
+  Duplicates, Smart scan, Startup, Phone, Sysprep... plus "Can be undone"
+  and "Deleted"), each in plain words ("Startup: turned off
   Spotify") with how to undo it. Registry values show before and after
   (startup switches read On / Off); also files moved to Undo, folders
   moved, each cleaned item, Windows commands that change something, apps

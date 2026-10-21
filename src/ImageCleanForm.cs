@@ -134,7 +134,7 @@ namespace CDriveCleaner
             busy = true; bClean.Enabled = false; list.Enabled = false; bClose.Enabled = false;
             // restore points last: everything before it can still be undone with one
             var order = sel.Where(i => i.Name != "Restore points").Concat(sel.Where(i => i.Name == "Restore points")).ToList();
-            Task.Factory.StartNew(() =>
+            Task.Factory.StartNew(() => ChangeLog.Within("Sysprep", () =>
             {
                 Write(Lang.T("Image cleanup started."));
                 foreach (var it in order)
@@ -145,7 +145,7 @@ namespace CDriveCleaner
                     ChangeLog.Cleaned(it, 0, problem, "Golden image cleanup");
                 }
                 Write(Lang.T("Image cleanup finished."));
-            }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            }), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 busy = false; list.Enabled = true; bClose.Enabled = true;
                 Measure();

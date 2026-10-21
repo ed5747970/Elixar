@@ -974,7 +974,7 @@ namespace CDriveCleaner
             progress.Maximum = toRun.Count;
             progress.Value = 0;
 
-            Task.Factory.StartNew(() =>
+            Task.Factory.StartNew(() => ChangeLog.Within("Cleaner", () =>
             {
                 foreach (var p in toKill) { try { p.Kill(); p.WaitForExit(5000); } catch { } }
                 if (toKill.Count > 0) Thread.Sleep(1500);
@@ -1020,7 +1020,7 @@ namespace CDriveCleaner
                 long total = Math.Max(0, Sys.Free() - start);
                 Log("Done. Total freed: " + Fs.Fmt(total));
                 return total;
-            }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            }), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 long total = t.IsFaulted ? 0 : t.Result;
                 if (t.IsFaulted) Log("Cleaning stopped with an error: " + t.Exception.GetBaseException().Message);

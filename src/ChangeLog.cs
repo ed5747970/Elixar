@@ -22,6 +22,7 @@ namespace CDriveCleaner
             public string Id { get; set; }
             public string Time { get; set; }           // local time, "s" format
             public string Kind { get; set; }           // Registry, Files, Windows command, Apps, Startup, Security, Settings, Email, Cleaning, Undo
+            public string Section { get; set; }        // the part of Elixar that made it: Cleaner, Duplicates, Startup... (see Sections)
             public string Action { get; set; }         // what was done, in a few words
             public string Target { get; set; }         // the key, file, app or command it was done to
             public string Before { get; set; }
@@ -52,6 +53,67 @@ namespace CDriveCleaner
         public static string FilePath { get { return File_; } }
         static string OldFile(string f) { return Path.Combine(Path.GetDirectoryName(f) ?? "", Path.GetFileNameWithoutExtension(f) + "-old.jsonl"); }
 
+        // ================= sections: which part of Elixar made each change =================
+        public static readonly string[] Sections =
+        {
+            "Cleaner", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "Drivers", "Phone", "Move folders",
+            "System space", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Other"
+        };
+
+        [ThreadStatic] static string scope;
+        // everything written down inside it belongs to that section (the Cleaner's DISM run, say)
+        public static IDisposable In(string section) { string was = scope; scope = section; return new Done(() => scope = was); }
+        public static T Within<T>(string section, Func<T> work) { using (In(section)) return work(); }
+        public static void Within(string section, Action work) { using (In(section)) work(); }
+
+        // a change that names its own section; restore points always go under Restore points
+        public static string SectionOf(Entry e)
+        {
+            if (e == null) return "Other";
+            if (!string.IsNullOrEmpty(e.Section)) return e.Section;
+            return Derive(e);
+        }
+
+        static bool Hs(string s, string w) { return (s ?? "").IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0; }
+
+        // from the words of the change: also sorts lines written before sections existed
+        public static string Derive(Entry e)
+        {
+            string a = e.Action ?? "", d = e.Detail ?? "", t = e.Target ?? "", all = a + " | " + d + " | " + t, k = e.Kind ?? "";
+            if (Hs(a, "restore point")) return "Restore points";
+            if (k == "Phone") return "Phone";
+            if (k == "Email") return "Email";
+            if (k == "Undo" || a.StartsWith("Put back from Undo") || a.StartsWith("Deleted from Undo")) return "Undo";
+            if (Hs(all, "Duplicates")) return "Duplicates";
+            if (Hs(all, "Smart scan") || a.StartsWith("Removed empty folders") || a.StartsWith("Compressed files")) return "Smart scan";
+            if (Hs(all, "Leftovers of removed apps")) return "Leftovers";
+            if (Hs(d, "Startup:") || Hs(a, "Startup") || Hs(t, @"\StartupApproved\") || Hs(t, @"\CurrentVersion\Run")) return "Startup";
+            if (Hs(all, "Weekly clean")) return "Weekly clean";
+            if (Hs(all, "Daily tidy") || a.StartsWith("Recycle Bin:")) return "Daily tidy";
+            if (Hs(all, "Golden image") || Hs(all, "Sysprep") || Hs(a, "answer file") || Hs(a, "capture kit") || Hs(a, "Start layout") || Hs(a, "default apps") || Hs(a, "event logs")) return "Sysprep";
+            if (Hs(d, "Privacy:")) return "Privacy";
+            if (Hs(a, "driver")) return "Drivers";
+            if (a.StartsWith("Moved a personal folder")) return "Move folders";
+            if (Hs(all, "Elixar's protected copy") || Hs(d, "Elixar installed") || Hs(d, "Elixar removed")) return "Install and updates";
+            if (k == "Settings" || d.StartsWith("Elixar setting")) return "Settings";
+            if (Hs(a, "scheduled task")) return "Schedules";
+            if (a.StartsWith("OneDrive")) return "OneDrive";
+            if (k == "Security" || d.StartsWith("Security:")) return "Security";
+            if (k == "Apps") return "Apps";
+            if (Hs(all, "Previous Windows")) return "Cleaner";
+            if (k == "Windows command") return "System space";
+            if (k == "Cleaning" || k == "Files") return "Cleaner";
+            return "Other";
+        }
+
+        // anything removed for good: files, registry values, phone files, restore points, logs
+        public static bool IsDeletion(Entry e)
+        {
+            string a = e.Action ?? "";
+            if (e.Failed || Hs(e.Detail, "left as it was")) return false;   // nothing was removed / a setting Elixar only lent for a moment
+            return a.StartsWith("Deleted") || a.StartsWith("Removed empty") || a.StartsWith("Emptied") || a.StartsWith("Cleared") || a.StartsWith("Uninstalled") || a.StartsWith("Removed a");
+        }
+
         // the steps inside a change Elixar already writes down as one line (the weekly clean's own schedule, say) are not written twice
         public static IDisposable Quiet() { quiet++; return new Done(() => quiet--); }
         class Done : IDisposable { readonly Action a; bool d; public Done(Action a) { this.a = a; } public void Dispose() { if (!d) { d = true; a(); } } }
@@ -74,6 +136,7 @@ namespace CDriveCleaner
             var now = NowOverride != null ? NowOverride() : DateTime.Now;
             if (string.IsNullOrEmpty(e.Id)) lock (rnd) e.Id = now.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture) + "-" + rnd.Next(0x10000).ToString("x4");
             e.Time = now.ToString("s", CultureInfo.InvariantCulture);
+            if (string.IsNullOrEmpty(e.Section)) { string dv = Derive(e); e.Section = dv == "Restore points" || scope == null ? dv : scope; }
             e.Kind = Cut(e.Kind, 40); e.Action = Cut(e.Action, 200); e.Target = Cut(e.Target, 400);
             e.Before = Cut(e.Before, 300); e.After = Cut(e.After, 300); e.Detail = Cut(e.Detail, 1000);
             string line;
@@ -153,7 +216,7 @@ namespace CDriveCleaner
             var w = e.When;
             string status = StatusOf(e, all);
             var sb = new StringBuilder();
-            sb.Append(w == DateTime.MinValue ? e.Time : w.ToString("ddd d MMM yyyy  HH:mm:ss", CultureInfo.InvariantCulture)).Append("   ").Append((e.Kind ?? "").ToUpperInvariant());
+            sb.Append(w == DateTime.MinValue ? e.Time : w.ToString("ddd d MMM yyyy  HH:mm:ss", CultureInfo.InvariantCulture)).Append("   ").Append(SectionOf(e).ToUpperInvariant()).Append("  (").Append(e.Kind ?? "").Append(")");
             if (status == "Failed") sb.Append("   ** FAILED **");
             else if (status == "Can be undone") sb.Append("   (can be undone in Elixar > Logs)");
             else if (status == "In Undo") sb.Append("   (files can be put back in Tools > Undo)");
@@ -222,7 +285,8 @@ namespace CDriveCleaner
                 catch { }
             }
             list.Reverse();
-            return list;
+            // newest first by the time of the change (a stable sort: changes in the same second keep their order)
+            return list.Select((e, i) => new { e, i }).OrderByDescending(x => x.e.When).ThenBy(x => x.i).Select(x => x.e).ToList();
         }
 
         public static string StatusOf(Entry e, List<Entry> all)
