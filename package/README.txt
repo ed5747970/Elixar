@@ -24,6 +24,9 @@ NEW IN 1.2.31
   salted hash; wrong tries make you wait longer each time; a recovery code
   (shown once) removes a forgotten one. Scheduled cleans and emails keep
   running. It stops other people using this PC; it doesn't encrypt files.
+- Dark mode: switched-off options (check boxes, lists, labels, buttons)
+  are written in near white instead of Windows' dark grey, so they stay
+  easy to read.
 - Fixed: in dark mode a list group title (e.g. "Caution - leftovers") could
   be drawn over a row instead of above the group.
 - After the first scan Elixar invites you once to connect your email

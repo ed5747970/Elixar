@@ -82,6 +82,8 @@ namespace CDriveCleaner
         static Color HeaderBack { get { return Color.FromArgb(48, 48, 58); } }
         static Color GroupInk { get { return Color.FromArgb(150, 150, 170); } }   // a list's own colour in the dark theme: group titles and their line
         static Color DisabledBack { get { return Color.FromArgb(40, 40, 48); } }
+        // text of a switched-off control in the dark theme: near white, so it stays easy to read (Windows' own grey isn't)
+        public static Color DisabledInk { get { return Color.FromArgb(200, 200, 212); } }
 
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr hwnd, string app, string idList);
@@ -125,6 +127,7 @@ namespace CDriveCleaner
             {
                 var cb = (ComboBox)c;
                 cb.BackColor = Panel; cb.ForeColor = Ink;
+                DarkCombo(cb);
                 // Windows 10/11 draw a dark drop-down with their own dark theme; elsewhere a flat one takes the colours
                 if (Win.IsWindows) try { SetWindowTheme(cb.Handle, "DarkMode_CFD", null); } catch { cb.FlatStyle = FlatStyle.Flat; }
                 else cb.FlatStyle = FlatStyle.Flat;
@@ -143,6 +146,7 @@ namespace CDriveCleaner
                 DarkDisabled(b);
             }
             else if (c is LinkLabel) { var l = (LinkLabel)c; l.LinkColor = Accent; l.ActiveLinkColor = Color.White; }
+            else if (c is CheckBox || c is RadioButton || c is Label) DarkDisabledText(c);
             else if (c is TabControl) DarkTabs((TabControl)c);
             else if (c is TabPage) { c.BackColor = Back; }
             else if (c is GroupBox) DarkGroup((GroupBox)c);
@@ -333,9 +337,71 @@ namespace CDriveCleaner
                 var g = e.Graphics;
                 using (var br = new SolidBrush(DisabledBack)) g.FillRectangle(br, b.ClientRectangle);
                 using (var p = new Pen(Grid)) g.DrawRectangle(p, 0, 0, b.Width - 1, b.Height - 1);
-                TextRenderer.DrawText(g, b.Text, b.Font, b.ClientRectangle, Color.FromArgb(118, 118, 134),
+                TextRenderer.DrawText(g, b.Text, b.Font, b.ClientRectangle, Color.FromArgb(176, 176, 190),
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak);
             };
+        }
+
+        // Windows writes the text of a switched-off check box, option or label in a dark grey that can't be read on a dark
+        // background. Elixar writes it again over it in near white (the box and dot stay as Windows draws them).
+        // controls that already have the handler; weak, so cards made again and again don't stay in memory
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Control, object> textFixed = new System.Runtime.CompilerServices.ConditionalWeakTable<Control, object>();
+        static bool FirstTime(Control c) { object x; if (textFixed.TryGetValue(c, out x)) return false; textFixed.Add(c, c); return true; }
+
+        static void DarkDisabledText(Control c)
+        {
+            if (!FirstTime(c)) return;
+            c.Paint += (o, e) =>
+            {
+                if (c.Enabled || !Dark || string.IsNullOrEmpty(c.Text)) return;
+                var g = e.Graphics;
+                bool rtl = c.RightToLeft == RightToLeft.Yes;
+                var flags = TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | (rtl ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left);
+                Rectangle r = c.ClientRectangle;
+                bool glyphRight = rtl && Win.IsWindows;   // Windows mirrors the box to the right in Hebrew; Mono keeps it on the left
+                if (c is CheckBox || c is RadioButton)
+                {
+                    var cb = c as CheckBox;
+                    if (cb != null && cb.Appearance == Appearance.Button) return;
+                    int glyph;
+                    try { glyph = c is CheckBox ? CheckBoxRenderer.GetGlyphSize(g, System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal).Width
+                                                : RadioButtonRenderer.GetGlyphSize(g, System.Windows.Forms.VisualStyles.RadioButtonState.UncheckedNormal).Width; }
+                    catch { glyph = 13; }
+                    int skip = glyph + 2;
+                    var clear = glyphRight ? new Rectangle(0, 0, Math.Max(0, r.Width - skip), r.Height) : new Rectangle(skip, 0, Math.Max(0, r.Width - skip), r.Height);
+                    using (var br = new SolidBrush(c.Parent != null ? c.Parent.BackColor : Back)) g.FillRectangle(br, clear);
+                    r = glyphRight ? new Rectangle(0, 0, Math.Max(0, r.Width - skip - 2), r.Height) : new Rectangle(skip + 2, 0, Math.Max(0, r.Width - skip - 2), r.Height);
+                }
+                else
+                {
+                    var l = (Label)c;
+                    using (var br = new SolidBrush(l.BackColor.A == 0 && l.Parent != null ? l.Parent.BackColor : l.BackColor)) g.FillRectangle(br, r);
+                    if (!l.AutoSize || l.MaximumSize.Width > 0) flags = (flags & ~TextFormatFlags.VerticalCenter) | TextFormatFlags.Top;
+                }
+                TextRenderer.DrawText(g, c.Text, c.Font, r, DisabledInk, flags);
+            };
+            c.EnabledChanged += (o, e) => c.Invalidate();
+        }
+
+        // drop-down lists: Elixar draws their items, so a switched-off one shows its choice in near white too
+        static void DarkCombo(ComboBox cb)
+        {
+            if (cb.DrawMode != DrawMode.Normal || !FirstTime(cb)) return;
+            cb.DrawMode = DrawMode.OwnerDrawFixed;
+            cb.DrawItem += (o, e) =>
+            {
+                bool edit = (e.State & DrawItemState.ComboBoxEdit) != 0, sel = (e.State & DrawItemState.Selected) != 0 && !edit;
+                Color back = !cb.Enabled ? DisabledBack : sel ? Color.FromArgb(72, 64, 120) : Panel;
+                using (var br = new SolidBrush(back)) e.Graphics.FillRectangle(br, e.Bounds);
+                if (e.Index >= 0)
+                {
+                    string t = cb.GetItemText(cb.Items[e.Index]);
+                    bool rtl = cb.RightToLeft == RightToLeft.Yes;
+                    TextRenderer.DrawText(e.Graphics, t, cb.Font, Rectangle.Inflate(e.Bounds, -3, 0), cb.Enabled ? Ink : DisabledInk,
+                        TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | (rtl ? TextFormatFlags.Right | TextFormatFlags.RightToLeft : TextFormatFlags.Left));
+                }
+            };
+            cb.EnabledChanged += (o, e) => cb.Invalidate();
         }
 
         // items added later keep their light-theme colours: remap them when a list changes
