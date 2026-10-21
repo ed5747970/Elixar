@@ -111,7 +111,7 @@ namespace CDriveCleaner
         void SwitchStartup(bool on)
         {
             var sel = StartSelected().Where(x => x.Enabled != on).ToList();
-            if (sel.Count == 0 || testMode) return;
+            if (sel.Count == 0 || testMode || Policy.Blocked(this, "startup.change")) return;
             int ok = sel.Count(x => StartupApps.SetEnabled(x, on));
             Log("Startup: turned " + (on ? "on " : "off ") + ok + " of " + sel.Count + ": " + string.Join(", ", sel.Select(x => x.Name)));
             RefreshStartup();
@@ -120,7 +120,7 @@ namespace CDriveCleaner
         void RemoveStartupLeftovers()
         {
             var left = startList.Items.Cast<ListViewItem>().Select(r => (StartupEntry)r.Tag).Where(x => x.Missing).ToList();
-            if (left.Count == 0 || testMode) return;
+            if (left.Count == 0 || testMode || Policy.Blocked(this, "startup.change")) return;
             if (Lang.Box(this, "Remove " + left.Count + " startup entries whose program is gone?\n\n" + string.Join("\n", left.Take(12).Select(x => "  - " + x.Name)) +
                     "\n\nThey are kept in Tools > Undo for 7 days.", "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
             int n = StartupApps.RemoveLeftovers(left, Log);

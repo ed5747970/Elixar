@@ -37,6 +37,9 @@ namespace CDriveCleaner
             string keepChangeLog = ChangeLog.OverrideFile;
             try { Directory.CreateDirectory(root); } catch { }
             ChangeLog.OverrideFile = Path.Combine(root, "changes-selftest.jsonl");
+            // the tests run with Elixar's Default policy, whatever policy this PC has
+            string keepPolicy = Policy.OverrideFile; var keepOrg = Policy.OrgOverride;
+            Policy.OverrideFile = Path.Combine(root, "policy-selftest.txt"); Policy.OrgOverride = () => new Dictionary<string, string>(); Policy.Load();
             try
             {
                 // 1. delete logic, in a throwaway folder
@@ -1515,7 +1518,7 @@ namespace CDriveCleaner
                                 ChangeLog.Command("vssadmin.exe", "delete shadows /for=C: /all /quiet", "", 0);
                                 var lf = new MainForm(true);
                                 lf.LogsLoad();
-                                bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs" }) && lf.LogsRowCount == 3;
+                                bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && lf.LogsRowCount == 3;
                                 lf.LogsSetFilter(1, 2, ""); page &= lf.LogsRowCount == 2;          // Registry only
                                 lf.LogsSetFilter(0, 2, "vssadmin"); page &= lf.LogsRowCount == 1;   // search
                                 lf.LogsSetFilter(0, 2, ""); page &= lf.LogsSections.Contains("*:3") && lf.LogsSections.Contains("Restore points:1") && lf.LogsSections.Contains("#undo:2") && lf.LogsSections.Contains("#deleted:1");
@@ -1548,6 +1551,83 @@ namespace CDriveCleaner
                             check(cmd && ps, "Logs: Windows commands and PowerShell that change something are written down in plain words (with the app or key they changed), and so are changed settings; ones that only read are not; each change sits under the part of Elixar that made it (Cleaner, Duplicates, Startup...)" + (cmd && ps ? "" : why));
                             check(rot, "Logs: a long log moves to changes-old.jsonl and both are still shown");
                             check(ui, "Logs: the Logs page sits next to Settings, filters and searches, shows before and after, and \"Undo this change\" puts the old value back");
+                        }
+                        // Policy manager: Default and Custom rules, an organization's rules win, export / import, and the rules at work
+                        {
+                            string pd = Path.Combine(root, "policy"); Directory.CreateDirectory(pd);
+                            string keepPf = Policy.OverrideFile, keepCl = ChangeLog.OverrideFile, keepTp = TidyPrefs.OverrideFile; var keepOg = Policy.OrgOverride;
+                            Policy.OverrideFile = Path.Combine(pd, "policy.txt"); ChangeLog.OverrideFile = Path.Combine(pd, "changes.jsonl"); TidyPrefs.OverrideFile = Path.Combine(pd, "tidy.txt");
+                            var org = new Dictionary<string, string>(); Policy.OrgOverride = () => org;
+                            bool model = false, files = false, work = false, pui = false; string pwhy = "";
+                            try
+                            {
+                                Policy.Load();
+                                // Default = how Elixar works without a policy
+                                model = Policy.Rules.All(r => Policy.Get(r.Key) == r.Default) && Policy.MaxTier == Tier.Caution && Policy.Rules.Where(r => r.Values.Contains("block")).All(r => Policy.Allowed(r.Key)) &&
+                                        Policy.Rules.All(r => r.Valid(r.Default) && r.Values.Length == r.Labels.Length);
+                                var c = Policy.Defaults(); c["clean.level"] = "safe"; c["apps.remove"] = "block"; c["undo.days"] = "7"; c["bogus"] = "x"; c["phone"] = "maybe";
+                                model &= Policy.Save(true, c) == null && Policy.Get("clean.level") == "safe" && !Policy.Allowed("apps.remove") && Policy.Allowed("phone") && Policy.Source("apps.remove") == "custom" &&
+                                         Policy.MaxTier == Tier.Safe && TidyPrefs.Load().UndoDays == 7 && Policy.Fixes("undo.days") && !Policy.Fixes("bin.days");
+                                var cl = ChangeLog.Read();
+                                model &= cl.Any(e => e.Action == "Policy: switched to Custom") && cl.Any(e => e.Action == "Policy: What the Cleaner may delete" && e.Before.StartsWith("Everything") && e.After == "Safe only" && ChangeLog.SectionOf(e) == "Policy");
+                                // back to Default: the custom rules are kept for later
+                                Policy.Save(false, Policy.Custom); Policy.Load();
+                                model &= Policy.Get("clean.level") == "everything" && Policy.Allowed("apps.remove") && !Policy.UseCustom && Policy.Custom["clean.level"] == "safe" && TidyPrefs.Load().UndoDays == 30;
+                                // an organization's rule wins, also over Default
+                                org["apps.remove"] = "block"; org["clean.level"] = "nonsense";
+                                model &= !Policy.Allowed("apps.remove") && Policy.Source("apps.remove") == "organization";
+                                org.Clear();
+                                // presets
+                                var ld = Policy.Preset("Locked down (shared PC)");
+                                model &= ld["apps.remove"] == "block" && ld["pin.open"] == "required" && Policy.Preset("Balanced (same as Default)").All(kv => kv.Value == Policy.Rule(kv.Key).Default) && Policy.Differences(ld) >= 8;
+                                if (!model) pwhy += " [rules]";
+                                // export / import: only known rules with allowed values; a changed file is noticed
+                                string ex = Policy.ExportText(ld);
+                                var im = Policy.Import(ex);
+                                files = im.FingerprintOk && im.Problems.Count == 0 && Policy.Rules.All(r => im.Rules[r.Key] == ld[r.Key]);
+                                var bad = Policy.Import(ex.Replace("apps.remove=block", "apps.remove=allow"));
+                                files &= !bad.FingerprintOk && bad.Rules["apps.remove"] == "allow";
+                                var odd = Policy.Import("clean.level=delete-everything\nrun=calc.exe\nphone=block");
+                                files &= odd.Rules["clean.level"] == "everything" && odd.Rules["phone"] == "block" && odd.Problems.Count == 2 && !odd.HadFingerprint;
+                                files &= Policy.Import("MZ\u0090garbage").Problems.Contains("Not an Elixar policy file.") && Policy.Import(new string('a', 70000)).Problems.Count > 0;
+                                string reg = Policy.RegText(ld);
+                                files &= reg.StartsWith("Windows Registry Editor Version 5.00") && reg.Contains("[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Elixar]") && reg.Contains("\"apps.remove\"=\"block\"");
+                                if (!files) pwhy += " [files]";
+                                // the rules at work: weekly clean items, cleaning levels
+                                var c2 = Policy.Defaults(); c2["clean.level"] = "review"; Policy.Save(true, c2);
+                                work = Automation.AutoItems().All(i => i.Tier != Tier.Caution) && Policy.MaxTier == Tier.Review;
+                                Policy.Save(false, c2);
+                                work &= Automation.AutoItems().Count >= Automation.AutoItems().Count(i => i.Tier != Tier.Caution);
+                                if (!work) pwhy += " [at work]";
+                                // the Policy manager tab, next to Logs
+                                var f = new MainForm(true);
+                                pui = f.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && !f.PolicyComboEnabled("phone") && !f.PolicyDirty && f.PolicyStatusText.StartsWith(Lang.T("Default policy"));
+                                bool phoneBase = f.NavGreyed.Contains("Phone");   // on Linux the Phone tab is greyed out anyway
+                                f.PolicySetMode(true); pui &= f.PolicyComboEnabled("phone") && f.PolicyDirty;
+                                f.PolicySet("phone", "block");
+                                string asked = null; MainForm.PolicyConfirmHook = q => { asked = q; return DialogResult.Yes; };
+                                pui &= f.PolicySave() == null && !Policy.Allowed("phone") && f.NavGreyed.Contains("Phone") && !f.PolicyDirty;
+                                f.PolicySetMode(false);
+                                pui &= f.PolicySave() == null && asked != null && Policy.Allowed("phone") && f.NavGreyed.Contains("Phone") == phoneBase;   // looser: it asked first
+                                f.PolicySetMode(true); f.PolicyUsePreset("Careful");
+                                pui &= f.PolicyDirty && f.PolicyStatusText.Contains("5");
+                                pui &= f.PolicyImportText(Policy.ExportText(ld)) && f.PolicyDirty;
+                                org["email"] = "block"; f.ShowPolicy(); f.PolicySetMode(false); f.PolicySetMode(true);
+                                var f2 = new MainForm(true);
+                                pui &= !f2.PolicyComboEnabled("email") && f2.NavGreyed.Contains("Email");
+                                f2.Dispose(); f.Dispose(); org.Clear();
+                                if (!pui) pwhy += " [tab]";
+                            }
+                            catch (Exception ex2) { pwhy += " ERROR: " + ex2.GetType().Name + ": " + ex2.Message; }
+                            finally
+                            {
+                                MainForm.PolicyConfirmHook = null;
+                                Policy.OverrideFile = keepPf; ChangeLog.OverrideFile = keepCl; TidyPrefs.OverrideFile = keepTp; Policy.OrgOverride = keepOg; Policy.Load();
+                            }
+                            check(model, "Policy: Default is how Elixar works without a policy; Custom rules work, are written to Logs, and are kept when you switch back to Default; an organization's rule wins" + (model ? "" : pwhy));
+                            check(files, "Policy: export and import take only known rules with allowed values, a changed file is noticed, and the .reg file for IT sets HKLM\\SOFTWARE\\Policies\\Elixar" + (files ? "" : pwhy));
+                            check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level" + (work ? "" : pwhy));
+                            check(pui, "Policy: the Policy manager tab sits next to Logs, switches between Default and Custom, uses presets and imports, asks before making rules looser, and turns tabs off" + (pui ? "" : pwhy));
                         }
                     }
                     // ---- similar photos, empty folders, compression ----
@@ -2095,6 +2175,7 @@ namespace CDriveCleaner
             finally
             {
                 ChangeLog.OverrideFile = keepChangeLog;
+                Policy.OverrideFile = keepPolicy; Policy.OrgOverride = keepOrg; Policy.Load();
                 try { Fs.Delete(root); } catch { }
                 Catalog.WindowsOnLinux = false; MainForm.ForceWindowsUi = false;
             }

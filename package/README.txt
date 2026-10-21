@@ -4,6 +4,13 @@ Made by Elisar
 =======================
 
 NEW IN 1.2.31
+- Policy manager (next to Logs): the rules for what Elixar may change on
+  this PC. Default = Elixar's own rules (works exactly as before); Custom =
+  your copy, kept when you switch back. Presets (Careful, Deep clean,
+  Golden image, Locked down), cleaning level, restore points, Undo days,
+  which tools are allowed, required PIN. Export / import a policy file,
+  or export a .reg for IT (HKLM\SOFTWARE\Policies\Elixar via Group Policy /
+  Intune): those rules are locked as "Set by your organization".
 - Logs (next to Settings): every change Elixar makes to this PC, newest
   first, grouped by day, each under its own section on the left (Cleaner,
   Duplicates, Smart scan, Startup, Phone, Sysprep... plus "Can be undone"

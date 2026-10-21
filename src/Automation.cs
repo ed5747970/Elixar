@@ -317,7 +317,7 @@ namespace CDriveCleaner
             // Windows' own update leftovers ($GetCurrent, $WinREAgent), and only when they are ticked: no update or upgrade is
             // running and nothing waits for a restart. They go to Undo first.
             // (Linux: only what runs as you; the system parts need your password, so they're never done unattended)
-            return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name))).ToList();
+            return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name)) && i.Tier <= Policy.MaxTier).ToList();
         }
 
         public static int AutoClean(bool notify) { using (ChangeLog.In("Weekly clean")) return AutoCleanIn(notify); }
@@ -553,6 +553,7 @@ namespace CDriveCleaner
                 cmbBinDays.Enabled = chkBin.Checked;
                 cmbUndoDays.SelectedIndex = Math.Max(0, Array.IndexOf(TidyPrefs.UndoChoices, p.UndoDays));
                 chkLowClean.Checked = p.LowClean;
+                ApplyPolicyUi();   // what the policy fixes is shown, and locked
             }
             int days = BinDaysChosen;
             System.Threading.Tasks.Task.Factory.StartNew(() =>

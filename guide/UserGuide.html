@@ -55,7 +55,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -103,7 +103,7 @@
 <h3>Folders to watch</h3>
 <p>Elixar writes down the size of each place on the Dashboard once a day (sizes only, never file names). After two weeks it knows which folders <strong>always grow</strong> (in at least 3 of every 4 weeks) and which <strong>grow fast</strong> (2 GB a month or more). The <strong>Watch</strong> tile on the Dashboard shows the one that most needs a look; click it for the full list: how much each one grows a month, what to do about it, and how often to look (every week from 5 GB a month, every 2 weeks from 1 GB, otherwise every month). After you look, click <strong>I checked it</strong>: the folder stays quiet until its next look is due. The weekly email and the exported report list them too.</p>
 <h3>The tabs</h3>
-<p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> (the gear) and <strong>Logs</strong> (every change Elixar made) on the right. A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
+<p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> (the gear) <strong>Logs</strong> (every change Elixar made) and <strong>Policy manager</strong> (the rules for what Elixar may change) on the right. A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
 <h3>C: Overview</h3>
 <ul>
   <li><strong>The ring:</strong> how full C: is, the free space in the middle, and one plain sentence: in good shape, getting full (under 20% or 25 GB free) or almost full (under 10% or 8 GB). It also warns when the space trend says C: fills up within a year.</li>
@@ -284,6 +284,22 @@
 </ul>
 <p>Passwords, PINs, tokens and recovery codes are never written to the log, only that they were set or removed, and email addresses are shortened. The log is in C:\ProgramData\Elixar, which only administrators can change; at 4 MB it moves to changes-old.jsonl and a new one starts, and both are shown.</p>
 
+<h2 id="policy">Policy manager</h2>
+<p>The <strong>Policy manager</strong> tab, next to Logs, holds the rules for what Elixar may change on this PC and how. Choose <strong>Default</strong> or <strong>Custom</strong> at the top:</p>
+<ul>
+  <li><strong>Default</strong> is Elixar&rsquo;s own rules: exactly how Elixar works without a policy (every clean asks first, everything is allowed, your choices in Automation and Settings count).</li>
+  <li><strong>Custom</strong> is your own copy. Change any rule, or <strong>start from a preset</strong>: Careful, Deep clean, Golden image (IT) or Locked down (shared PC). Rules that differ from Default are marked &ldquo;Changed&rdquo;. Switching back to Default keeps your custom rules for later. Click <strong>Save the policy</strong>; making the rules less strict asks first.</li>
+</ul>
+<table>
+  <tr><th>Rule</th><th>What it does</th></tr>
+  <tr><td>What the Cleaner may delete</td><td>Everything, Safe and Check first, or Safe only. Items above the level are left out of every clean, also the weekly clean</td></tr>
+  <tr><td>Restore point before a clean</td><td>You choose each time, always, or never (the tick box in the Cleaner follows it)</td></tr>
+  <tr><td>Undo days, old Recycle Bin items, clean when C: is low</td><td>Fix the Automation choices; they are then locked in Automation</td></tr>
+  <tr><td>Remove apps, change startup programs, remove drivers, phone tools, Sysprep tools, email</td><td>Allowed or not allowed. A tool that isn&rsquo;t allowed says so, and the Phone and Email tabs are greyed out</td></tr>
+  <tr><td>PIN to open Elixar, PIN to change the policy</td><td>Required PINs can&rsquo;t be turned off; changing the policy then asks for the PIN first</td></tr>
+</table>
+<p><strong>Export&hellip;</strong> saves the rules as an .elixarpolicy file; <strong>Import&hellip;</strong> on another PC takes only known rules with allowed values and warns if the file was changed after it was exported. <strong>Export for IT (.reg)&hellip;</strong> makes a registry file for HKLM\SOFTWARE\Policies\Elixar: deployed with Group Policy or Intune, those rules are <strong>set by your organization</strong>, win over Default and Custom, and are locked. The line under the rules says whether this PC follows its policy (for example, a required PIN that isn&rsquo;t set yet). Every change to the policy is written to Logs (section Policy). The policy is kept in C:\ProgramData\Elixar\policy.txt, which only administrators can change.</p>
+
 <h2 id="email">Email account and reports (Settings)</h2>
 <p>Connect your email in <strong>Settings &rsaquo; Email account</strong>. Choose which kind you have:</p>
 <table>
@@ -412,7 +428,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
-  <tr><td>2026-10-19</td><td>1.2.31</td><td>Logs tab next to Settings: every change Elixar makes (registry values with before and after, files, commands, apps, security, settings), with search, filters, export and one-click undo for registry values. Dark mode: switched-off options are written in near white, easy to read. Optional PIN (4, 6 or 8 digits) or password for opening Elixar (Settings &rsaquo; Security and protection &rsaquo; Secure your data with a PIN or password) with a recovery code. Dark-mode group titles drawn in the right place. A one-time invitation to connect email after the first scan (Not now / Don't ask again). Gmail can connect with an app password when this copy has no Google sign-in. Windows update leftovers ($GetCurrent, $WinREAgent) are removed when it is safe (also by the weekly clean), including their protected parts; what can't be removed is reported. Dashboard &rsaquo; Watch: the folders that always grow or grow fast, with advice and how often to look at them (also in the weekly email and the report). New slogan: the cure for a cluttered PC; tidier Dashboard header. Tools &rsaquo; Sysprep &rsaquo; Golden image: finds saved passwords and keys, programs that clone their ID, Entra/Intune; Audit mode, VM checkpoint reminder, Start layout and default apps for new accounts; Image cleanup, Image passport and Capture kit</td></tr>
+  <tr><td>2026-10-19</td><td>1.2.31</td><td>Policy manager next to Logs: Default or Custom rules for what Elixar may change, presets, export / import, a .reg file for IT, organization rules (Group Policy / Intune). Logs tab next to Settings: every change Elixar makes (registry values with before and after, files, commands, apps, security, settings), with search, filters, export and one-click undo for registry values. Dark mode: switched-off options are written in near white, easy to read. Optional PIN (4, 6 or 8 digits) or password for opening Elixar (Settings &rsaquo; Security and protection &rsaquo; Secure your data with a PIN or password) with a recovery code. Dark-mode group titles drawn in the right place. A one-time invitation to connect email after the first scan (Not now / Don't ask again). Gmail can connect with an app password when this copy has no Google sign-in. Windows update leftovers ($GetCurrent, $WinREAgent) are removed when it is safe (also by the weekly clean), including their protected parts; what can't be removed is reported. Dashboard &rsaquo; Watch: the folders that always grow or grow fast, with advice and how often to look at them (also in the weekly email and the report). New slogan: the cure for a cluttered PC; tidier Dashboard header. Tools &rsaquo; Sysprep &rsaquo; Golden image: finds saved passwords and keys, programs that clone their ID, Entra/Intune; Audit mode, VM checkpoint reminder, Start layout and default apps for new accounts; Image cleanup, Image passport and Capture kit</td></tr>
   <tr><td>2026-10-19</td><td>1.2.30</td><td>Tools &rsaquo; Sysprep &rsaquo; Answer file: make, load and check unattend.xml (name, language, time zone, setup screens, account, built-in Administrator and its password, CopyProfile, drivers, first sign-in commands); save to Sysprep's folder or run Sysprep with it</td></tr>
   <tr><td>2026-10-19</td><td>1.2.29</td><td>Tools &rsaquo; Sysprep: checks what stops Sysprep (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state, a pending restart) and offers Microsoft's fix for each; reads Sysprep's log</td></tr>
   <tr><td>2026-10-19</td><td>1.2.28</td><td>Security check: Undo never fills a drive (files stay on their own drive when it is full, files from C: go to a second drive, and a copy is refused when no drive has room); old copies left in Program Files after an update are removed</td></tr>

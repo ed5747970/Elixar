@@ -226,6 +226,7 @@ namespace CDriveCleaner
             BuildPhone();
             BuildSettingsTab();
             BuildLogsTab();
+            BuildPolicyTab();
             BuildEmailClean();
             BuildLinuxTab();
             BuildOneDriveTab();
@@ -240,6 +241,7 @@ namespace CDriveCleaner
             if (LinuxUi) tabs.TabPages.Add(pageLinux);
             tabs.TabPages.Add(pageSettings);
             tabs.TabPages.Add(pageLogs);
+            tabs.TabPages.Add(pagePolicy);
             bool appsLoaded = false, autoLoaded = false;
             tabs.SelectedIndexChanged += (o, e) =>
             {
@@ -251,9 +253,11 @@ namespace CDriveCleaner
                 if (tabs.SelectedTab == pagePhone) OnPhoneTab();
                 if (tabs.SelectedTab == pageLinux) OnLinuxTab();
                 if (tabs.SelectedTab == pageLogs) OnLogsTab();
+                if (tabs.SelectedTab == pagePolicy) OnPolicyTab();
                 if (tabs.SelectedTab == pageOneDrive) OnOneDriveTab();
             };
             BuildNav();
+            ApplyPolicyUi();
             BuildTray();
             Controls.Add(tabHost);
             Controls.Add(nav);
@@ -325,7 +329,7 @@ namespace CDriveCleaner
             Theme.Apply(this); Lang.Apply(this); Theme.Watch(this);
             Shown += (o, e) =>
             {
-                if (!testMode) { var pt = new System.Windows.Forms.Timer { Interval = 1500 }; pt.Tick += (o2, e2) => { pt.Stop(); pt.Dispose(); if (Form.ActiveForm == this) OfferPinOnce(); }; pt.Start(); }
+                if (!testMode) { var pt = new System.Windows.Forms.Timer { Interval = 1500 }; pt.Tick += (o2, e2) => { pt.Stop(); pt.Dispose(); if (Form.ActiveForm == this) { PolicyPinCheck(); OfferPinOnce(); } }; pt.Start(); }
                 Log("Elixar " + (LinuxUi ? "(running as you; system items ask for your password when you clean them)" : Sys.IsAdmin() ? "(running as administrator)" : "(NOT running as administrator - some items will be skipped)"));
                 Log(lastScan == null ? "First scan..." : "Scanning and comparing with the scan from " + ScanSnapshot.FmtWhen(lastScan.Time) + "...");
                 RefreshOverview();
@@ -937,6 +941,8 @@ namespace CDriveCleaner
         void CleanItems(List<CleanItem> sel)
         {
             if (testMode || cleaningNow || !ready || sel.Count == 0) return;
+            sel = PolicyFilter(sel);
+            if (sel.Count == 0) return;
 
             long est = sel.Where(i => !i.SizeUnknown).Sum(i => i.Size);
             var lines = sel.Select(i => "  - " + Lang.T(i.Name) + "  (" + (i.SizeUnknown ? Lang.T("varies") : Fs.Fmt(i.Size)) + ")");
@@ -967,7 +973,8 @@ namespace CDriveCleaner
             }
             if (toRun.Count == 0) return;
 
-            bool restore = chkRestore.Checked;
+            string rpRule = Policy.Get("clean.restore");
+            bool restore = rpRule == "always" ? !LinuxUi : rpRule == "never" ? false : chkRestore.Checked;
             SetBusy(true);
             cleaningNow = true;
             RefreshOverview();

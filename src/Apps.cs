@@ -367,7 +367,7 @@ namespace CDriveCleaner
 
         public void UninstallProgram(AppEntry a)
         {
-            if (a == null || testMode) return;
+            if (a == null || testMode || Policy.Blocked(this, "apps.remove")) return;
             var ok = Lang.Box(this,
                 "Uninstall " + a.Name + "?\n\nThis opens the app's own uninstaller (the same one Windows uses). Follow its steps.\n" +
                 "Size: " + Fs.Fmt(a.Size) + "\n\nWhen it has finished, click Refresh.",

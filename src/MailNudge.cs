@@ -47,7 +47,7 @@ namespace CDriveCleaner
         // called when the Dashboard is filled in: asks once the person is looking at Elixar, a few seconds later
         void MaybeNudgeMail(DashSummary m)
         {
-            if (nudgeDone || testMode || m == null || !m.Measured || m.MailEmail != null) return;
+            if (nudgeDone || testMode || m == null || !m.Measured || m.MailEmail != null || !Policy.Allowed("email")) return;
             string state = Settings.Get("MailNudge", "");
             if (!MailNudge.Due(state, DateTime.Today, false)) { nudgeDone = true; return; }
             nudgeDone = true;

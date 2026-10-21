@@ -1,0 +1,362 @@
+// Policy manager (next to Logs): Default or Custom rules for what Elixar may change, presets, export / import, a .reg file for IT,
+// and whether this PC follows its policy. Every change to the policy is written to Logs.
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+
+namespace CDriveCleaner
+{
+    public partial class MainForm
+    {
+        TabPage pagePolicy;
+        RadioButton rbPolDefault, rbPolCustom;
+        Label polStatus, polOrg, polCheck;
+        ComboBox polPreset;
+        Button btnPolPreset, btnPolSave, btnPolDiscard, btnPolExport, btnPolImport, btnPolReg, btnPolFix;
+        TableLayoutPanel polGrid;
+        readonly Dictionary<string, ComboBox> polCombos = new Dictionary<string, ComboBox>();
+        readonly Dictionary<string, Label> polMarks = new Dictionary<string, Label>();
+        Dictionary<string, string> polEdit = Policy.Defaults();
+        bool polCustom, polFilling;
+        Label sysprepBlocked;
+        public static Func<string, DialogResult> PolicyConfirmHook;   // self-test: answers the questions
+
+        // for the self-test and previews
+        public bool PolicyDirty { get { return btnPolSave != null && btnPolSave.Enabled; } }
+        public string PolicyStatusText { get { return polStatus.Text; } }
+        public void PolicySetMode(bool custom) { (custom ? rbPolCustom : rbPolDefault).Checked = true; }
+        public void PolicySet(string key, string value) { var cb = polCombos[key]; var r = Policy.Rule(key); cb.SelectedIndex = Array.IndexOf(r.Values, value); }
+        public void PolicyUsePreset(string name) { polPreset.SelectedIndex = Array.IndexOf(Policy.PresetNames, name); PolicyPreset(); }
+        public string PolicySave() { return PolicySaveNow(); }
+        public bool PolicyComboEnabled(string key) { return polCombos[key].Enabled; }
+        public void ShowPolicy() { tabs.SelectedTab = pagePolicy; }
+
+        DialogResult PolAsk(string text, bool warn)
+        {
+            if (PolicyConfirmHook != null) return PolicyConfirmHook(text);
+            return warn ? Lang.BoxNo(this, text, "Elixar") : Lang.Box(this, text, "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        }
+
+        void BuildPolicyTab()
+        {
+            pagePolicy = new TabPage("Policy manager") { BackColor = Color.FromArgb(246, 248, 251) };
+            var t = Page(7);
+            for (int i = 0; i < 4; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.Controls.Add(Title("Policy manager"), 0, 0);
+            t.Controls.Add(Note("A policy decides what Elixar may change on this PC and how. Default is Elixar's own rules: exactly how Elixar works without a policy. " +
+                                "Custom is your own copy: change any rule, and switch back to Default any time - your custom rules are kept. Every change to the policy is written to Logs."), 0, 1);
+
+            // Default / Custom, like a switch
+            var top = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, S(6)) };
+            Func<string, RadioButton> seg = s => new RadioButton { Text = s, Appearance = Appearance.Button, AutoSize = false, Size = new Size(S(120), S(32)), TextAlign = ContentAlignment.MiddleCenter,
+                                                                    FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(0, 0, 0, 0) };
+            rbPolDefault = seg("Default"); rbPolCustom = seg("Custom");
+            rbPolDefault.FlatAppearance.BorderColor = rbPolCustom.FlatAppearance.BorderColor = Theme.Grid;
+            polStatus = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(S(16), S(7), 0, 0), UseMnemonic = false };
+            top.Controls.AddRange(new Control[] { rbPolDefault, rbPolCustom, polStatus });
+            t.Controls.Add(top, 0, 2);
+
+            var presetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, S(4)) };
+            polPreset = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(240), Margin = new Padding(0, S(2), S(8), 0) };
+            polPreset.Items.AddRange(Policy.PresetNames); polPreset.SelectedIndex = 0;
+            btnPolPreset = MakeButton("Use this preset");
+            polOrg = new Label { AutoSize = true, ForeColor = Theme.MapFore(Color.FromArgb(150, 90, 0)), Margin = new Padding(S(16), S(6), 0, 0), UseMnemonic = false, MaximumSize = new Size(S(560), 0) };
+            presetRow.Controls.AddRange(new Control[] { new Label { AutoSize = true, Text = "Start from a preset:", Margin = new Padding(S(2), S(6), S(6), 0) }, polPreset, btnPolPreset, polOrg });
+            t.Controls.Add(presetRow, 0, 3);
+
+            // the rules, grouped
+            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0, S(4), 0, S(4)), BorderStyle = BorderStyle.FixedSingle, BackColor = Theme.Panel };
+            polGrid = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 4, Location = new Point(0, 0), Padding = new Padding(S(10), S(6), S(10), S(6)), BackColor = Theme.Panel };
+            polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(380))); polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(270)));
+            polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(240))); polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            int row = 0;
+            Action<Control, int> add = (c, col) => polGrid.Controls.Add(c, col, row);
+            polGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            add(new Label { AutoSize = true, Text = "Rule", Font = new Font("Segoe UI Semibold", 9f), ForeColor = Theme.Quiet, Margin = new Padding(0, S(2), 0, S(4)) }, 0);
+            add(new Label { AutoSize = true, Text = "In force", Font = new Font("Segoe UI Semibold", 9f), ForeColor = Theme.Quiet, Margin = new Padding(0, S(2), 0, S(4)) }, 1);
+            add(new Label { AutoSize = true, Text = "Default", Font = new Font("Segoe UI Semibold", 9f), ForeColor = Theme.Quiet, Margin = new Padding(S(10), S(2), 0, S(4)) }, 2);
+            row++;
+            string group = null;
+            foreach (var r in Policy.Rules)
+            {
+                if (r.Group != group)
+                {
+                    group = r.Group;
+                    polGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                    var gh = new Label { AutoSize = true, Text = group, Font = new Font("Segoe UI Semibold", 11f), ForeColor = Theme.MapFore(Theme.Accent), Margin = new Padding(0, S(10), 0, S(4)) };
+                    add(gh, 0); polGrid.SetColumnSpan(gh, 4); row++;
+                }
+                polGrid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                var name = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0, S(2), S(10), S(6)), BackColor = Theme.Panel };
+                name.Controls.Add(new Label { AutoSize = true, Text = r.Name, Font = new Font("Segoe UI Semibold", 9.5f), Margin = new Padding(0) });
+                name.Controls.Add(new Label { AutoSize = true, Text = r.Help, ForeColor = Theme.Quiet, MaximumSize = new Size(S(370), 0), Margin = new Padding(0, S(1), 0, 0) });
+                add(name, 0);
+                var cb = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(255), Margin = new Padding(0, S(4), S(6), 0), Tag = r.Key };
+                cb.Items.AddRange(r.Labels.Cast<object>().ToArray());
+                cb.SelectedIndexChanged += (o, e) => { if (!polFilling) { var k = (string)((ComboBox)o).Tag; polEdit[k] = Policy.Rule(k).Values[Math.Max(0, ((ComboBox)o).SelectedIndex)]; PolicyRefresh(); } };
+                polCombos[r.Key] = cb; add(cb, 1);
+                add(new Label { AutoSize = true, Text = r.Label(r.Default), ForeColor = Theme.Quiet, Margin = new Padding(S(10), S(7), S(6), 0) }, 2);
+                var mark = new Label { AutoSize = true, Margin = new Padding(S(4), S(7), 0, 0), Font = new Font("Segoe UI Semibold", 9f), UseMnemonic = false };
+                polMarks[r.Key] = mark; add(mark, 3);
+                row++;
+            }
+            scroll.Controls.Add(polGrid);
+            t.Controls.Add(scroll, 0, 4);
+
+            var checkRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, S(2), 0, S(4)) };
+            polCheck = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 9.5f), Margin = new Padding(S(2), S(7), S(10), 0), UseMnemonic = false, MaximumSize = new Size(S(900), 0) };
+            btnPolFix = MakeButton("Set a PIN or password now...");
+            checkRow.Controls.AddRange(new Control[] { polCheck, btnPolFix });
+            t.Controls.Add(checkRow, 0, 5);
+
+            var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0) };
+            btnPolSave = MakeButton("Save the policy"); btnPolSave.Font = new Font("Segoe UI Semibold", 9f);
+            btnPolDiscard = MakeButton("Discard changes");
+            btnPolExport = MakeButton("Export...");
+            btnPolImport = MakeButton("Import...");
+            btnPolReg = MakeButton("Export for IT (.reg)...");
+            buttons.Controls.AddRange(new Control[] { btnPolSave, btnPolDiscard, btnPolExport, btnPolImport, btnPolReg });
+            t.Controls.Add(buttons, 0, 6);
+            pagePolicy.Controls.Add(t);
+
+            rbPolDefault.CheckedChanged += (o, e) => { PolSegColors(); if (!polFilling && rbPolDefault.Checked) { polCustom = false; PolicyRefresh(); } };
+            rbPolCustom.CheckedChanged += (o, e) => { PolSegColors(); if (!polFilling && rbPolCustom.Checked) { polCustom = true; PolicyRefresh(); } };
+            pagePolicy.VisibleChanged += (o, e) => PolSegColors();   // after the theme has painted everything
+            btnPolPreset.Click += (o, e) => PolicyPreset();
+            btnPolSave.Click += (o, e) => { string err = PolicySaveNow(); if (err != null && err != "") Lang.Box(this, Lang.T("The policy was not saved: ") + Lang.T(err), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); };
+            btnPolDiscard.Click += (o, e) => PolicyLoadUi();
+            btnPolExport.Click += (o, e) => PolicyExport(false);
+            btnPolReg.Click += (o, e) => PolicyExport(true);
+            btnPolImport.Click += (o, e) => PolicyImport();
+            btnPolFix.Click += (o, e) => { if (!testMode && PinForm.SetNew(this)) { Log(Lang.T("A PIN or password now protects Elixar.")); UpdatePinUi(); } PolicyRefresh(); };
+            PolicyLoadUi();
+        }
+
+        void OnPolicyTab() { Policy.Load(); PolicyLoadUi(); PolSegColors(); }
+
+        // the chosen side of the Default / Custom switch is filled with the accent colour
+        void PolSegColors()
+        {
+            foreach (var rb in new[] { rbPolDefault, rbPolCustom })
+            {
+                if (rb == null) continue;
+                rb.BackColor = rb.Checked ? Theme.Accent : Theme.Panel;
+                rb.ForeColor = rb.Checked ? Color.White : Theme.Ink;
+                rb.FlatAppearance.CheckedBackColor = Theme.Accent;
+                rb.FlatAppearance.BorderColor = rb.Checked ? Theme.Accent : Theme.Grid;
+            }
+        }
+
+        void PolicyLoadUi()
+        {
+            polCustom = Policy.UseCustom;
+            polEdit = new Dictionary<string, string>(Policy.Custom);
+            polFilling = true;
+            (polCustom ? rbPolCustom : rbPolDefault).Checked = true;
+            polFilling = false;
+            PolicyRefresh();
+        }
+
+        // what the screen shows: in Default the combos show the default rules (locked); an organization's rules are always locked
+        void PolicyRefresh()
+        {
+            if (polGrid == null) return;
+            var org = Policy.Org();
+            polFilling = true;
+            foreach (var r in Policy.Rules)
+            {
+                var cb = polCombos[r.Key]; var mark = polMarks[r.Key];
+                string v = org.ContainsKey(r.Key) ? org[r.Key] : polCustom ? polEdit[r.Key] : r.Default;
+                cb.SelectedIndex = Math.Max(0, Array.IndexOf(r.Values, v));
+                cb.Enabled = polCustom && !org.ContainsKey(r.Key);
+                if (org.ContainsKey(r.Key)) { mark.Text = "🔒 " + Lang.T("Set by your organization"); mark.ForeColor = Theme.MapFore(Color.FromArgb(150, 90, 0)); }
+                else if (v != r.Default) { mark.Text = "● " + Lang.T("Changed"); mark.ForeColor = Theme.MapFore(Theme.Accent); }
+                else mark.Text = "";
+            }
+            polFilling = false;
+            int diff = polCustom ? Policy.Differences(polEdit) : 0;
+            polStatus.Text = Lang.T(polCustom ? "Custom policy" : "Default policy") + "  ·  " +
+                             Lang.T(!polCustom ? "Elixar's own rules" : diff == 0 ? "same as Default" : diff == 1 ? "1 rule differs from Default" : diff + " rules differ from Default");
+            polOrg.Text = org.Count == 0 ? "" : Lang.T(org.Count == 1 ? "1 rule is set by your organization and can't be changed here." : org.Count + " rules are set by your organization and can't be changed here.");
+            polPreset.Enabled = btnPolPreset.Enabled = polCustom;
+            bool dirty = polCustom != Policy.UseCustom || Policy.Rules.Any(r => polEdit[r.Key] != (Policy.Custom.ContainsKey(r.Key) ? Policy.Custom[r.Key] : r.Default));
+            btnPolSave.Enabled = btnPolDiscard.Enabled = dirty;
+            var probs = Policy.Check();
+            polCheck.Text = dirty ? Lang.T("Not saved yet: click Save the policy.") : probs.Count == 0 ? "✔ " + Lang.T("This PC follows its policy.") : "⚠ " + string.Join("  ", probs.Select(Lang.T));
+            polCheck.ForeColor = Theme.MapFore(dirty ? Color.FromArgb(196, 120, 0) : probs.Count == 0 ? Color.FromArgb(0, 125, 70) : Color.FromArgb(190, 40, 40));
+            btnPolFix.Visible = !dirty && probs.Count > 0;
+        }
+
+        void PolicyPreset()
+        {
+            if (!polCustom) return;
+            polEdit = Policy.Preset(Policy.PresetNames[Math.Max(0, polPreset.SelectedIndex)]);
+            PolicyRefresh();
+        }
+
+        // returns null when saved, "" when you stopped it, or why it didn't save
+        string PolicySaveNow()
+        {
+            var target = polCustom ? polEdit : Policy.Defaults();
+            bool loosens = Policy.Rules.Any(r => Strictness(r, target[r.Key]) < Strictness(r, Policy.Get(r.Key))) || (Policy.UseCustom && !polCustom);
+            // a PIN is needed to change the policy (the rule in force now decides)
+            if (Policy.Get("pin.policy") == "on" && PinLock.IsSet && PolicyConfirmHook == null && !testMode)
+                if (!PinLock.Unlock(this)) return "";
+            if (loosens && PolAsk(Lang.T("This makes the rules less strict. Save it?") + "\n\n" + Lang.T("Elixar writes every change to the policy in Logs."), true) != DialogResult.Yes) return "";
+            string err = Policy.Save(polCustom, polEdit);
+            if (err != null) return err;
+            Log(Lang.T(polCustom ? "Policy saved: Custom." : "Policy saved: Default."));
+            ApplyPolicyUi();
+            PolicyLoadUi();
+            // a rule now asks for a PIN that isn't set
+            if (!testMode && PolicyConfirmHook == null && Policy.Check().Count > 0 && !PinLock.IsSet &&
+                PolAsk(Lang.T("The policy needs a PIN or password. Set one now?"), false) == DialogResult.Yes && PinForm.SetNew(this)) { UpdatePinUi(); PolicyRefresh(); }
+            return null;
+        }
+
+        // higher = stricter, to know when a change makes the rules looser
+        static int Strictness(PolicyRule r, string v)
+        {
+            switch (r.Key)
+            {
+                case "clean.level": return v == "safe" ? 2 : v == "review" ? 1 : 0;
+                case "clean.restore": return v == "always" ? 1 : 0;
+                case "pin.open": return v == "required" ? 1 : 0;
+                case "pin.policy": return v == "on" ? 1 : 0;
+                default: return v == "block" ? 1 : 0;
+            }
+        }
+
+        void PolicyExport(bool reg)
+        {
+            if (testMode) return;
+            var rules = Policy.Rules.ToDictionary(r => r.Key, r => Policy.Get(r.Key));
+            using (var d = new SaveFileDialog { Filter = reg ? "Registry file (*.reg)|*.reg" : "Elixar policy (*.elixarpolicy)|*.elixarpolicy",
+                                                FileName = "Elixar policy " + DateTime.Today.ToString("yyyy-MM-dd") + (reg ? ".reg" : ".elixarpolicy"),
+                                                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                try
+                {
+                    if (reg) File.WriteAllText(d.FileName, Policy.RegText(rules), Encoding.Unicode);   // regedit reads UTF-16
+                    else { try { SafeFile.WriteText(d.FileName, Policy.ExportText(rules)); } catch { File.WriteAllText(d.FileName, Policy.ExportText(rules), new UTF8Encoding(false)); } }
+                }
+                catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; }
+                using (ChangeLog.In("Policy")) ChangeLog.Add("Settings", reg ? "Policy: exported for IT (.reg)" : "Policy: exported", d.FileName, "", "", "", false);
+                Log(Lang.T("Policy exported: ") + d.FileName);
+                if (reg) Lang.Box(this, Lang.T("Saved. Import it on each PC (regedit, Group Policy Preferences or Intune) to set these rules for the whole organization. Elixar then shows them as set by your organization."),
+                                  "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        void PolicyImport()
+        {
+            if (testMode) return;
+            string text;
+            using (var d = new OpenFileDialog { Filter = "Elixar policy (*.elixarpolicy)|*.elixarpolicy|Text (*.txt)|*.txt", InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                try { var fi = new FileInfo(d.FileName); if (fi.Length > 64 * 1024) { Lang.Box(this, "Not an Elixar policy file.", "Elixar"); return; } text = File.ReadAllText(d.FileName); }
+                catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; }
+            }
+            PolicyImportText(text);
+        }
+
+        // shows what the file sets, then takes it as the Custom policy (saved only when you click Save the policy)
+        public bool PolicyImportText(string text)
+        {
+            var res = Policy.Import(text);
+            if (res.Problems.Count > 0 && res.Problems[0] == "Not an Elixar policy file.") { if (PolicyConfirmHook == null) Lang.Box(this, Lang.T("Not an Elixar policy file."), "Elixar"); return false; }
+            var diff = Policy.Rules.Where(r => res.Rules[r.Key] != r.Default).Select(r => "  - " + Lang.T(r.Name) + ": " + Lang.T(r.Label(res.Rules[r.Key]))).ToList();
+            string ask = Lang.T("Use the rules in this file as your Custom policy?") + "\n\n" +
+                         (diff.Count == 0 ? Lang.T("It sets the same rules as Default.") : string.Join("\n", diff)) + "\n\n" +
+                         (!res.HadFingerprint ? Lang.T("The file has no fingerprint: it may have been written by hand.") + "\n\n" :
+                          !res.FingerprintOk ? Lang.T("Careful: the fingerprint doesn't match - the file was changed after it was exported.") + "\n\n" : "") +
+                         (res.Problems.Count > 0 ? Lang.T("Left out:") + "\n" + string.Join("\n", res.Problems.Take(8).Select(p => "  - " + p)) + "\n\n" : "") +
+                         Lang.T("Check the rules, then click Save the policy.");
+            if (PolAsk(ask, !res.FingerprintOk) != DialogResult.Yes) return false;
+            polCustom = true; polEdit = res.Rules;
+            polFilling = true; rbPolCustom.Checked = true; polFilling = false;
+            PolicyRefresh();
+            return true;
+        }
+
+        // ================= the rules at work across the window =================
+        public void ApplyPolicyUi()
+        {
+            if (nav == null) return;
+            Action<TabPage, string> navOn = (page, key) =>
+            {
+                var it = nav.Items.FirstOrDefault(i => i.Page == page); if (it == null) return;
+                if (it.Tag == null) it.Tag = Tuple.Create(it.Enabled, it.Tip);   // how it was before any policy
+                var was = (Tuple<bool, string>)it.Tag;
+                bool ok = Policy.Allowed(key);
+                it.Enabled = was.Item1 && ok;
+                it.Tip = ok ? was.Item2 : Lang.T("Turned off by the policy (Policy manager).");
+            };
+            navOn(pagePhone, "phone");
+            navOn(pageEmail, "email");
+            nav.Invalidate();
+            if (tabs.SelectedTab != null && nav.Items.Any(i => i.Page == tabs.SelectedTab && !i.Enabled)) tabs.SelectedTab = pageDash;
+            // restore point before a clean
+            string rp = Policy.Get("clean.restore");
+            if (chkRestore != null && !LinuxUi)
+            {
+                if (rp != "ask") chkRestore.Checked = rp == "always";
+                chkRestore.Enabled = rp == "ask" && !cleaningNow;
+            }
+            // Tools > Sysprep
+            if (pageSysprep != null)
+            {
+                bool ok = Policy.Allowed("sysprep");
+                foreach (Control c in pageSysprep.Controls) if (c != sysprepBlocked) c.Enabled = ok;
+                if (!ok && sysprepBlocked == null)
+                {
+                    sysprepBlocked = new Label { Dock = DockStyle.Top, AutoSize = false, Height = S(34), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(S(12), 0, 0, 0),
+                                                 Text = Lang.T("Sysprep and golden image tools are turned off by the policy (Policy manager)."), Font = new Font("Segoe UI Semibold", 9.5f),
+                                                 BackColor = Theme.Dark ? Color.FromArgb(70, 55, 20) : Color.FromArgb(255, 243, 205), ForeColor = Theme.Dark ? Color.FromArgb(255, 220, 150) : Color.FromArgb(110, 75, 0) };
+                    pageSysprep.Controls.Add(sysprepBlocked);
+                }
+                if (sysprepBlocked != null) sysprepBlocked.Visible = !ok;
+            }
+            // Automation: the rules the policy fixes can't be changed there
+            if (cmbUndoDays != null)
+            {
+                cmbUndoDays.Enabled = !Policy.Fixes("undo.days");
+                chkBin.Enabled = !Policy.Fixes("bin.days"); if (Policy.Fixes("bin.days")) cmbBinDays.Enabled = false; else cmbBinDays.Enabled = chkBin.Checked;
+                chkLowClean.Enabled = !Policy.Fixes("low.clean");
+            }
+            // Settings: a required PIN can't be switched off
+            if (PinSwitch != null && !testMode) PinSwitch.Enabled = !(Policy.Get("pin.open") == "required" && PinLock.IsSet);
+        }
+
+        // only the items the policy allows are cleaned; the others are named
+        List<CleanItem> PolicyFilter(List<CleanItem> sel)
+        {
+            var max = Policy.MaxTier;
+            var no = sel.Where(i => i.Tier > max).ToList();
+            if (no.Count == 0) return sel;
+            Log(Lang.T("Not cleaned (the policy doesn't allow them): ") + string.Join(", ", no.Select(i => Lang.T(i.Name))));
+            if (!testMode)
+                Lang.Box(this, Lang.T("The policy allows only " + (max == Tier.Safe ? "Safe items" : "Safe and Check first items") + ", so these are left out:") + "\n\n" +
+                               string.Join("\n", no.Select(i => "  - " + Lang.T(i.Name))), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return sel.Except(no).ToList();
+        }
+
+        // the policy asks for a PIN that isn't set yet: asked once each time Elixar opens
+        void PolicyPinCheck()
+        {
+            if (testMode || Policy.Get("pin.open") != "required" || PinLock.IsSet) return;
+            var r = NiceBox.ShowWith(this, Lang.T("The policy on this PC needs a PIN or password to open Elixar.") + "\n\n" + Lang.T("Choose a 4, 6 or 8 digit PIN, or a password."),
+                                     Lang.T("Protect Elixar with a PIN or password"), MessageBoxButtons.YesNo, MessageBoxIcon.Information, 0, new[] { Lang.T("Set it up..."), Lang.T("Later") });
+            if (r == DialogResult.Yes && PinForm.SetNew(this)) Log(Lang.T("A PIN or password now protects Elixar."));
+            UpdatePinUi(); ApplyPolicyUi();
+        }
+    }
+}

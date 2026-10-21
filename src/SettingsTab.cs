@@ -158,7 +158,7 @@ namespace CDriveCleaner
         // the first time Elixar opens: offered once, never forced
         void OfferPinOnce()
         {
-            if (testMode || PinLock.IsSet || Settings.Get("PinOffered", "") == "1") return;
+            if (testMode || PinLock.IsSet || Settings.Get("PinOffered", "") == "1" || Policy.Get("pin.open") == "required") return;
             Settings.Set("PinOffered", "1");
             var r = NiceBox.ShowWith(this, Lang.T("Add a PIN or password, so other people who use this PC can't open Elixar and remove things?") + "\n\n" +
                                            Lang.T("Choose a 4, 6 or 8 digit PIN, or a password. Elixar asks for it every time it opens. You can change it or turn it off any time in Settings > Security and protection."),

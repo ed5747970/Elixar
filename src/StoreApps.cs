@@ -377,7 +377,7 @@ namespace CDriveCleaner
         public void RemoveStoreApps(List<StoreApp> apps)
         {
             apps = apps.Where(a => a.Level != "keep").ToList();
-            if (apps.Count == 0 || testMode) return;
+            if (apps.Count == 0 || testMode || Policy.Blocked(this, "apps.remove")) return;
             string list = string.Join("\n", apps.Select(a => "  - " + a.Friendly + (a.Level == "review" ? "   (" + a.Note + ")" : "")));
             if (Lang.Box(this, "Remove these " + apps.Count + " apps for your account?\n\n" + list +
                     "\n\nYou can reinstall any of them from the Microsoft Store.", "Elixar",

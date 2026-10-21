@@ -77,6 +77,7 @@ namespace CDriveCleaner
             if (args.Contains("--mail-daily"))
             {
                 Application.EnableVisualStyles();
+                if (!Policy.Allowed("email")) return 0;   // the policy turned email off: no reports
                 return MailReports.Daily();
             }
             if (args.Contains("--auto-clean"))

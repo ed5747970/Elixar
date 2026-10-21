@@ -18,6 +18,7 @@ namespace CDriveCleaner
             public TabPage Page;
             public bool Enabled = true, Right;
             public Rectangle Rect;
+            public object Tag;
         }
         public List<Item> Items = new List<Item>();
         public Item Selected;
@@ -57,6 +58,7 @@ namespace CDriveCleaner
                     int gs = S(16);
                     var gr = M(new Rectangle(r.X + S(12), r.Y + (r.Height - gs) / 2, gs, gs));
                     if (it.Glyph == "list") ListGlyph(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
+                    else if (it.Glyph == "shield") ShieldGlyph(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
                     else Gear(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
                     tr = M(new Rectangle(r.X + S(20), r.Y, r.Width - S(20), r.Height));
                 }
@@ -82,6 +84,22 @@ namespace CDriveCleaner
                 }
                 g.DrawEllipse(p, cx - R * .7f, cy - R * .7f, R * 1.4f, R * 1.4f);
                 g.DrawEllipse(p, cx - ri, cy - ri, ri * 2, ri * 2);
+            }
+        }
+
+        // a shield with a tick: the policy
+        static void ShieldGlyph(Graphics g, Rectangle r, Color c, float w)
+        {
+            float x = r.X, y = r.Y, W = r.Width, H = r.Height;
+            using (var p = new Pen(c, w) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round })
+            using (var path = new GraphicsPath())
+            {
+                path.AddLine(x + W * .5f, y + H * .04f, x + W * .9f, y + H * .2f);
+                path.AddBezier(x + W * .9f, y + H * .2f, x + W * .9f, y + H * .62f, x + W * .7f, y + H * .82f, x + W * .5f, y + H * .96f);
+                path.AddBezier(x + W * .5f, y + H * .96f, x + W * .3f, y + H * .82f, x + W * .1f, y + H * .62f, x + W * .1f, y + H * .2f);
+                path.CloseFigure();
+                g.DrawPath(p, path);
+                g.DrawLines(p, new[] { new PointF(x + W * .32f, y + H * .5f), new PointF(x + W * .46f, y + H * .64f), new PointF(x + W * .7f, y + H * .36f) });
             }
         }
 
@@ -155,6 +173,7 @@ namespace CDriveCleaner
             nav.Items.Add(item("Linux", pageLinux, lx, "Only on Linux: this PC runs " + OsInfo.Current.Name + "."));
             nav.Items.Add(new NavBar.Item { Text = "Settings", Page = pageSettings, Right = true, Glyph = "gear" });
             nav.Items.Add(new NavBar.Item { Text = "Logs", Page = pageLogs, Right = true, Glyph = "list" });
+            nav.Items.Add(new NavBar.Item { Text = "Policy manager", Page = pagePolicy, Right = true, Glyph = "shield" });
             nav.Selected = nav.Items[0];
             nav.Picked += it => tabs.SelectedTab = it.Page;
             tabs.SelectedIndexChanged += (o, e) => nav.Select(tabs.SelectedTab);

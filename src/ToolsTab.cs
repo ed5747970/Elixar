@@ -187,7 +187,7 @@ namespace CDriveCleaner
         void RemoveDrivers()
         {
             var sel = drvList.CheckedItems.Cast<ListViewItem>().Select(r => (DriverPkg)r.Tag).Where(d => d.Removable).ToList();
-            if (sel.Count == 0 || testMode) return;
+            if (sel.Count == 0 || testMode || Policy.Blocked(this, "drivers.remove")) return;
             var lines = sel.GroupBy(d => d.Kind).Select(g => "  - " + g.Count() + " " + (g.Key == DrvKind.Old ? "old versions" : g.Key == DrvKind.NotForWindows ? "built for another kind of Windows" :
                                                                                        g.Key == DrvKind.NoHardware ? "for hardware not in this PC" : "for hardware that isn't connected now"));
             if (Lang.Box(this, "Remove " + sel.Count + " drivers (" + Fs.Fmt(sel.Sum(d => Math.Max(0, d.Bytes))) + ")?\n\n" + string.Join("\n", lines) +

@@ -52,8 +52,11 @@ namespace CDriveCleaner
 
         public static TidyPrefs Load()
         {
-            try { string f = File_; if (File.Exists(f)) return Parse(File.ReadAllLines(f)); } catch { }
-            return new TidyPrefs();
+            TidyPrefs p = null;
+            try { string f = File_; if (File.Exists(f)) p = Parse(File.ReadAllLines(f)); } catch { }
+            p = p ?? new TidyPrefs();
+            try { Policy.ApplyTo(p); } catch { }   // a rule in the policy wins over the choice in Automation
+            return p;
         }
 
         public string Text()
