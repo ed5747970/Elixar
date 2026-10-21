@@ -61,9 +61,16 @@ namespace CDriveCleaner
             return "undoDays=" + UndoDays + "\nbinDays=" + BinDays + "\nbinChoice=" + BinChoice + "\nlowClean=" + (LowClean ? 1 : 0) + "\nlastLowClean=" + LastLowClean + "\n";
         }
 
+        // what you chose, for the change log (not the date of the last clean)
+        public string Choices() { return "Undo " + UndoDays + " days, Recycle Bin " + (BinDays == 0 ? "off" : BinDays + " days") + ", clean when low " + (LowClean ? "on" : "off"); }
+
         public bool Save()
         {
-            try { File.WriteAllText(File_, Text()); return true; } catch { return false; }
+            string before = null; try { before = Load().Choices(); } catch { }
+            try { File.WriteAllText(File_, Text()); }
+            catch { return false; }
+            if (before != null && before != Choices()) ChangeLog.Add("Settings", "Changed the daily tidy settings", "Automation", before, Choices(), "", false);
+            return true;
         }
     }
 

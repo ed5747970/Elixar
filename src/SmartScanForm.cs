@@ -354,8 +354,9 @@ namespace CDriveCleaner
             var sel = lvEmpty.CheckedItems.Cast<ListViewItem>().ToList();
             if (test || sel.Count == 0) return;
             if (Lang.Box(this, Lang.T("Remove " + sel.Count + " empty folders?") + "\n\n" + Lang.T("Only folders that are still empty are removed."), "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-            int ok = 0;
-            foreach (var r in sel) if (SmartScan.RemoveEmpty((string)r.Tag)) { ok++; lvEmpty.Items.Remove(r); }
+            int ok = 0; var removed = new List<string>();
+            foreach (var r in sel) if (SmartScan.RemoveEmpty((string)r.Tag)) { ok++; removed.Add((string)r.Tag); lvEmpty.Items.Remove(r); }
+            if (ok > 0) ChangeLog.Files("Removed empty folders (" + ok + ")", null, removed, 0, "Smart scan of " + title);
             string msg = "Removed " + ok + " of " + sel.Count + " empty folders.";
             lblStatus.Text = Lang.T(msg);
             if (owner != null) owner.Log(Lang.T("Smart scan of " + title + " - " + msg));

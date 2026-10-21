@@ -23,7 +23,7 @@ namespace CDriveCleaner
         List<ChangeLog.Entry> logsAll = new List<ChangeLog.Entry>();
         public static Func<string, DialogResult> LogsConfirmHook;   // self-test: answers the undo question
 
-        static readonly string[] LogKinds = { "All changes", "Registry", "Files", "Cleaning", "Windows command", "Apps", "Security", "Email", "Undo" };
+        static readonly string[] LogKinds = { "All changes", "Registry", "Files", "Cleaning", "Windows command", "Apps", "Phone", "Security", "Email", "Settings", "Undo" };
         static readonly string[] LogPeriods = { "Last 7 days", "Last 30 days", "Everything" };
 
         // for the self-test and previews
@@ -59,8 +59,8 @@ namespace CDriveCleaner
             t.Controls.Add(bar, 0, 2);
 
             logsList = new ListView { View = View.Details, FullRowSelect = true, Dock = DockStyle.Fill, HideSelection = false, MultiSelect = false, GridLines = false };
-            logsList.Columns.Add("Time", S(125)); logsList.Columns.Add("Kind", S(130)); logsList.Columns.Add("What", S(270));
-            logsList.Columns.Add("Where", S(340)); logsList.Columns.Add("Before", S(150)); logsList.Columns.Add("After", S(150)); logsList.Columns.Add("Status", S(110));
+            logsList.Columns.Add("Time", S(70)); logsList.Columns.Add("Kind", S(130)); logsList.Columns.Add("What happened", S(300));
+            logsList.Columns.Add("Where", S(360)); logsList.Columns.Add("Before", S(150)); logsList.Columns.Add("After", S(150)); logsList.Columns.Add("Status", S(110));
             t.Controls.Add(logsList, 0, 3);
             logsDetail = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Font = new Font("Consolas", 9f), Margin = new Padding(0, S(6), 0, S(4)), RightToLeft = Lang.Hebrew ? RightToLeft.Yes : RightToLeft.No };
             t.Controls.Add(logsDetail, 0, 4);
@@ -69,7 +69,7 @@ namespace CDriveCleaner
             btnLogsUndo = MakeButton("Undo this change..."); btnLogsUndo.Font = new Font("Segoe UI Semibold", 9f); btnLogsUndo.Enabled = false;
             btnLogsCopy = MakeButton("Copy details"); btnLogsCopy.Enabled = false;
             btnLogsExport = MakeButton("Save the log as...");
-            btnLogsFile = MakeButton("Show the log file");
+            btnLogsFile = MakeButton("Open the log file");
             btnLogsText = MakeButton("Open the activity log");
             btnLogsRefresh = MakeButton("Refresh");
             buttons.Controls.AddRange(new Control[] { btnLogsUndo, btnLogsCopy, btnLogsExport, btnLogsFile, btnLogsText, btnLogsRefresh });
@@ -87,7 +87,16 @@ namespace CDriveCleaner
             btnLogsCopy.Click += (o, e) => { try { if (logsDetail.Text.Length > 0) Clipboard.SetText(logsDetail.Text); } catch { } };
             btnLogsRefresh.Click += (o, e) => LogsLoad();
             btnLogsExport.Click += (o, e) => LogsExport();
-            btnLogsFile.Click += (o, e) => { try { if (File.Exists(ChangeLog.FilePath)) Shell.Select(ChangeLog.FilePath); else Shell.Open(Path.GetDirectoryName(ChangeLog.FilePath)); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); } };
+            // changes.txt: the same list in plain words, opened in Notepad (with your normal rights)
+            btnLogsFile.Click += (o, e) =>
+            {
+                try
+                {
+                    ChangeLog.EnsureText();
+                    if (File.Exists(ChangeLog.TextPath)) Shell.Open(ChangeLog.TextPath); else Lang.Box(this, "Nothing changed yet.", "Elixar");
+                }
+                catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); }
+            };
             btnLogsText.Click += (o, e) => { try { if (File.Exists(logFile)) Shell.Open(logFile); else Lang.Box(this, "There is no activity log yet.", "Elixar"); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); } };
         }
 
@@ -106,7 +115,26 @@ namespace CDriveCleaner
             return e.Kind == "Registry" && i > 0 ? t.Substring(i + 5) + "   \u00B7   " + t.Substring(0, i) : t;
         }
 
+        // a startup switch reads just On or Off in the list (the bytes are in the details)
+        static string Brief(string v)
+        {
+            v = v ?? "";
+            return v.StartsWith("On  (") ? "On" : v.StartsWith("Off  (") ? "Off" : v;
+        }
+
         static string LogTime(ChangeLog.Entry e) { var w = e.When; return w == DateTime.MinValue ? e.Time : w.ToString(Lang.Hebrew ? "d.M.yyyy HH:mm" : "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); }
+        static string LogLongTime(ChangeLog.Entry e)
+        {
+            var w = e.When; if (w == DateTime.MinValue) return e.Time;
+            return Lang.Hebrew ? w.ToString("dddd, d.M.yyyy, HH:mm:ss", new CultureInfo("he-IL")) : w.ToString("dddd d MMMM yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+        // the day heading over the lines: Today, Yesterday, or the date
+        public static string LogDay(DateTime d, DateTime today)
+        {
+            if (d.Date == today.Date) return Lang.T("Today");
+            if (d.Date == today.Date.AddDays(-1)) return Lang.T("Yesterday");
+            return Lang.Hebrew ? d.ToString("dddd, d.M.yyyy", new CultureInfo("he-IL")) : d.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture);
+        }
 
         void LogsFill()
         {
@@ -115,15 +143,20 @@ namespace CDriveCleaner
             DateTime from = logsPeriod.SelectedIndex == 0 ? DateTime.Now.AddDays(-7) : logsPeriod.SelectedIndex == 1 ? DateTime.Now.AddDays(-30) : DateTime.MinValue;
             string q = (logsSearch.Text ?? "").Trim();
             var shown = logsAll.Where(e => (kind == null || e.Kind == kind) && e.When >= from &&
-                                           (q.Length == 0 || new[] { e.Action, e.Target, e.Before, e.After, e.Detail, e.Kind, Lang.T(e.Action ?? ""), Lang.T(e.Kind ?? "") }
+                                           (q.Length == 0 || new[] { e.Action, e.Target, e.Before, e.After, e.Detail, e.Kind, Lang.T(e.Action ?? ""), Lang.T(e.Kind ?? ""), Lang.T(ChangeLog.Summary(e)) }
                                                 .Any(s => (s ?? "").IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0))).Take(5000).ToList();
             var selE = LogsSelected(); string sel = selE == null ? null : selE.Id;
             logsList.BeginUpdate();
             logsList.Items.Clear();
+            logsList.Groups.Clear();
+            var groups = new Dictionary<DateTime, ListViewGroup>();
             foreach (var e in shown)
             {
                 string status = ChangeLog.StatusOf(e, logsAll);
-                var r = new ListViewItem(new[] { LogTime(e), Lang.T(e.Kind ?? ""), Lang.T(e.Action ?? ""), LogWhere(e), Lang.T(e.Before ?? ""), Lang.T(e.After ?? ""), Lang.T(status) }) { Tag = e, UseItemStyleForSubItems = false };
+                var day = e.When.Date; ListViewGroup grp;
+                if (!groups.TryGetValue(day, out grp)) { grp = new ListViewGroup(LogDay(day, DateTime.Today)); groups[day] = grp; logsList.Groups.Add(grp); }
+                string time = e.When == DateTime.MinValue ? e.Time : e.When.ToString("HH:mm", CultureInfo.InvariantCulture);
+                var r = new ListViewItem(new[] { time, Lang.T(e.Kind ?? ""), Lang.T(ChangeLog.Summary(e)), LogWhere(e), Lang.T(Brief(e.Before)), Lang.T(Brief(e.After)), Lang.T(status) }) { Tag = e, UseItemStyleForSubItems = false, Group = grp };
                 if (status == "Failed") r.SubItems[6].ForeColor = Theme.MapFore(Color.FromArgb(190, 40, 40));
                 else if (status == "Can be undone") r.SubItems[6].ForeColor = Theme.MapFore(Theme.Accent);
                 else if (status == "Undone") r.SubItems[6].ForeColor = Theme.Quiet;
@@ -151,17 +184,19 @@ namespace CDriveCleaner
             var sb = new StringBuilder();
             // \u200E keeps numbers and paths in their own order after a Hebrew label
             Action<string, string> line = (k, v) => { if (!string.IsNullOrEmpty(v)) sb.Append(Lang.T(k)).Append(": \u200E").Append(v).Append("\u200E\r\n"); };
-            line("Time", LogTime(e));
-            line("Kind", Lang.T(e.Kind ?? ""));
-            line("What", Lang.T(e.Action ?? ""));
-            line("Where", e.Target);
+            string sum = ChangeLog.Summary(e);
+            line("What happened", Lang.T(sum));
+            line("When", LogLongTime(e));
+            line("Kind", Lang.T(e.Kind ?? "") + (sum != e.Action ? "  -  " + Lang.T(e.Action ?? "") : ""));
+            line(e.Kind == "Windows command" ? "Command" : "Where", e.Target);
             if (e.Kind == "Registry" && e.CanUndo) line("Registry view", e.View == "Registry32" ? "32-bit" : e.View == "Registry64" ? "64-bit" : "default");
             line("Before", Lang.T(e.Before ?? ""));
             line("After", Lang.T(e.After ?? ""));
-            line("Details", e.Detail);
             line("Status", Lang.T(status));
+            line("How to undo", Lang.T(ChangeLog.HowToUndo(e, status)));
+            if (e.Detail != sum) line("Details", e.Detail);
             var undid = e.Ref == null ? null : logsAll.FirstOrDefault(x => x.Id == e.Ref);
-            if (undid != null) line("Undid", LogTime(undid) + "  " + Lang.T(undid.Action ?? "") + "  " + undid.Target);
+            if (undid != null) line("Undid", LogTime(undid) + "  " + Lang.T(ChangeLog.Summary(undid)));
             var by = logsAll.FirstOrDefault(x => x.Ref == e.Id);
             if (by != null) line("Undone on", LogTime(by));
             line("Change ID", e.Id);
@@ -209,13 +244,23 @@ namespace CDriveCleaner
             return sb.ToString();
         }
 
+        // the readable version: oldest first, like changes.txt
+        public static string LogsText(List<ChangeLog.Entry> all)
+        {
+            var sb = new StringBuilder(ChangeLog.TextHeader);
+            foreach (var e in Enumerable.Reverse(all)) sb.Append(ChangeLog.Block(e, all));
+            return sb.ToString();
+        }
+
         void LogsExport()
         {
-            using (var d = new SaveFileDialog { Filter = "Spreadsheet (*.csv)|*.csv", FileName = "Elixar change log " + DateTime.Today.ToString("yyyy-MM-dd") + ".csv",
+            using (var d = new SaveFileDialog { Filter = "Spreadsheet (*.csv)|*.csv|Text, easy to read (*.txt)|*.txt", FileName = "Elixar change log " + DateTime.Today.ToString("yyyy-MM-dd") + ".csv",
                                                 InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                string text = "﻿" + LogsCsv(logsAll);   // the mark lets Excel read Hebrew and other letters correctly
+                bool txt = d.FilterIndex == 2 || d.FileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
+                // the mark lets Excel and Notepad read Hebrew and other letters correctly
+                string text = "\uFEFF" + (txt ? LogsText(logsAll).Replace("\n", "\r\n") : LogsCsv(logsAll));
                 try { SafeFile.WriteText(d.FileName, text); }
                 catch { try { File.WriteAllText(d.FileName, text, new UTF8Encoding(false)); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; } }
                 Log(Lang.T("Change log saved: ") + d.FileName);

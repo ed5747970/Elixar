@@ -86,21 +86,116 @@ namespace CDriveCleaner
                     try { m = new Mutex(false, @"Global\Elixar-ChangeLog"); owned = m.WaitOne(3000); } catch (AbandonedMutexException) { owned = true; } catch { }
                     string f = File_;
                     try { var fi = new FileInfo(f); if (fi.Exists && fi.Length > MaxBytes) { string old = OldFile(f); if (File.Exists(old)) File.Delete(old); File.Move(f, old); } } catch { }
-                    for (int i = 0; i < 5; i++)
+                    Append(f, line + "\n");
+                    // the same change, in plain words, in changes.txt (opens in Notepad)
+                    string tf = TextFile(f);
+                    try { var ti = new FileInfo(tf); if (ti.Exists && ti.Length > MaxBytes) { string old = OldText(tf); if (File.Exists(old)) File.Delete(old); File.Move(tf, old); } } catch { }
+                    if (!File.Exists(tf))
                     {
-                        try
-                        {
-                            using (var s = new FileStream(f, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
-                            { var b = new UTF8Encoding(false).GetBytes(line + "\n"); s.Write(b, 0, b.Length); }
-                            break;
-                        }
-                        catch (IOException) { Thread.Sleep(40); }
-                        catch { break; }
+                        // first time (or after it was deleted): everything still in the log, oldest first
+                        var sb = new StringBuilder(TextHeader);
+                        var all = Read(); all.Reverse();
+                        foreach (var x in all) sb.Append(Block(x, all));
+                        Append(tf, sb.ToString());
                     }
+                    else Append(tf, Block(e, null));
                 }
                 finally { if (m != null) { if (owned) try { m.ReleaseMutex(); } catch { } m.Dispose(); } }
             }
             return e;
+        }
+
+        static void Append(string f, string text)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                try
+                {
+                    using (var s = new FileStream(f, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                    { var b = new UTF8Encoding(false).GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n").Replace("\r\r", "\r")); s.Write(b, 0, b.Length); }
+                    return;
+                }
+                catch (IOException) { Thread.Sleep(40); }
+                catch { return; }
+            }
+        }
+
+        // changes.txt is made from the log when it isn't there yet (a log from before it existed, or after it was deleted)
+        public static void EnsureText()
+        {
+            lock (gate)
+            {
+                string tf = TextPath;
+                if (File.Exists(tf)) return;
+                var all = Read(); if (all.Count == 0) return;
+                all.Reverse();
+                var sb = new StringBuilder(TextHeader);
+                foreach (var x in all) sb.Append(Block(x, all));
+                Append(tf, sb.ToString());
+            }
+        }
+
+        public static string TextFile(string f) { return Path.Combine(Path.GetDirectoryName(f) ?? "", Path.GetFileNameWithoutExtension(f) + ".txt"); }
+        static string OldText(string tf) { return Path.Combine(Path.GetDirectoryName(tf) ?? "", Path.GetFileNameWithoutExtension(tf) + "-old.txt"); }
+        public static string TextPath { get { return TextFile(File_); } }
+
+        public const string TextHeader =
+            "======================================================================\n" +
+            " ELIXAR CHANGE LOG  -  every change Elixar made to this PC\n" +
+            " Newest at the bottom. Passwords, PINs and tokens are never written here.\n" +
+            " To undo a registry change: Elixar > Logs > select it > Undo this change.\n" +
+            " To put files back: Elixar > Tools > Undo.\n" +
+            "======================================================================\n\n";
+
+        // one change, in plain words, for changes.txt and "Save the log as... (text)"
+        public static string Block(Entry e, List<Entry> all)
+        {
+            var w = e.When;
+            string status = StatusOf(e, all);
+            var sb = new StringBuilder();
+            sb.Append(w == DateTime.MinValue ? e.Time : w.ToString("ddd d MMM yyyy  HH:mm:ss", CultureInfo.InvariantCulture)).Append("   ").Append((e.Kind ?? "").ToUpperInvariant());
+            if (status == "Failed") sb.Append("   ** FAILED **");
+            else if (status == "Can be undone") sb.Append("   (can be undone in Elixar > Logs)");
+            else if (status == "In Undo") sb.Append("   (files can be put back in Tools > Undo)");
+            else if (status == "Undone") sb.Append("   (undone later)");
+            sb.Append("\n");
+            Action<string, string> f = (k, v) => { if (!string.IsNullOrEmpty(v)) sb.Append("  ").Append((k + ":").PadRight(9)).Append(v).Append("\n"); };
+            string sum = Summary(e);
+            f("What", sum);
+            if (sum != e.Action) f("Change", e.Action);
+            f(e.Kind == "Windows command" ? "Command" : "Where", e.Target);
+            f("Before", e.Before);
+            f("After", e.After);
+            if (e.Kind != "Registry" || sum != e.Detail) f("Details", e.Detail);
+            f("ID", e.Id + (string.IsNullOrEmpty(e.Ref) ? "" : "   (undoes " + e.Ref + ")"));
+            sb.Append("\n");
+            return sb.ToString();
+        }
+
+        // the line in plain words: for a registry value, why Elixar changed it ("Startup: turned off Spotify")
+        public static string Summary(Entry e)
+        {
+            if (e == null) return "";
+            if (e.Kind == "Registry" && !string.IsNullOrEmpty(e.Detail)) return e.Detail;
+            return e.Action ?? "";
+        }
+
+        // what to do to reverse it, for the details under the list
+        public static string HowToUndo(Entry e, string status)
+        {
+            if (status == "Can be undone") return e.Old == null ? "Click \"Undo this change\" to remove this value again." : "Click \"Undo this change\" to put the value back as it was before.";
+            if (status == "Undone") return "Already undone (see the line it points to).";
+            if (status == "In Undo") return "Click \"Open Tools > Undo\" to put the files back, until they are deleted for good.";
+            if (status == "Failed") return "Nothing to undo: it did not work. The details say why.";
+            if (e.Kind == "Security" || (e.Detail ?? "").Contains("not put back on purpose") || (e.Before ?? "").StartsWith("(hidden")) return "Not put back from here on purpose: it was a security fix.";
+            if (e.Kind == "Cleaning") return "What went to Undo can be put back in Tools > Undo; the rest (caches, temp files) is rebuilt by Windows and apps when needed.";
+            if (e.Kind == "Windows command") return "Windows commands can't be reversed from Elixar. A restore point from before the change (Tools) takes the PC back.";
+            if (e.Kind == "Registry") return "Can't be undone from here: what was there is not kept (privacy or security).";
+            if (e.Kind == "Settings") return "Change it back where you set it.";
+            if (e.Kind == "Email") return "Connect or disconnect the account again in Settings > Email account.";
+            if (e.Kind == "Phone") return "Pre-installed phone apps come back with \"Put back\" in the Phone tab; deleted phone files are gone.";
+            if (e.Kind == "Apps") return "Install the app again from its website or the Microsoft Store.";
+            return "";
         }
 
         // newest first; the older file too, so a long history is still there
@@ -390,6 +485,17 @@ namespace CDriveCleaner
             }
         }
 
+        // a startup switch reads On or Off (Windows: an even first byte is on, odd is off)
+        public static string Friendly(string key, string enc)
+        {
+            string shown = Show(enc);
+            if (enc != null && enc.StartsWith("hex:") && enc.Length >= 6 && (key ?? "").IndexOf(@"\StartupApproved\", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                int b; if (int.TryParse(enc.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out b)) return (b % 2 == 0 ? "On" : "Off") + "  (" + shown + ")";
+            }
+            return shown;
+        }
+
         [ThreadStatic] static string pendingRef;
         [ThreadStatic] static bool written;
 
@@ -403,8 +509,8 @@ namespace CDriveCleaner
                 Kind = "Registry",
                 Action = pendingRef != null ? "Put back the old value" : oldEnc == null ? "Added a value" : newEnc == null ? "Deleted a value" : "Changed a value",
                 Target = Target(hive, key, name, view),
-                Before = hide && oldEnc != null ? "(hidden: secret)" : Show(oldEnc),
-                After = hide && newEnc != null ? "(hidden: secret)" : Show(newEnc),
+                Before = hide && oldEnc != null ? "(hidden: secret)" : Friendly(key, oldEnc),
+                After = hide && newEnc != null ? "(hidden: secret)" : Friendly(key, newEnc),
                 Detail = why,
                 Ref = pendingRef,
             };
@@ -493,7 +599,7 @@ namespace CDriveCleaner
                 using (var b = Base(e.Hive, e.View))
                 using (var k = e.Old == null ? b.OpenSubKey(e.Key, true) : b.CreateSubKey(e.Key))
                 {
-                    string why = "Undo of the change on " + e.When.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + (string.IsNullOrEmpty(e.Detail) ? "" : " (" + e.Detail + ")");
+                    string why = "Undo of: " + ChangeLog.Summary(e);
                     pendingRef = e.Id; written = false;
                     try
                     {

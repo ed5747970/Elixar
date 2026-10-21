@@ -5,11 +5,14 @@ Made by Elisar
 
 NEW IN 1.2.31
 - Logs (next to Settings): every change Elixar makes to this PC, newest
-  first - registry values with the value before and after, files moved to
-  Undo, each cleaned item, Windows commands that change something, apps,
-  startup, security, PIN and email. Search and filter, save as .csv, and
-  "Undo this change..." puts a registry value back exactly as it was
-  (written down as a change of its own). Passwords are never written there.
+  first, grouped by day, each in plain words ("Startup: turned off
+  Spotify") with how to undo it. Registry values show before and after
+  (startup switches read On / Off); also files moved to Undo, folders
+  moved, each cleaned item, Windows commands that change something, apps
+  (also on the phone), security, PIN, email and settings. Search, filter,
+  save as .csv or .txt. "Undo this change..." puts a registry value back
+  exactly as it was. "Open the log file" opens changes.txt, the same log
+  in plain words, in Notepad. Passwords are never written there.
 - Dashboard > Watch: the folders that always grow or grow fast, how much a
   month, what to do, and how often to look at them (every week, 2 weeks or
   month). "I checked it" keeps a folder quiet until its next look is due.

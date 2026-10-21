@@ -273,12 +273,13 @@
 </ul>
 
 <h2 id="logs">Logs (change log)</h2>
-<p>The <strong>Logs</strong> tab, right next to Settings, lists every change Elixar makes to this PC, newest first: registry values (with the value <strong>before</strong> and <strong>after</strong>, also for startup switches and Elixar&rsquo;s own settings), files moved to Undo, put back or deleted, each cleaned item, Windows commands that change something (DISM, Disk Cleanup, restore points, scheduled tasks, drivers, PowerShell), apps removed, security fixes, the PIN and the email account. Commands that only read are not listed.</p>
+<p>The <strong>Logs</strong> tab, right next to Settings, lists every change Elixar makes to this PC, newest first: registry values (with the value <strong>before</strong> and <strong>after</strong>, also for startup switches and Elixar&rsquo;s own settings), files moved to Undo, put back or deleted, personal folders moved to another drive, empty folders removed, each cleaned item, Windows commands that change something (DISM, Disk Cleanup, restore points, scheduled tasks, drivers, PowerShell), apps removed (also on the phone) and files deleted on the phone, security fixes, the PIN, the email account, and changed settings (email reports, daily tidy, theme, language). Commands that only read are not listed.</p>
 <ul>
-  <li><strong>Find a change:</strong> pick a kind (Registry, Files, Cleaning, Windows command, Apps, Security, Email, Undo), a period, or type in Search. Click a line to see everything about it underneath.</li>
+  <li><strong>Easy to read:</strong> the lines are grouped by day (Today, Yesterday, then the date) and each says in plain words what happened, for example &ldquo;Startup: turned off Spotify&rdquo;; startup switches show On or Off. Click a line: underneath it says when, where, the value before and after, and <strong>How to undo</strong> it.</li>
+  <li><strong>Find a change:</strong> pick a kind (Registry, Files, Cleaning, Windows command, Apps, Phone, Security, Email, Settings, Undo), a period, or type in Search. Click a line to see everything about it underneath.</li>
   <li><strong>Undo this change&hellip;</strong> puts a registry value back exactly as it was (or removes one Elixar added). If the value was changed again since, Elixar tells you first. The undo is written down as a change of its own, so it can be undone too. Undo only writes to the keys Elixar changes itself; security fixes (a removed password or risky setting) are not put back from here on purpose.</li>
   <li><strong>Files:</strong> a line &ldquo;In Undo&rdquo; opens Tools &rsaquo; Undo, where you put them back.</li>
-  <li><strong>Save the log as&hellip;</strong> makes a spreadsheet (.csv) to keep or send to whoever helps you; <strong>Show the log file</strong> shows changes.jsonl; <strong>Open the activity log</strong> opens cleaner-log.txt, the step-by-step text log.</li>
+  <li><strong>Save the log as&hellip;</strong> makes a spreadsheet (.csv) to keep or send to whoever helps you; <strong>Open the log file</strong> opens changes.txt in Notepad: the same list in plain words, one block per change, oldest first (Save the log as&hellip; can also make this text version); <strong>Open the activity log</strong> opens cleaner-log.txt, the step-by-step text log.</li>
 </ul>
 <p>Passwords, PINs, tokens and recovery codes are never written to the log, only that they were set or removed, and email addresses are shortened. The log is in C:\ProgramData\Elixar, which only administrators can change; at 4 MB it moves to changes-old.jsonl and a new one starts, and both are shown.</p>
 
@@ -386,7 +387,7 @@
 <table>
   <tr><th>Where</th><th>What</th></tr>
   <tr><td>Elixar folder</td><td>Elixar.exe, &ldquo;Run self-test (safe).bat&rdquo;, README.txt, UserGuide.html, SHA256.txt, source code, selftest-report.txt</td></tr>
-  <tr><td>C:\ProgramData\Elixar</td><td>changes.jsonl (the Logs tab: every change, with before and after), cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt, growth.txt (daily sizes of the Dashboard places, 90 days)</td></tr>
+  <tr><td>C:\ProgramData\Elixar</td><td>changes.txt (every change in plain words, with before and after) and changes.jsonl (the same for the Logs tab), cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt, growth.txt (daily sizes of the Dashboard places, 90 days)</td></tr>
   <tr><td>C:\Program Files\Elixar</td><td>The protected copy used by the schedules, and the Android tools</td></tr>
   <tr><td>X:\Elixar Undo (second drive) or C:\ProgramData\Elixar Undo</td><td>Undo backups, kept 7 days, locked to admins</td></tr>
   <tr><td>Phone backup (second drive or Pictures)</td><td>Files copied or moved from your phone</td></tr>

@@ -445,6 +445,7 @@ namespace CDriveCleaner
 
         public static void RemoveFiles(string serial, List<string> paths)
         {
+            if (paths.Count > 0) ChangeLog.Add("Phone", "Deleted files on the phone (" + paths.Count + ")", string.Join(", ", paths.Take(5)) + (paths.Count > 5 ? " and " + (paths.Count - 5) + " more" : ""), "", "", "Android", false);
             for (int i = 0; i < paths.Count; i += 40)
             {
                 var chunk = paths.Skip(i).Take(40).ToList();

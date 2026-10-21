@@ -742,8 +742,12 @@ namespace CDriveCleaner
                     if (File.Exists(tmp)) File.Delete(tmp);
                     File.WriteAllBytes(tmp, SelfImage.Bytes());
                     if (Trust.Sha256(tmp) != SelfImage.Sha256()) { File.Delete(tmp); return "The copy did not match."; }
-                    if (File.Exists(Exe)) { try { File.Delete(Exe); } catch { File.Move(Exe, Exe + ".old-" + DateTime.Now.Ticks); } }
+                    bool had = File.Exists(Exe);
+                    string oldVer = ""; try { if (had) oldVer = System.Diagnostics.FileVersionInfo.GetVersionInfo(Exe).FileVersion; } catch { }
+                    if (had) { try { File.Delete(Exe); } catch { File.Move(Exe, Exe + ".old-" + DateTime.Now.Ticks); } }
                     File.Move(tmp, Exe);
+                    string newVer = ""; try { newVer = System.Diagnostics.FileVersionInfo.GetVersionInfo(Exe).FileVersion; } catch { }
+                    ChangeLog.Add("Apps", had ? "Updated Elixar's protected copy" : "Installed Elixar's protected copy", Exe, had ? oldVer : "", newVer, "In a folder only administrators can change; the schedules use this copy", false);
                 }
                 // older copies that were in use during an update ("Elixar.exe.old-...") are removed once they are free
                 try { foreach (var o in Directory.GetFiles(Dir, "Elixar.exe.old-*")) try { File.Delete(o); } catch { } } catch { }

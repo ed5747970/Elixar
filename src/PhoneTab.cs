@@ -462,6 +462,7 @@ namespace CDriveCleaner
                     bool good = Android.Ok(o);
                     if (good) ok++;
                     Log("Phone: " + (restore ? "put back " : "removed ") + a.Name + " (" + a.Package + ")" + (good ? "" : " - failed: " + o.Trim()));
+                    ChangeLog.Add("Phone", restore ? "Put back a phone app" : a.System ? "Removed a pre-installed phone app (for you only)" : "Uninstalled a phone app", a.Name + " (" + a.Package + ")", "", good ? "" : "Failed", good ? "" : o.Trim(), !good);
                 }
                 return ok;
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
@@ -535,6 +536,7 @@ namespace CDriveCleaner
                     {
                         if (dev != null) gone.Add(f.Path);
                         else if (!IPhone.Delete(f.Path) || IPhone.Exists(f.Path)) Log("Phone: copied " + f.Name + " but the iPhone did not allow deleting it.");
+                        else ChangeLog.Add("Phone", "Moved a file from the iPhone to this PC", f.Path, "", Path.Combine(root, f.Name), "iPhone", false);
                     }
                 }
                 if (dev != null && gone.Count > 0) Android.RemoveFiles(dev.Serial, gone);
@@ -562,7 +564,7 @@ namespace CDriveCleaner
             Task.Factory.StartNew(() =>
             {
                 if (dev != null) Android.RemoveFiles(dev.Serial, sel.Select(f => f.Path).ToList());
-                else foreach (var f in sel) IPhone.Delete(f.Path);
+                else foreach (var f in sel) { bool del = IPhone.Delete(f.Path); ChangeLog.Add("Phone", "Deleted a file on the iPhone", f.Path, "", del ? "" : "Failed", "iPhone", !del); }
                 Log("Phone: deleted " + sel.Count + " files (" + Fs.Fmt(sel.Sum(f => f.Bytes)) + ").");
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() => { SetPhBusy(false); FindBigFiles(); }));
         }

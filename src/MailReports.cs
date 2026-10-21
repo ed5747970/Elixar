@@ -50,10 +50,14 @@ namespace CDriveCleaner
             return p;
         }
 
+        public string Choices() { return "Clean report " + (CleanReport ? "on" : "off") + ", alerts " + (Alerts ? "on" : "off") + ", weekly summary " + (Summary ? Day + " " + Time : "off"); }
+
         public void Save()
         {
             string f = File_;
             if (f == null) return;
+            string before = null; try { before = Load().Choices(); } catch { }
+            if (before != null && before != Choices()) ChangeLog.Add("Settings", "Changed the email reports", "Email", before, Choices(), "", false);
             Func<DateTime, string> D = d => d == DateTime.MinValue ? "" : d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             File.WriteAllText(f, "clean=" + (CleanReport ? 1 : 0) + "\nalerts=" + (Alerts ? 1 : 0) + "\nsummary=" + (Summary ? 1 : 0) + "\nday=" + Day + "\ntime=" + Time +
                                  "\nlastSummary=" + D(LastSummary) + "\nlastSpace=" + D(LastSpaceAlert) + "\ndisk=" + DiskStamp + "\n");

@@ -186,6 +186,8 @@ namespace CDriveCleaner
                     var f = p.Item1;
                     UI(() => moveStatus.Text = "Moving " + f.Name + "...");
                     var r = Mover.Move(f.Path, p.Item2, to => Mover.SetPath(f.Id, to), Log);
+                    ChangeLog.Add("Files", "Moved a personal folder: " + f.Name, f.Name, f.Path, r.Switched ? p.Item2 : "(not moved)",
+                                  (r.Switched ? r.Copied + " files (" + Fs.Fmt(r.Bytes) + "). Windows now opens " + f.Name + " in the new place." : "") + (r.Problems.Count > 0 ? " Problems: " + string.Join("; ", r.Problems.Take(3)) : ""), !r.Switched);
                     lines.Add(f.Name + ": " + (r.Switched ? "moved " + r.Copied + " files (" + Fs.Fmt(r.Bytes) + ") to " + p.Item2 : "not moved") +
                               (r.Problems.Count > 0 ? "\n    " + string.Join("\n    ", r.Problems.Take(3)) : ""));
                     Log("Move: " + lines.Last().Replace("\n", " "));

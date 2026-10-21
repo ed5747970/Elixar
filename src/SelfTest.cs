@@ -1405,6 +1405,18 @@ namespace CDriveCleaner
                                 rg = l1.Count == 5 && add != null && chg != null && add.Before == "(not there)" && add.After.StartsWith("5 ") && chg.Before.StartsWith("5 ") && chg.After.StartsWith("9 ") &&
                                      add.CanUndo && chg.CanUndo && add.Kind == "Registry" && chg.Target.StartsWith("HKCU\\" + sub, StringComparison.OrdinalIgnoreCase) && l1[0].Detail == "test expand";
                                 if (!rg) why += " [add/change " + l1.Count + "]";
+                                // the same changes in plain words in changes.txt, oldest first; startup switches read On / Off
+                                string txt = ChangeLog.TextFile(clf);
+                                string tt = File.Exists(txt) ? File.ReadAllText(txt) : "";
+                                bool clear = tt.StartsWith("=====") && tt.Contains("ELIXAR CHANGE LOG") && tt.IndexOf("What:    test add") > 0 && tt.IndexOf("What:    test add") < tt.IndexOf("What:    test change") &&
+                                             tt.Contains("Before:  5 (0x5)") && tt.Contains("(can be undone in Elixar > Logs)") && tt.Contains("\r\n") &&
+                                             RegLog.Friendly(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", "hex:020000000000000000000000").StartsWith("On  (02 00") &&
+                                             RegLog.Friendly(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run", "hex:03000000B0A27C6E1E04DD01").StartsWith("Off  (03 00") &&
+                                             ChangeLog.Summary(chg) == "test change" && MainForm.LogDay(DateTime.Today, DateTime.Today) == Lang.T("Today") && MainForm.LogDay(DateTime.Today.AddDays(-1), DateTime.Today) == Lang.T("Yesterday");
+                                File.Delete(txt); ChangeLog.EnsureText();
+                                clear &= File.Exists(txt) && File.ReadAllText(txt).Contains("What:    test expand");
+                                if (!clear) why += " [text log]";
+                                rg &= clear;
                                 // undo the change: 9 goes back to 5, written down as its own change pointing at the one it undid
                                 string err = RegLog.Undo(chg);
                                 int now; using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub)) now = (int)k.GetValue("Count");
@@ -1439,7 +1451,8 @@ namespace CDriveCleaner
                                 }
                                 var s1 = ChangeLog.Read().First(e => e.Detail == "test secret"); var s2 = ChangeLog.Read().First(e => e.Detail == "test token");
                                 string raw = File.ReadAllText(clf);
-                                sec = s1.Before == "(hidden: secret)" && !s1.CanUndo && !raw.Contains("Hunter2") && !raw.Contains("tok-123456") && !s2.CanUndo;
+                                string rawText = File.ReadAllText(ChangeLog.TextFile(clf));
+                                sec = s1.Before == "(hidden: secret)" && !s1.CanUndo && !raw.Contains("Hunter2") && !raw.Contains("tok-123456") && !s2.CanUndo && !rawText.Contains("Hunter2") && !rawText.Contains("tok-123456");
                                 // Windows commands: only the ones that change something, in plain words
                                 cmd = ChangeLog.Describe("dism.exe", "/Online /Cleanup-Image /StartComponentCleanup") != null && ChangeLog.Describe("dism.exe", "/Online /Cleanup-Image /AnalyzeComponentStore /English") == null &&
                                       ChangeLog.Describe("schtasks.exe", "/Query /TN x") == null && ChangeLog.Describe("schtasks.exe", "/Create /TN x /XML y") != null &&
@@ -1457,6 +1470,17 @@ namespace CDriveCleaner
                                 var l3 = ChangeLog.Read();
                                 ps = l3.Count == before + 2 && l3[1].Kind == "Apps" && l3[1].Action == "Removed a Microsoft Store app" && l3[1].Target.Contains("Remove-AppxPackage -Package 'Microsoft.BingNews") &&
                                      l3[0].Kind == "Security" && !File.ReadAllText(clf).Contains("Pa55word");
+                                // settings: only a real change of your choices is written down (not the date of the last clean)
+                                string keepTidy = TidyPrefs.OverrideFile; TidyPrefs.OverrideFile = Path.Combine(root, "changelog", "tidy.txt");
+                                try
+                                {
+                                    before = ChangeLog.Read().Count;
+                                    var tp = new TidyPrefs(); tp.Save(); tp.LastLowClean = "2026-10-01"; tp.Save(); tp.UndoDays = 90; tp.Save();
+                                    var tl = ChangeLog.Read();
+                                    ps &= tl.Count == before + 1 && tl[0].Kind == "Settings" && tl[0].Before.Contains("Undo 30 days") && tl[0].After.Contains("Undo 90 days");
+                                    if (!ps) why += " [settings " + (tl.Count - before) + "]";
+                                }
+                                finally { TidyPrefs.OverrideFile = keepTidy; }
                                 // a big log moves to the -old file and both are still read
                                 ChangeLog.MaxBytes = 2000;
                                 for (int i = 0; i < 30; i++) ChangeLog.Add("Cleaning", "Cleaned: item " + i, "", "", "", "rotation", false);
@@ -1488,7 +1512,7 @@ namespace CDriveCleaner
                                 page &= asked != null && asked.Contains("\"dark\"") && shown == "light" && lf.LogsRowCount == 3 && ChangeLog.Read().Count(e => e.Ref != null) == 1 &&
                                         ChangeLog.StatusOf(ChangeLog.Read().First(e => e.After == "\"dark\""), ChangeLog.Read()) == "Undone";
                                 string csv = MainForm.LogsCsv(ChangeLog.Read());
-                                page &= csv.StartsWith("Time,Kind,What") && csv.Split('\n').Length >= 5;
+                                page &= csv.StartsWith("Time,Kind,What") && csv.Split('\n').Length >= 5 && MainForm.LogsText(ChangeLog.Read()).Contains("Undo of: ui");
                                 string csv2 = MainForm.LogsCsv(new List<ChangeLog.Entry> { new ChangeLog.Entry { Id = "x", Target = "=HYPERLINK(\"http://x\")", Action = "a,b" } });
                                 page &= csv2.Contains("\"'=HYPERLINK(\"\"http://x\"\")\"") && !csv2.Contains(",=HYPERLINK") && csv2.Contains(",\"a,b\",");   // no formulas run in Excel
                                 if (!page) why += " [page " + string.Join(",", lf.NavRightItems) + " rows " + lf.LogsRowCount + "]";
@@ -1501,9 +1525,9 @@ namespace CDriveCleaner
                                 ChangeLog.OverrideFile = keep; ChangeLog.MaxBytes = keepMax; MainForm.LogsConfirmHook = null;
                                 try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(sub, false); } catch { }
                             }
-                            check(rg, "Logs: each registry value Elixar changes is written down with the value before and after, undo puts back exactly the old value (numbers, bytes, lists, %variables%) or removes an added one, and never writes outside Elixar's own keys" + why);
+                            check(rg, "Logs: each registry value Elixar changes is written down with the value before and after (also in plain words in changes.txt), undo puts back exactly the old value (numbers, bytes, lists, %variables%) or removes an added one, and never writes outside Elixar's own keys" + why);
                             check(sec, "Logs: passwords and tokens are never written to the log, only that they were removed, and they can't be put back from it");
-                            check(cmd && ps, "Logs: Windows commands and PowerShell that change something are written down in plain words (with the app or key they changed); ones that only read are not");
+                            check(cmd && ps, "Logs: Windows commands and PowerShell that change something are written down in plain words (with the app or key they changed), and so are changed settings; ones that only read are not" + (cmd && ps ? "" : why));
                             check(rot, "Logs: a long log moves to changes-old.jsonl and both are still shown");
                             check(ui, "Logs: the Logs page sits next to Settings, filters and searches, shows before and after, and \"Undo this change\" puts the old value back");
                         }
