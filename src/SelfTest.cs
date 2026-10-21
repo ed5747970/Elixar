@@ -33,6 +33,10 @@ namespace CDriveCleaner
             rep.AppendLine();
 
             string root = Path.Combine(UserDirs.Temp, "CDC-SelfTest-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            // what the tests change goes to a throwaway change log, not the one on the Logs page
+            string keepChangeLog = ChangeLog.OverrideFile;
+            try { Directory.CreateDirectory(root); } catch { }
+            ChangeLog.OverrideFile = Path.Combine(root, "changes-selftest.jsonl");
             try
             {
                 // 1. delete logic, in a throwaway folder
@@ -1378,6 +1382,131 @@ namespace CDriveCleaner
                             }
                             finally { PinLock.OverrideDir = null; }
                         }
+                        // Logs: every change written down, registry values with before and after, undo puts the old value back
+                        {
+                            string keep = ChangeLog.OverrideFile; long keepMax = ChangeLog.MaxBytes;
+                            string clf = Path.Combine(root, "changelog", "changes.jsonl"); Directory.CreateDirectory(Path.GetDirectoryName(clf));
+                            ChangeLog.OverrideFile = clf;
+                            string sub = @"Software\Elixar\SelfTest-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                            bool rg = false, cmd = false, ps = false, sec = false, rot = false, ui = false; string why = "";
+                            try
+                            {
+                                using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(sub))
+                                {
+                                    RegLog.Set(k, "Count", 5, Microsoft.Win32.RegistryValueKind.DWord, "test add");
+                                    RegLog.Set(k, "Count", 9, Microsoft.Win32.RegistryValueKind.DWord, "test change");
+                                    RegLog.Set(k, "Count", 9, Microsoft.Win32.RegistryValueKind.DWord, "same again: not written");
+                                    RegLog.Set(k, "Bytes", new byte[] { 1, 2, 255 }, Microsoft.Win32.RegistryValueKind.Binary, "test binary");
+                                    RegLog.Set(k, "Lines", new[] { "a", "b \"c\"" }, Microsoft.Win32.RegistryValueKind.MultiString, "test multi");
+                                    RegLog.Set(k, "Path", "%TEMP%\\x", Microsoft.Win32.RegistryValueKind.ExpandString, "test expand");
+                                }
+                                var l1 = ChangeLog.Read();
+                                var add = l1.FirstOrDefault(e => e.Detail == "test add"); var chg = l1.FirstOrDefault(e => e.Detail == "test change");
+                                rg = l1.Count == 5 && add != null && chg != null && add.Before == "(not there)" && add.After.StartsWith("5 ") && chg.Before.StartsWith("5 ") && chg.After.StartsWith("9 ") &&
+                                     add.CanUndo && chg.CanUndo && add.Kind == "Registry" && chg.Target.StartsWith("HKCU\\" + sub, StringComparison.OrdinalIgnoreCase) && l1[0].Detail == "test expand";
+                                if (!rg) why += " [add/change " + l1.Count + "]";
+                                // undo the change: 9 goes back to 5, written down as its own change pointing at the one it undid
+                                string err = RegLog.Undo(chg);
+                                int now; using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub)) now = (int)k.GetValue("Count");
+                                var l2 = ChangeLog.Read();
+                                bool u1 = err == null && now == 5 && l2[0].Ref == chg.Id && ChangeLog.StatusOf(chg, l2) == "Undone" && l2[0].CanUndo && ChangeLog.StatusOf(l2[0], l2) == "Can be undone";
+                                // binary, multi-line and %variable% values come back exactly
+                                bool exact = true;
+                                foreach (var d in new[] { "test binary", "test multi", "test expand" })
+                                {
+                                    var e = l2.First(x => x.Detail == d);
+                                    using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub, true)) k.DeleteValue(e.Name, false);
+                                    exact &= RegLog.ChangedSince(e) != null;            // it noticed the value is gone
+                                    var back = new ChangeLog.Entry { Kind = "Registry", Hive = e.Hive, View = e.View, Key = e.Key, Name = e.Name, Old = e.New, New = null, CanUndo = true, Target = e.Target, Id = "t" + d };
+                                    exact &= RegLog.Undo(back) == null && RegLog.Current(e) == e.New;
+                                }
+                                if (!u1 || !exact) why += " [undo " + u1 + "/" + exact + (err ?? "") + "]";
+                                // a value Elixar added: undo removes it again
+                                bool u2 = RegLog.Undo(add) == null; object gone; using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub)) gone = k.GetValue("Count");
+                                // an undo can never write outside the keys Elixar changes itself (also if the log file were edited)
+                                var bad = new ChangeLog.Entry { CanUndo = true, Hive = "HKCU", Key = @"Software\Microsoft\Windows\CurrentVersion\Policies\System", Name = "x", Old = "dword:1", View = "Default" };
+                                var bad2 = new ChangeLog.Entry { CanUndo = true, Hive = "HKCU", Key = @"Software\Elixar\..\..\Classes", Name = "x", Old = "sz:y", View = "Default" };
+                                bool fenced = RegLog.Undo(bad) != null && RegLog.Undo(bad2) != null && !RegLog.UndoAllowed("HKLM", @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon") && !RegLog.UndoAllowed("HKU", @"Software\Elixar");
+                                rg = rg && u1 && exact && u2 && gone == null && fenced;
+                                if (!u2 || gone != null || !fenced) why += " [remove " + u2 + "/" + (gone == null) + ", fenced " + fenced + "]";
+                                // a secret is never written down, only that it was removed, and can't be put back from here
+                                using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(sub))
+                                {
+                                    k.SetValue("DefaultPassword", "Hunter2-Secret");
+                                    RegLog.Delete(k, "DefaultPassword", "test secret", true, false);
+                                    k.SetValue("ApiToken", "tok-123456");
+                                    RegLog.Delete(k, "ApiToken", "test token");
+                                }
+                                var s1 = ChangeLog.Read().First(e => e.Detail == "test secret"); var s2 = ChangeLog.Read().First(e => e.Detail == "test token");
+                                string raw = File.ReadAllText(clf);
+                                sec = s1.Before == "(hidden: secret)" && !s1.CanUndo && !raw.Contains("Hunter2") && !raw.Contains("tok-123456") && !s2.CanUndo;
+                                // Windows commands: only the ones that change something, in plain words
+                                cmd = ChangeLog.Describe("dism.exe", "/Online /Cleanup-Image /StartComponentCleanup") != null && ChangeLog.Describe("dism.exe", "/Online /Cleanup-Image /AnalyzeComponentStore /English") == null &&
+                                      ChangeLog.Describe("schtasks.exe", "/Query /TN x") == null && ChangeLog.Describe("schtasks.exe", "/Create /TN x /XML y") != null &&
+                                      ChangeLog.Describe("vssadmin.exe", "list shadows") == null && ChangeLog.Describe("vssadmin.exe", "delete shadows /for=C: /all /quiet") != null &&
+                                      ChangeLog.Describe("powercfg.exe", "/a") == null && ChangeLog.Describe("wevtutil.exe", "el") == null && ChangeLog.Describe("cmd.exe", "/c dir") == null;
+                                int before = ChangeLog.Read().Count;
+                                ChangeLog.Command("vssadmin.exe", "delete shadows /for=C: /all /quiet", "Successfully deleted", 0);
+                                ChangeLog.Command("vssadmin.exe", "list shadows", "", 0);
+                                cmd &= ChangeLog.Read().Count == before + 1 && ChangeLog.Read()[0].Kind == "Windows command";
+                                // PowerShell: each changing command with its target; read-only scripts and passwords stay out
+                                before = ChangeLog.Read().Count;
+                                ChangeLog.PowerShell(StoreData.RemoveScript("Microsoft.BingNews_4.1.0.0_x64__8wekyb3d8bbwe"), "OK");
+                                ChangeLog.PowerShell("Get-CimInstance Win32_Volume | ForEach-Object { $_.Name }", "C:\\");
+                                ChangeLog.PowerShell("Set-LocalUser -Name x -Password 'Pa55word!'; 'OK'", "OK");
+                                var l3 = ChangeLog.Read();
+                                ps = l3.Count == before + 2 && l3[1].Kind == "Apps" && l3[1].Action == "Removed a Microsoft Store app" && l3[1].Target.Contains("Remove-AppxPackage -Package 'Microsoft.BingNews") &&
+                                     l3[0].Kind == "Security" && !File.ReadAllText(clf).Contains("Pa55word");
+                                // a big log moves to the -old file and both are still read
+                                ChangeLog.MaxBytes = 2000;
+                                for (int i = 0; i < 30; i++) ChangeLog.Add("Cleaning", "Cleaned: item " + i, "", "", "", "rotation", false);
+                                var l4 = ChangeLog.Read();
+                                string oldf = Path.Combine(Path.GetDirectoryName(clf), "changes-old.jsonl");
+                                int inOld = File.Exists(oldf) ? File.ReadAllLines(oldf).Count(x => x.StartsWith("{")) : 0, inNew = File.ReadAllLines(clf).Count(x => x.StartsWith("{"));
+                                rot = inOld > 0 && new FileInfo(clf).Length < 4000 && l4.Count == inOld + inNew && l4.First(e => e.Detail == "rotation").Action == "Cleaned: item 29";
+                                if (!rot) why += " [rotation " + inOld + "+" + inNew + "/" + l4.Count + "]";
+                                ChangeLog.MaxBytes = keepMax;
+                                // the Logs page, right next to Settings: filter, details and undo with one click
+                                ChangeLog.OverrideFile = Path.Combine(Path.GetDirectoryName(clf), "ui.jsonl");
+                                using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(sub))
+                                {
+                                    RegLog.Set(k, "Shown", "light", Microsoft.Win32.RegistryValueKind.String, "ui");
+                                    RegLog.Set(k, "Shown", "dark", Microsoft.Win32.RegistryValueKind.String, "ui");
+                                }
+                                ChangeLog.Command("vssadmin.exe", "delete shadows /for=C: /all /quiet", "", 0);
+                                var lf = new MainForm(true);
+                                lf.LogsLoad();
+                                bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs" }) && lf.LogsRowCount == 3;
+                                lf.LogsSetFilter(1, 2, ""); page &= lf.LogsRowCount == 2;          // Registry only
+                                lf.LogsSetFilter(0, 2, "vssadmin"); page &= lf.LogsRowCount == 1;   // search
+                                lf.LogsSetFilter(1, 2, ""); lf.LogsSelect(0);
+                                page &= lf.LogsUndoEnabled && lf.LogsDetailText.Contains("\"light\"") && lf.LogsDetailText.Contains("\"dark\"");
+                                string asked = null; MainForm.LogsConfirmHook = q => { asked = q; return DialogResult.Yes; };
+                                lf.LogsClickUndo();
+                                MainForm.LogsConfirmHook = null;
+                                string shown; using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(sub)) shown = k.GetValue("Shown") as string;
+                                page &= asked != null && asked.Contains("\"dark\"") && shown == "light" && lf.LogsRowCount == 3 && ChangeLog.Read().Count(e => e.Ref != null) == 1 &&
+                                        ChangeLog.StatusOf(ChangeLog.Read().First(e => e.After == "\"dark\""), ChangeLog.Read()) == "Undone";
+                                string csv = MainForm.LogsCsv(ChangeLog.Read());
+                                page &= csv.StartsWith("Time,Kind,What") && csv.Split('\n').Length >= 5;
+                                string csv2 = MainForm.LogsCsv(new List<ChangeLog.Entry> { new ChangeLog.Entry { Id = "x", Target = "=HYPERLINK(\"http://x\")", Action = "a,b" } });
+                                page &= csv2.Contains("\"'=HYPERLINK(\"\"http://x\"\")\"") && !csv2.Contains(",=HYPERLINK") && csv2.Contains(",\"a,b\",");   // no formulas run in Excel
+                                if (!page) why += " [page " + string.Join(",", lf.NavRightItems) + " rows " + lf.LogsRowCount + "]";
+                                lf.Dispose();
+                                ui = page;
+                            }
+                            catch (Exception ex) { why += " ERROR: " + ex.GetType().Name + ": " + ex.Message; }
+                            finally
+                            {
+                                ChangeLog.OverrideFile = keep; ChangeLog.MaxBytes = keepMax; MainForm.LogsConfirmHook = null;
+                                try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(sub, false); } catch { }
+                            }
+                            check(rg, "Logs: each registry value Elixar changes is written down with the value before and after, undo puts back exactly the old value (numbers, bytes, lists, %variables%) or removes an added one, and never writes outside Elixar's own keys" + why);
+                            check(sec, "Logs: passwords and tokens are never written to the log, only that they were removed, and they can't be put back from it");
+                            check(cmd && ps, "Logs: Windows commands and PowerShell that change something are written down in plain words (with the app or key they changed); ones that only read are not");
+                            check(rot, "Logs: a long log moves to changes-old.jsonl and both are still shown");
+                            check(ui, "Logs: the Logs page sits next to Settings, filters and searches, shows before and after, and \"Undo this change\" puts the old value back");
+                        }
                     }
                     // ---- similar photos, empty folders, compression ----
                     {
@@ -1923,6 +2052,7 @@ namespace CDriveCleaner
             }
             finally
             {
+                ChangeLog.OverrideFile = keepChangeLog;
                 try { Fs.Delete(root); } catch { }
                 Catalog.WindowsOnLinux = false; MainForm.ForceWindowsUi = false;
             }

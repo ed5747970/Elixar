@@ -241,9 +241,10 @@ namespace CDriveCleaner
                 {
                     var o = p.StandardOutput.ReadToEndAsync();
                     var e = p.StandardError.ReadToEndAsync();
-                    if (!p.WaitForExit(5 * 60 * 1000)) { try { p.Kill(); } catch { } output = "timed out"; return -1; }
+                    if (!p.WaitForExit(5 * 60 * 1000)) { try { p.Kill(); } catch { } output = "timed out"; ChangeLog.Command(exe, args, output, -1); return -1; }
                     output = (o.Result + " " + e.Result).Trim();
                     if (output.Length > 300) output = output.Substring(output.Length - 300);
+                    ChangeLog.Command(exe, args, output, p.ExitCode);
                     return p.ExitCode;
                 }
             }

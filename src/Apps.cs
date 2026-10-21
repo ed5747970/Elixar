@@ -404,6 +404,7 @@ namespace CDriveCleaner
                     Process.Start(cmd);
                 }
                 Log("Started the uninstaller for " + a.Name + (a.PerUser ? " (with your normal rights)." : "."));
+                ChangeLog.Add("Apps", "Started the uninstaller", a.Name, "installed", "", a.Uninstall + (a.PerUser ? " (run with your normal rights)" : ""), false);
                 appsStatus.Text = "Uninstaller for " + a.Name + " started. When it has finished, click Refresh.";
             }
             catch (Exception ex)

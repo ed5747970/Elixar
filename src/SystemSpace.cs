@@ -30,12 +30,13 @@ namespace CDriveCleaner
                 {
                     var o = p.StandardOutput.ReadToEndAsync();
                     var e = p.StandardError.ReadToEndAsync();
-                    if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch { } output = "timed out"; return -1; }
+                    if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch { } output = "timed out"; ChangeLog.Command(exe, args, output, -1); return -1; }
                     output = (o.Result + "\n" + e.Result).Trim();
+                    ChangeLog.Command(exe, args, output, p.ExitCode);
                     return p.ExitCode;
                 }
             }
-            catch (Exception ex) { output = ex.Message; return -1; }
+            catch (Exception ex) { output = ex.Message; ChangeLog.Command(exe, args, output, -1); return -1; }
         }
 
         // ---------- WinSxS ----------

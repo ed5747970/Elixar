@@ -94,13 +94,21 @@ namespace CDriveCleaner
             string line = "v2|" + Name(kind) + "|" + Rounds + "|" + Convert.ToBase64String(s1) + "|" + Convert.ToBase64String(Hash(secret, s1)) + "|" + Convert.ToBase64String(s2) + "|" + Convert.ToBase64String(Hash(NormalizeCode(code), s2));
             string tmp = PinFile + ".new";
             File.WriteAllText(tmp, line);
-            if (File.Exists(PinFile)) File.Delete(PinFile);
+            bool had = File.Exists(PinFile);
+            if (had) File.Delete(PinFile);
             File.Move(tmp, PinFile);
             ResetTries();
+            ChangeLog.Add("Security", had ? "Changed the PIN or password" : "Turned on the PIN or password", "Elixar", "", kind == Kind.Password ? "a password" : "a " + Digits(kind) + "-digit PIN", "The PIN, the password and the recovery code are never written here", false);
             return code;
         }
 
-        public static void Remove() { try { File.Delete(PinFile); } catch { } ResetTries(); }
+        public static void Remove()
+        {
+            bool had = false;
+            try { had = File.Exists(PinFile); File.Delete(PinFile); } catch { }
+            ResetTries();
+            if (had) ChangeLog.Add("Security", "Turned off the PIN or password", "Elixar", "", "", "", false);
+        }
 
         public enum Result { Ok, Wrong, Wait }
         // seconds to wait before the next try: none for the first 5 wrong PINs, then 30 s, 1, 2, 4... up to 15 minutes

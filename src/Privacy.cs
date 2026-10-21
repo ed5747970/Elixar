@@ -101,8 +101,10 @@ namespace CDriveCleaner
                     using (var k = Registry.CurrentUser.OpenSubKey(key, true))
                     {
                         if (k == null) continue;
-                        foreach (var n in k.GetValueNames()) k.DeleteValue(n, false);
-                        foreach (var sub in k.GetSubKeyNames()) k.DeleteSubKeyTree(sub, false);
+                        var names = k.GetValueNames(); var subs = k.GetSubKeyNames();
+                        foreach (var n in names) k.DeleteValue(n, false);
+                        foreach (var sub in subs) k.DeleteSubKeyTree(sub, false);
+                        RegLog.ClearedKey(k, null, names.Length, subs.Length, "Privacy: cleared the list of recently used items (what was in it is not written down)");
                     }
                 }
                 catch (Exception e) { if (log != null) log("  " + key + ": " + e.Message); }
@@ -147,7 +149,7 @@ namespace CDriveCleaner
                     Measure = () => -1, Clean = log => IPhone.Sta(() => { try { System.Windows.Forms.Clipboard.Clear(); } catch { } return 0; }) },
                 new CleanItem { Name = "DNS cache", Tier = Tier.Review, Privacy = true, Where = "Windows network cache",
                     Info = "The list of websites this PC looked up recently. Windows fills it again as you browse.",
-                    Measure = () => -1, Clean = log => { try { var p = Process.Start(new ProcessStartInfo(Win.SystemExe("ipconfig.exe"), "/flushdns") { UseShellExecute = false, CreateNoWindow = true }); p.WaitForExit(30000); } catch { } } },
+                    Measure = () => -1, Clean = log => { try { var p = Process.Start(new ProcessStartInfo(Win.SystemExe("ipconfig.exe"), "/flushdns") { UseShellExecute = false, CreateNoWindow = true }); p.WaitForExit(30000); ChangeLog.Command("ipconfig.exe", "/flushdns", "", 0); } catch { } } },
             };
         }
     }

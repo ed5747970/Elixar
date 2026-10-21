@@ -1,0 +1,225 @@
+// Logs (next to Settings): every change Elixar made to this PC - registry values with the value before and after, files, commands,
+// apps, security and settings - with search, filters, details, undo for registry values, and export.
+
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+
+namespace CDriveCleaner
+{
+    public partial class MainForm
+    {
+        TabPage pageLogs;
+        ListView logsList;
+        ComboBox logsKind, logsPeriod;
+        TextBox logsSearch, logsDetail;
+        Label logsCount;
+        Button btnLogsUndo, btnLogsCopy, btnLogsFile, btnLogsText, btnLogsExport, btnLogsRefresh;
+        List<ChangeLog.Entry> logsAll = new List<ChangeLog.Entry>();
+        public static Func<string, DialogResult> LogsConfirmHook;   // self-test: answers the undo question
+
+        static readonly string[] LogKinds = { "All changes", "Registry", "Files", "Cleaning", "Windows command", "Apps", "Security", "Email", "Undo" };
+        static readonly string[] LogPeriods = { "Last 7 days", "Last 30 days", "Everything" };
+
+        // for the self-test and previews
+        public int LogsRowCount { get { return logsList == null ? 0 : logsList.Items.Count; } }
+        public string LogsRowText(int i) { var r = logsList.Items[i]; return string.Join(" | ", r.SubItems.Cast<ListViewItem.ListViewSubItem>().Select(s => s.Text)); }
+        public void LogsSelect(int i) { logsList.SelectedItems.Clear(); logsList.Items[i].Selected = true; logsList.Items[i].Focused = true; LogsShowSelected(); }
+        public string LogsDetailText { get { return logsDetail.Text; } }
+        public bool LogsUndoEnabled { get { return btnLogsUndo.Enabled; } }
+        public void LogsSetFilter(int kind, int period, string search) { logsKind.SelectedIndex = kind; logsPeriod.SelectedIndex = period; logsSearch.Text = search ?? ""; LogsFill(); }
+        public void ShowLogs() { tabs.SelectedTab = pageLogs; }
+        public void LogsClickUndo() { LogsUndo(); }
+        public void LogsFocus() { logsList.Focus(); }
+
+        void BuildLogsTab()
+        {
+            pageLogs = new TabPage("Logs") { BackColor = Color.FromArgb(246, 248, 251) };
+            var t = Page(6);
+            t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.RowStyles.Add(new RowStyle(SizeType.Percent, 68)); t.RowStyles.Add(new RowStyle(SizeType.Percent, 32)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.Controls.Add(Title("Change log"), 0, 0);
+            t.Controls.Add(Note("Every change Elixar makes to this PC: registry values (with the value before and after), files moved to Undo or deleted, Windows commands, apps, startup, security and settings. " +
+                                "If something stops working after a change, find it here: registry values can be put back with one click, files from Tools > Undo. Passwords are never written here."), 0, 1);
+
+            var bar = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, 0, 0, S(6)) };
+            Func<string, Label> lab = s => new Label { AutoSize = true, Text = s, Margin = new Padding(S(2), S(6), S(4), 0) };
+            logsKind = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(170), Margin = new Padding(0, S(2), S(14), 0) };
+            logsKind.Items.AddRange(LogKinds); logsKind.SelectedIndex = 0;
+            logsPeriod = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(140), Margin = new Padding(0, S(2), S(14), 0) };
+            logsPeriod.Items.AddRange(LogPeriods); logsPeriod.SelectedIndex = 1;
+            logsSearch = new TextBox { Width = S(240), Margin = new Padding(0, S(2), S(14), 0) };
+            logsCount = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(2), S(6), 0, 0) };
+            bar.Controls.AddRange(new Control[] { lab("Show:"), logsKind, lab("When:"), logsPeriod, lab("Search:"), logsSearch, logsCount });
+            t.Controls.Add(bar, 0, 2);
+
+            logsList = new ListView { View = View.Details, FullRowSelect = true, Dock = DockStyle.Fill, HideSelection = false, MultiSelect = false, GridLines = false };
+            logsList.Columns.Add("Time", S(125)); logsList.Columns.Add("Kind", S(130)); logsList.Columns.Add("What", S(270));
+            logsList.Columns.Add("Where", S(340)); logsList.Columns.Add("Before", S(150)); logsList.Columns.Add("After", S(150)); logsList.Columns.Add("Status", S(110));
+            t.Controls.Add(logsList, 0, 3);
+            logsDetail = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Font = new Font("Consolas", 9f), Margin = new Padding(0, S(6), 0, S(4)), RightToLeft = Lang.Hebrew ? RightToLeft.Yes : RightToLeft.No };
+            t.Controls.Add(logsDetail, 0, 4);
+
+            var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0) };
+            btnLogsUndo = MakeButton("Undo this change..."); btnLogsUndo.Font = new Font("Segoe UI Semibold", 9f); btnLogsUndo.Enabled = false;
+            btnLogsCopy = MakeButton("Copy details"); btnLogsCopy.Enabled = false;
+            btnLogsExport = MakeButton("Save the log as...");
+            btnLogsFile = MakeButton("Show the log file");
+            btnLogsText = MakeButton("Open the activity log");
+            btnLogsRefresh = MakeButton("Refresh");
+            buttons.Controls.AddRange(new Control[] { btnLogsUndo, btnLogsCopy, btnLogsExport, btnLogsFile, btnLogsText, btnLogsRefresh });
+            t.Controls.Add(buttons, 0, 5);
+            pageLogs.Controls.Add(t);
+
+            var typing = new Timer { Interval = 300 };
+            typing.Tick += (o, e) => { typing.Stop(); LogsFill(); };
+            logsSearch.TextChanged += (o, e) => { typing.Stop(); typing.Start(); };
+            logsKind.SelectedIndexChanged += (o, e) => LogsFill();
+            logsPeriod.SelectedIndexChanged += (o, e) => LogsFill();
+            logsList.SelectedIndexChanged += (o, e) => LogsShowSelected();
+            logsList.DoubleClick += (o, e) => { if (btnLogsUndo.Enabled) LogsUndo(); };
+            btnLogsUndo.Click += (o, e) => LogsUndo();
+            btnLogsCopy.Click += (o, e) => { try { if (logsDetail.Text.Length > 0) Clipboard.SetText(logsDetail.Text); } catch { } };
+            btnLogsRefresh.Click += (o, e) => LogsLoad();
+            btnLogsExport.Click += (o, e) => LogsExport();
+            btnLogsFile.Click += (o, e) => { try { if (File.Exists(ChangeLog.FilePath)) Shell.Select(ChangeLog.FilePath); else Shell.Open(Path.GetDirectoryName(ChangeLog.FilePath)); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); } };
+            btnLogsText.Click += (o, e) => { try { if (File.Exists(logFile)) Shell.Open(logFile); else Lang.Box(this, "There is no activity log yet.", "Elixar"); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); } };
+        }
+
+        void OnLogsTab() { LogsLoad(); }
+
+        public void LogsLoad()
+        {
+            logsAll = ChangeLog.Read();
+            LogsFill();
+        }
+
+        // a registry value reads name first in the list, so it isn't cut off behind the long key
+        static string LogWhere(ChangeLog.Entry e)
+        {
+            string t = e.Target ?? ""; int i = t.LastIndexOf("  >  ", StringComparison.Ordinal);
+            return e.Kind == "Registry" && i > 0 ? t.Substring(i + 5) + "   \u00B7   " + t.Substring(0, i) : t;
+        }
+
+        static string LogTime(ChangeLog.Entry e) { var w = e.When; return w == DateTime.MinValue ? e.Time : w.ToString(Lang.Hebrew ? "d.M.yyyy HH:mm" : "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); }
+
+        void LogsFill()
+        {
+            if (logsList == null) return;
+            string kind = logsKind.SelectedIndex <= 0 ? null : LogKinds[logsKind.SelectedIndex];
+            DateTime from = logsPeriod.SelectedIndex == 0 ? DateTime.Now.AddDays(-7) : logsPeriod.SelectedIndex == 1 ? DateTime.Now.AddDays(-30) : DateTime.MinValue;
+            string q = (logsSearch.Text ?? "").Trim();
+            var shown = logsAll.Where(e => (kind == null || e.Kind == kind) && e.When >= from &&
+                                           (q.Length == 0 || new[] { e.Action, e.Target, e.Before, e.After, e.Detail, e.Kind, Lang.T(e.Action ?? ""), Lang.T(e.Kind ?? "") }
+                                                .Any(s => (s ?? "").IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0))).Take(5000).ToList();
+            var selE = LogsSelected(); string sel = selE == null ? null : selE.Id;
+            logsList.BeginUpdate();
+            logsList.Items.Clear();
+            foreach (var e in shown)
+            {
+                string status = ChangeLog.StatusOf(e, logsAll);
+                var r = new ListViewItem(new[] { LogTime(e), Lang.T(e.Kind ?? ""), Lang.T(e.Action ?? ""), LogWhere(e), Lang.T(e.Before ?? ""), Lang.T(e.After ?? ""), Lang.T(status) }) { Tag = e, UseItemStyleForSubItems = false };
+                if (status == "Failed") r.SubItems[6].ForeColor = Theme.MapFore(Color.FromArgb(190, 40, 40));
+                else if (status == "Can be undone") r.SubItems[6].ForeColor = Theme.MapFore(Theme.Accent);
+                else if (status == "Undone") r.SubItems[6].ForeColor = Theme.Quiet;
+                logsList.Items.Add(r);
+                if (e.Id == sel) r.Selected = true;
+            }
+            logsList.EndUpdate();
+            logsCount.Text = Lang.T(logsAll.Count == 0 ? "Nothing changed yet." : shown.Count == 1 ? "1 change" : shown.Count + " changes") + (logsAll.Count > 0 && shown.Count != logsAll.Count ? "  " + Lang.T("(of " + logsAll.Count + ")") : "");
+            LogsShowSelected();
+        }
+
+        ChangeLog.Entry LogsSelected()
+        {
+            if (logsList.SelectedItems.Count > 0) return (ChangeLog.Entry)logsList.SelectedItems[0].Tag;
+            var r = logsList.Items.Cast<ListViewItem>().FirstOrDefault(i => i.Selected);   // before the list is on screen
+            return r == null ? null : (ChangeLog.Entry)r.Tag;
+        }
+
+        void LogsShowSelected()
+        {
+            var e = LogsSelected();
+            btnLogsCopy.Enabled = e != null;
+            if (e == null) { logsDetail.Text = Lang.T("Select a line to see everything about that change."); btnLogsUndo.Enabled = false; btnLogsUndo.Text = Lang.T("Undo this change..."); return; }
+            string status = ChangeLog.StatusOf(e, logsAll);
+            var sb = new StringBuilder();
+            // \u200E keeps numbers and paths in their own order after a Hebrew label
+            Action<string, string> line = (k, v) => { if (!string.IsNullOrEmpty(v)) sb.Append(Lang.T(k)).Append(": \u200E").Append(v).Append("\u200E\r\n"); };
+            line("Time", LogTime(e));
+            line("Kind", Lang.T(e.Kind ?? ""));
+            line("What", Lang.T(e.Action ?? ""));
+            line("Where", e.Target);
+            if (e.Kind == "Registry" && e.CanUndo) line("Registry view", e.View == "Registry32" ? "32-bit" : e.View == "Registry64" ? "64-bit" : "default");
+            line("Before", Lang.T(e.Before ?? ""));
+            line("After", Lang.T(e.After ?? ""));
+            line("Details", e.Detail);
+            line("Status", Lang.T(status));
+            var undid = e.Ref == null ? null : logsAll.FirstOrDefault(x => x.Id == e.Ref);
+            if (undid != null) line("Undid", LogTime(undid) + "  " + Lang.T(undid.Action ?? "") + "  " + undid.Target);
+            var by = logsAll.FirstOrDefault(x => x.Ref == e.Id);
+            if (by != null) line("Undone on", LogTime(by));
+            line("Change ID", e.Id);
+            logsDetail.Text = sb.ToString();
+
+            bool inUndo = status == "In Undo";
+            btnLogsUndo.Text = Lang.T(inUndo ? "Open Tools > Undo" : "Undo this change...");
+            btnLogsUndo.Enabled = inUndo || status == "Can be undone";
+        }
+
+        void LogsUndo()
+        {
+            var e = LogsSelected();
+            if (e == null) return;
+            if (ChangeLog.StatusOf(e, logsAll) == "In Undo") { ShowUndo(); return; }
+            if (!e.CanUndo || ChangeLog.StatusOf(e, logsAll) != "Can be undone") return;
+            string now;
+            try { now = RegLog.ChangedSince(e); } catch (Exception ex) { Lang.Box(this, Lang.T("The value could not be read: ") + ex.Message, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            string ask = Lang.T(e.Old == null ? "Remove this value again?" : "Put back the value it had before?") + "\n\n" + e.Target + "\n\n" +
+                         Lang.T("Now: ") + (now ?? e.After) + "\n" + Lang.T("Back to: ") + (e.Old == null ? Lang.T("(not there)") : e.Before) + "\n\n" +
+                         (now != null ? Lang.T("Careful: this value was changed again after Elixar's change.") + "\n\n" : "") +
+                         Lang.T("Elixar writes the undo down as a change of its own, so you can undo it again.");
+            var answer = LogsConfirmHook != null ? LogsConfirmHook(ask) : Lang.BoxNo(this, ask, "Elixar");
+            if (answer != DialogResult.Yes) return;
+            string err = RegLog.Undo(e);
+            if (err != null) { Log(Lang.T("Undo didn't work: ") + err); if (LogsConfirmHook == null) Lang.Box(this, Lang.T("Undo didn't work: ") + err, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            else Log(Lang.T("Undone: ") + e.Target);
+            LogsLoad();
+        }
+
+        // a cell starting with = + - @ would run as a formula in Excel (a file name can start with one): it gets a ' first
+        static string Csv(string s)
+        {
+            s = s ?? "";
+            if (s.Length > 0 && "=+-@\t\r".IndexOf(s[0]) >= 0) s = "'" + s;
+            return s.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0 ? "\"" + s.Replace("\"", "\"\"") + "\"" : s;
+        }
+
+        public static string LogsCsv(List<ChangeLog.Entry> all)
+        {
+            var sb = new StringBuilder();
+            sb.Append("Time,Kind,What,Where,Before,After,Status,Details,Change ID\r\n");
+            foreach (var e in all)
+                sb.Append(string.Join(",", new[] { e.Time, e.Kind, e.Action, e.Target, e.Before, e.After, ChangeLog.StatusOf(e, all), e.Detail, e.Id }.Select(Csv))).Append("\r\n");
+            return sb.ToString();
+        }
+
+        void LogsExport()
+        {
+            using (var d = new SaveFileDialog { Filter = "Spreadsheet (*.csv)|*.csv", FileName = "Elixar change log " + DateTime.Today.ToString("yyyy-MM-dd") + ".csv",
+                                                InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true })
+            {
+                if (d.ShowDialog(this) != DialogResult.OK) return;
+                string text = "﻿" + LogsCsv(logsAll);   // the mark lets Excel read Hebrew and other letters correctly
+                try { SafeFile.WriteText(d.FileName, text); }
+                catch { try { File.WriteAllText(d.FileName, text, new UTF8Encoding(false)); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; } }
+                Log(Lang.T("Change log saved: ") + d.FileName);
+            }
+        }
+    }
+}

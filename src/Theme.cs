@@ -19,9 +19,17 @@ namespace CDriveCleaner
             try { using (var k = Registry.CurrentUser.OpenSubKey(Key)) { var v = k == null ? null : k.GetValue(name) as string; return string.IsNullOrEmpty(v) ? def : v; } }
             catch { return def; }
         }
+        // the choices you make; the dates Elixar keeps for itself (last update check, reminders) are not written to the change log
+        static readonly string[] Logged = { "Theme", "Language", "TrayMinimize" };
         public static void Set(string name, string value)
         {
-            try { using (var k = Registry.CurrentUser.CreateSubKey(Key)) k.SetValue(name, value, RegistryValueKind.String); } catch { }
+            try
+            {
+                using (var k = Registry.CurrentUser.CreateSubKey(Key))
+                    if (Array.IndexOf(Logged, name) >= 0) RegLog.Set(k, name, value, RegistryValueKind.String, "Elixar setting: " + name);
+                    else k.SetValue(name, value, RegistryValueKind.String);
+            }
+            catch { }
         }
         public static string ThemeMode { get { return Get("Theme", "auto"); } set { Set("Theme", value); } }        // auto, light, dark
         public static string Language { get { return Get("Language", "en"); } set { Set("Language", value); } }     // en, he

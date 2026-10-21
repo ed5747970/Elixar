@@ -736,7 +736,11 @@ namespace CDriveCleaner
                 return GoogleAuth.Load() != null ? "google" : null;
             }
         }
-        public static void SetKind(string k) { try { string f = ActiveFile; if (f != null) File.WriteAllText(f, k); } catch { } }
+        public static void SetKind(string k)
+        {
+            try { string f = ActiveFile; if (f != null) File.WriteAllText(f, k); } catch { }
+            ChangeLog.Add("Email", "Connected an email account", k == "google" ? "Google" : k == "microsoft" ? "Microsoft" : "Other email (IMAP/SMTP)", "", "", "Elixar keeps the sign-in protected for this PC; the password is never written here", false);
+        }
 
         public static string Email
         {
@@ -819,6 +823,7 @@ namespace CDriveCleaner
         public static void Disconnect()
         {
             string k = Kind;
+            if (!string.IsNullOrEmpty(k)) ChangeLog.Add("Email", "Disconnected the email account", k == "google" ? "Google" : k == "microsoft" ? "Microsoft" : "Other email (IMAP/SMTP)", "", "", "The saved sign-in was removed from this PC", false);
             if (k == "google") GoogleAuth.SignOut();
             else if (k == "microsoft") MicrosoftAuth.SignOut();
             else if (k == "other") OtherMail.Forget();

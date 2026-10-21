@@ -225,6 +225,7 @@ namespace CDriveCleaner
             BuildTools();
             BuildPhone();
             BuildSettingsTab();
+            BuildLogsTab();
             BuildEmailClean();
             BuildLinuxTab();
             BuildOneDriveTab();
@@ -238,6 +239,7 @@ namespace CDriveCleaner
             tabs.TabPages.Add(pageAuto);
             if (LinuxUi) tabs.TabPages.Add(pageLinux);
             tabs.TabPages.Add(pageSettings);
+            tabs.TabPages.Add(pageLogs);
             bool appsLoaded = false, autoLoaded = false;
             tabs.SelectedIndexChanged += (o, e) =>
             {
@@ -248,6 +250,7 @@ namespace CDriveCleaner
                 if (tabs.SelectedTab == pageTools) OnToolsTab();
                 if (tabs.SelectedTab == pagePhone) OnPhoneTab();
                 if (tabs.SelectedTab == pageLinux) OnLinuxTab();
+                if (tabs.SelectedTab == pageLogs) OnLogsTab();
                 if (tabs.SelectedTab == pageOneDrive) OnOneDriveTab();
             };
             BuildNav();
@@ -997,6 +1000,7 @@ namespace CDriveCleaner
                     string script = string.Join("\n", asRoot.Select(i => i.RootScript));
                     string outp;
                     int code = Lx.RunAsRoot(script, out outp);
+                    ChangeLog.Add("Cleaning", "Cleaned as root: " + string.Join(", ", asRoot.Select(i => i.Name)), "", "", code == 0 ? "freed " + Fs.Fmt(Math.Max(0, Sys.Free() - before)) : "Problem (" + code + ")", "Cleaner", code != 0);
                     if (code == 126 || code == 127) Log("  Not done: the password wasn't entered.");
                     else if (code != 0) Log("  Finished with a problem (" + code + "): " + (outp.Length > 300 ? outp.Substring(0, 300) + "..." : outp));
                     Log("  Freed " + Fs.Fmt(Math.Max(0, Sys.Free() - before)));
@@ -1006,10 +1010,11 @@ namespace CDriveCleaner
                 {
                     if (it.Clean == null) continue;
                     Log("Cleaning " + it.Name + "...");
-                    long before = Sys.Free();
+                    long before = Sys.Free(); string problem = null;
                     try { it.Clean(Log); }
-                    catch (Exception ex) { Log("  Problem: " + ex.Message); }
+                    catch (Exception ex) { Log("  Problem: " + ex.Message); problem = ex.Message; }
                     Log("  Freed " + Fs.Fmt(Math.Max(0, Sys.Free() - before)));
+                    ChangeLog.Cleaned(it, Math.Max(0, Sys.Free() - before), problem, "Cleaner");
                     UI(() => progress.Value = Math.Min(progress.Maximum, progress.Value + 1));
                 }
                 long total = Math.Max(0, Sys.Free() - start);

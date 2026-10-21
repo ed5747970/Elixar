@@ -39,6 +39,7 @@ namespace CDriveCleaner
                 }
                 catch { }
             }
+            ChangeLog.Add("Cleaning", Clean(text), "", "", bytes > 0 ? Fs.Fmt(bytes) : "", "", false);
         }
 
         public static List<Entry> Read()

@@ -317,7 +317,9 @@ namespace CDriveCleaner
                     if (log != null) log("  Restored " + it[1]);
                 }
             }
-            if (ok == b.Items.Count) Delete(b);
+            try { ChangeLog.Add("Undo", "Put back from Undo: " + b.Label, string.Join(", ", b.Items.Select(i => i.Length > 1 ? i[1] : i[0]).Take(5)) + (b.Items.Count > 5 ? " and " + (b.Items.Count - 5) + " more" : ""),
+                                "", ok + " of " + b.Items.Count + " put back", "", ok < b.Items.Count); } catch { }
+            if (ok == b.Items.Count) Delete(b, false);
             return ok;
         }
 
@@ -337,9 +339,11 @@ namespace CDriveCleaner
             catch { return false; }
         }
 
-        public static void Delete(UndoBatch b)
+        public static void Delete(UndoBatch b) { Delete(b, true); }
+        static void Delete(UndoBatch b, bool record)
         {
             try { Fs.Delete(b.Dir); } catch { }
+            if (record) try { ChangeLog.Add("Files", "Deleted from Undo for good: " + b.Label, b.Dir, b.Bytes > 0 ? Fs.Fmt(b.Bytes) : "", Directory.Exists(b.Dir) ? "Some files are still there" : "(deleted)", "", Directory.Exists(b.Dir)); } catch { }
         }
 
         public static int PurgeOld(Action<string> log)
@@ -367,6 +371,7 @@ namespace CDriveCleaner
             long moved = 0;
             foreach (var p in list) moved += MoveIn(b, p, log);
             Commit(b);
+            ChangeLog.Files("Moved to Undo", label, list, moved, "Kept for " + b.Keep + " days in " + b.Dir + ". Put it back in Tools > Undo.");
             if (log != null) log("  Kept in Undo for " + b.Keep + " days: " + b.Dir + (RootIsOffC(b.Dir) ? "" : "  (no second drive: the space comes back after " + b.Keep + " days or when you delete it in Tools > Undo)"));
             return moved;
         }

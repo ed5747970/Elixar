@@ -303,7 +303,7 @@ namespace CDriveCleaner
             {
                 using (var hk = Hklm())
                 {
-                    using (var k = hk.OpenSubKey(@"SYSTEM\Setup", true)) if (k != null) k.DeleteValue("Upgrade", false);
+                    using (var k = hk.OpenSubKey(@"SYSTEM\Setup", true)) if (k != null) RegLog.Delete(k, "Upgrade", "Sysprep fix: Windows was upgraded (Microsoft's workaround)");
                     ResetStateIn(hk);
                 }
                 return null;
@@ -315,8 +315,8 @@ namespace CDriveCleaner
         {
             using (var k = hk.CreateSubKey(@"SYSTEM\Setup\Status\SysprepStatus"))
             {
-                k.SetValue("GeneralizationState", 7, RegistryValueKind.DWord);
-                if (k.GetValue("CleanupState") != null) k.SetValue("CleanupState", 2, RegistryValueKind.DWord);
+                RegLog.Set(k, "GeneralizationState", 7, RegistryValueKind.DWord, "Sysprep fix: Sysprep's state reset");
+                if (k.GetValue("CleanupState") != null) RegLog.Set(k, "CleanupState", 2, RegistryValueKind.DWord, "Sysprep fix: Sysprep's state reset");
             }
         }
 
@@ -328,10 +328,14 @@ namespace CDriveCleaner
                 using (var hk = Hklm())
                 {
                     ResetStateIn(hk);
-                    if (skipRearm) using (var k = hk.CreateSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SoftwareProtectionPlatform")) k.SetValue("SkipRearm", 1, RegistryValueKind.DWord);
+                    if (skipRearm) using (var k = hk.CreateSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SoftwareProtectionPlatform")) RegLog.Set(k, "SkipRearm", 1, RegistryValueKind.DWord, "Sysprep fix: skip the activation rearm");
                 }
                 if (Directory.Exists(Panther) && (new DirectoryInfo(Panther).Attributes & FileAttributes.ReparsePoint) == 0)
-                    Directory.Move(Panther, Panther + ".old-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+                {
+                    string to = Panther + ".old-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    Directory.Move(Panther, to);
+                    ChangeLog.Add("Files", "Renamed Sysprep's old logs (kept)", Panther, "", to, "Sysprep fix: a fresh start for Sysprep's logs", false);
+                }
                 return null;
             }
             catch (Exception e) { return e.Message; }
@@ -344,7 +348,7 @@ namespace CDriveCleaner
                 using (var hk = Hklm())
                 using (var k = hk.CreateSubKey(@"SOFTWARE\Policies\Microsoft\WindowsStore"))
                 {
-                    if (pause) k.SetValue("AutoDownload", 2, RegistryValueKind.DWord); else k.DeleteValue("AutoDownload", false);
+                    if (pause) RegLog.Set(k, "AutoDownload", 2, RegistryValueKind.DWord, "Sysprep: Microsoft Store app updates paused"); else RegLog.Delete(k, "AutoDownload", "Sysprep: Microsoft Store app updates back on");
                 }
                 return null;
             }

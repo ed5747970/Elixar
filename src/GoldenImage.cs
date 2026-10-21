@@ -140,10 +140,12 @@ namespace CDriveCleaner
                 using (var k = hk.OpenSubKey(Winlogon, true))
                     if (k != null)
                     {
-                        k.DeleteValue("DefaultPassword", false);
-                        if (k.GetValue("AutoAdminLogon") != null) k.SetValue("AutoAdminLogon", "0", RegistryValueKind.String);
+                        RegLog.Delete(k, "DefaultPassword", "Golden image: removed the saved auto sign-in password", true, false);
+                        if (k.GetValue("AutoAdminLogon") != null) RegLog.Set(k, "AutoAdminLogon", "0", RegistryValueKind.String, "Golden image: auto sign-in turned off", false);
                     }
+                bool had = Lsa.HasSecret("DefaultPassword");
                 string e = Lsa.DeleteSecret("DefaultPassword");
+                if (had) ChangeLog.Add("Security", "Removed the saved auto sign-in password (Windows' protected store)", "LSA secret DefaultPassword", "(hidden: secret)", e == null ? "(removed)" : "", e, e != null);
                 return e;
             }
             catch (Exception e) { return e.Message; }
@@ -291,6 +293,9 @@ namespace CDriveCleaner
                 int type; if (!int.TryParse(c[1], out type)) continue;
                 if (!CredDelete(c[0], type, 0)) { int e = Marshal.GetLastWin32Error(); if (e != 1168) errs.Add(c[0] + ": error " + e); }
             }
+            if (creds.Count > 0)
+                ChangeLog.Add("Security", "Removed saved sign-ins from Credential Manager (" + creds.Count + ")", string.Join(", ", creds.Select(c => c[0]).Take(8)) + (creds.Count > 8 ? " ..." : ""),
+                              "", errs.Count == 0 ? "(removed)" : errs.Count + " not removed", "Golden image: the passwords themselves are never read or written down", errs.Count > 0);
             return errs.Count == 0 ? null : string.Join("\n", errs.Take(6));
         }
 
@@ -345,7 +350,7 @@ namespace CDriveCleaner
             foreach (var p in paths)
             {
                 if (!allowed.Contains(p)) { errs.Add(p + ": skipped"); continue; }
-                try { if (Links.IsLink(p)) { errs.Add(p + ": skipped (a link)"); continue; } File.Delete(p); }
+                try { if (Links.IsLink(p)) { errs.Add(p + ": skipped (a link)"); continue; } File.Delete(p); ChangeLog.Add("Files", "Deleted an old answer file", p, "", "(deleted)", "Golden image: it can hold passwords and Windows Setup would read it first", false); }
                 catch (Exception e) { errs.Add(p + ": " + e.Message); }
             }
             return errs.Count == 0 ? null : string.Join("\n", errs.Take(6));
@@ -655,6 +660,7 @@ namespace CDriveCleaner
                     int done = 0;
                     foreach (var n in names) { Sys.Run("wevtutil.exe", "cl \"" + n + "\"", 30000); if (++done % 200 == 0) log("  " + done + " / " + names.Count + " logs"); }
                     log("  " + names.Count + " logs cleared.");
+                    ChangeLog.Add("Windows command", "Cleared Windows' event logs (" + names.Count + ")", "wevtutil cl", "", "", "Golden image cleanup", false);
                 } });
             l.Add(new CleanItem {
                 Name = "Hibernation file (hiberfil.sys)", Tier = Tier.Review, DefaultOn = false, Where = sys + @"\hiberfil.sys",
@@ -682,6 +688,7 @@ namespace CDriveCleaner
                 if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess) exe = exe.Replace(@"\System32\", @"\Sysnative\");
                 if (!File.Exists(exe)) return "Sysprep wasn't found on this PC.";
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, "/audit /reboot") { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe) });
+                ChangeLog.Command(exe, "/audit /reboot", "", 0);
                 return null;
             }
             catch (Exception e) { return e.Message; }
@@ -705,7 +712,7 @@ namespace CDriveCleaner
                 if (!File.Exists(xml)) errs.Add("Default apps: the export didn't work.");
                 else
                 {
-                    if (File.Exists(AppsFile) && !File.Exists(AppsFile + ".before-elixar")) File.Copy(AppsFile, AppsFile + ".before-elixar");
+                    if (File.Exists(AppsFile) && !File.Exists(AppsFile + ".before-elixar")) { File.Copy(AppsFile, AppsFile + ".before-elixar"); ChangeLog.Add("Files", "Kept a copy of Windows' default apps file", AppsFile, "", AppsFile + ".before-elixar", "Golden image: copy the defaults to new accounts", false); }
                     string r = Sys.Run("dism.exe", "/Online /Import-DefaultAppAssociations:\"" + xml + "\"", 300000);
                     File.WriteAllText(DefaultsMarker, DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
                     log("Default apps: " + (r.Split('\n').Select(x => x.Trim()).LastOrDefault(x => x.Length > 0) ?? "done"));
@@ -725,6 +732,7 @@ namespace CDriveCleaner
                 {
                     if (File.Exists(dest) && !File.Exists(dest + ".before-elixar")) File.Copy(dest, dest + ".before-elixar");
                     File.Copy(tmp, dest, true); log("Start layout copied to new accounts.");
+                    ChangeLog.Add("Files", "Start layout copied to new accounts", dest, "", "", File.Exists(dest + ".before-elixar") ? "The one before is kept as " + dest + ".before-elixar" : "", false);
                 }
                 else
                 {
@@ -978,6 +986,7 @@ the image: keep it next to the .wim.
                     if (File.Exists(f) && Links.IsLink(f)) return f + " is a link.";
                     File.WriteAllText(f, kv.Value, new UTF8Encoding(false));
                 }
+                ChangeLog.Add("Files", "Saved the capture kit", folder, "", string.Join(", ", CaptureKit().Keys), "", false);
                 return null;
             }
             catch (Exception e) { return e.Message; }

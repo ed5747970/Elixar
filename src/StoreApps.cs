@@ -184,9 +184,11 @@ namespace CDriveCleaner
             {
                 var o = p.StandardOutput.ReadToEndAsync();
                 var e = p.StandardError.ReadToEndAsync();
-                if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch { } return "ERROR: timed out"; }
+                if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch { } ChangeLog.PowerShell(script, "timed out"); return "ERROR: timed out"; }
                 string err = e.Result.Trim();
-                return o.Result + (err.Length > 0 ? "\n" + err : "");
+                string r = o.Result + (err.Length > 0 ? "\n" + err : "");
+                ChangeLog.PowerShell(script, r);
+                return r;
             }
         }
 

@@ -55,7 +55,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -103,7 +103,7 @@
 <h3>Folders to watch</h3>
 <p>Elixar writes down the size of each place on the Dashboard once a day (sizes only, never file names). After two weeks it knows which folders <strong>always grow</strong> (in at least 3 of every 4 weeks) and which <strong>grow fast</strong> (2 GB a month or more). The <strong>Watch</strong> tile on the Dashboard shows the one that most needs a look; click it for the full list: how much each one grows a month, what to do about it, and how often to look (every week from 5 GB a month, every 2 weeks from 1 GB, otherwise every month). After you look, click <strong>I checked it</strong>: the folder stays quiet until its next look is due. The weekly email and the exported report list them too.</p>
 <h3>The tabs</h3>
-<p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> on the right (the gear). A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
+<p>The tabs run along the top: Dashboard, Apps, Cleaner, Tools, Phone, Email and Automation, with <strong>Settings</strong> (the gear) and <strong>Logs</strong> (every change Elixar made) on the right. A Linux tab is shown greyed out: it only works when Elixar runs on Linux.</p>
 <h3>C: Overview</h3>
 <ul>
   <li><strong>The ring:</strong> how full C: is, the free space in the middle, and one plain sentence: in good shape, getting full (under 20% or 25 GB free) or almost full (under 10% or 8 GB). It also warns when the space trend says C: fills up within a year.</li>
@@ -272,6 +272,16 @@
   <li><strong>Check for updates:</strong> once Elixar is published on GitHub, it checks for a new version (also quietly once a week). An update is installed only if it is signed with Elisar&rsquo;s key and every file matches its fingerprint.</li>
 </ul>
 
+<h2 id="logs">Logs (change log)</h2>
+<p>The <strong>Logs</strong> tab, right next to Settings, lists every change Elixar makes to this PC, newest first: registry values (with the value <strong>before</strong> and <strong>after</strong>, also for startup switches and Elixar&rsquo;s own settings), files moved to Undo, put back or deleted, each cleaned item, Windows commands that change something (DISM, Disk Cleanup, restore points, scheduled tasks, drivers, PowerShell), apps removed, security fixes, the PIN and the email account. Commands that only read are not listed.</p>
+<ul>
+  <li><strong>Find a change:</strong> pick a kind (Registry, Files, Cleaning, Windows command, Apps, Security, Email, Undo), a period, or type in Search. Click a line to see everything about it underneath.</li>
+  <li><strong>Undo this change&hellip;</strong> puts a registry value back exactly as it was (or removes one Elixar added). If the value was changed again since, Elixar tells you first. The undo is written down as a change of its own, so it can be undone too. Undo only writes to the keys Elixar changes itself; security fixes (a removed password or risky setting) are not put back from here on purpose.</li>
+  <li><strong>Files:</strong> a line &ldquo;In Undo&rdquo; opens Tools &rsaquo; Undo, where you put them back.</li>
+  <li><strong>Save the log as&hellip;</strong> makes a spreadsheet (.csv) to keep or send to whoever helps you; <strong>Show the log file</strong> shows changes.jsonl; <strong>Open the activity log</strong> opens cleaner-log.txt, the step-by-step text log.</li>
+</ul>
+<p>Passwords, PINs, tokens and recovery codes are never written to the log, only that they were set or removed, and email addresses are shortened. The log is in C:\ProgramData\Elixar, which only administrators can change; at 4 MB it moves to changes-old.jsonl and a new one starts, and both are shown.</p>
+
 <h2 id="email">Email account and reports (Settings)</h2>
 <p>Connect your email in <strong>Settings &rsaquo; Email account</strong>. Choose which kind you have:</p>
 <table>
@@ -376,7 +386,7 @@
 <table>
   <tr><th>Where</th><th>What</th></tr>
   <tr><td>Elixar folder</td><td>Elixar.exe, &ldquo;Run self-test (safe).bat&rdquo;, README.txt, UserGuide.html, SHA256.txt, source code, selftest-report.txt</td></tr>
-  <tr><td>C:\ProgramData\Elixar</td><td>cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt, growth.txt (daily sizes of the Dashboard places, 90 days)</td></tr>
+  <tr><td>C:\ProgramData\Elixar</td><td>changes.jsonl (the Logs tab: every change, with before and after), cleaner-log.txt (what was cleaned), last-scan.txt (for the Change column), auto-clean-history.txt, growth.txt (daily sizes of the Dashboard places, 90 days)</td></tr>
   <tr><td>C:\Program Files\Elixar</td><td>The protected copy used by the schedules, and the Android tools</td></tr>
   <tr><td>X:\Elixar Undo (second drive) or C:\ProgramData\Elixar Undo</td><td>Undo backups, kept 7 days, locked to admins</td></tr>
   <tr><td>Phone backup (second drive or Pictures)</td><td>Files copied or moved from your phone</td></tr>
@@ -389,6 +399,7 @@
   <tr><td>&ldquo;Windows protected your PC&rdquo;</td><td>Click More info &rsaquo; Run anyway once (check SHA256.txt if unsure), then install Elixar from the Settings tab and use the Start menu entry</td></tr>
   <tr><td>&ldquo;Elixar did not start, because something was put next to Elixar.exe&rdquo;</td><td>Delete the file it names (Elixar.exe.config, .local or .manifest), or download Elixar again into a new folder. Elixar never uses these files</td></tr>
   <tr><td>&ldquo;These settings for your Windows account make every .NET program load extra code&rdquo;</td><td>Click Yes to remove them, unless you know a developer tool you use needs them</td></tr>
+  <tr><td>Something stopped working after Elixar changed something</td><td>Open Logs, find the change by its time or kind, and click Undo this change (or put files back in Tools &rsaquo; Undo). Save the log as .csv to send it to whoever helps you</td></tr>
   <tr><td>A self-test check failed</td><td>Send selftest-report.txt (in the Elixar folder) for a fix</td></tr>
   <tr><td>Driver list empty in the self-test</td><td>Normal without admin rights; Windows lists drivers only to administrators</td></tr>
   <tr><td>Automation says &ldquo;Not protected&rdquo;</td><td>Open Automation and click Save</td></tr>
@@ -399,7 +410,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
-  <tr><td>2026-10-19</td><td>1.2.31</td><td>Dark mode: switched-off options are written in near white, easy to read. Optional PIN (4, 6 or 8 digits) or password for opening Elixar (Settings &rsaquo; Security and protection &rsaquo; Secure your data with a PIN or password) with a recovery code. Dark-mode group titles drawn in the right place. A one-time invitation to connect email after the first scan (Not now / Don't ask again). Gmail can connect with an app password when this copy has no Google sign-in. Windows update leftovers ($GetCurrent, $WinREAgent) are removed when it is safe (also by the weekly clean), including their protected parts; what can't be removed is reported. Dashboard &rsaquo; Watch: the folders that always grow or grow fast, with advice and how often to look at them (also in the weekly email and the report). New slogan: the cure for a cluttered PC; tidier Dashboard header. Tools &rsaquo; Sysprep &rsaquo; Golden image: finds saved passwords and keys, programs that clone their ID, Entra/Intune; Audit mode, VM checkpoint reminder, Start layout and default apps for new accounts; Image cleanup, Image passport and Capture kit</td></tr>
+  <tr><td>2026-10-19</td><td>1.2.31</td><td>Logs tab next to Settings: every change Elixar makes (registry values with before and after, files, commands, apps, security, settings), with search, filters, export and one-click undo for registry values. Dark mode: switched-off options are written in near white, easy to read. Optional PIN (4, 6 or 8 digits) or password for opening Elixar (Settings &rsaquo; Security and protection &rsaquo; Secure your data with a PIN or password) with a recovery code. Dark-mode group titles drawn in the right place. A one-time invitation to connect email after the first scan (Not now / Don't ask again). Gmail can connect with an app password when this copy has no Google sign-in. Windows update leftovers ($GetCurrent, $WinREAgent) are removed when it is safe (also by the weekly clean), including their protected parts; what can't be removed is reported. Dashboard &rsaquo; Watch: the folders that always grow or grow fast, with advice and how often to look at them (also in the weekly email and the report). New slogan: the cure for a cluttered PC; tidier Dashboard header. Tools &rsaquo; Sysprep &rsaquo; Golden image: finds saved passwords and keys, programs that clone their ID, Entra/Intune; Audit mode, VM checkpoint reminder, Start layout and default apps for new accounts; Image cleanup, Image passport and Capture kit</td></tr>
   <tr><td>2026-10-19</td><td>1.2.30</td><td>Tools &rsaquo; Sysprep &rsaquo; Answer file: make, load and check unattend.xml (name, language, time zone, setup screens, account, built-in Administrator and its password, CopyProfile, drivers, first sign-in commands); save to Sysprep's folder or run Sysprep with it</td></tr>
   <tr><td>2026-10-19</td><td>1.2.29</td><td>Tools &rsaquo; Sysprep: checks what stops Sysprep (BitLocker, Store apps for one account, upgraded Windows, an old Sysprep state, a pending restart) and offers Microsoft's fix for each; reads Sysprep's log</td></tr>
   <tr><td>2026-10-19</td><td>1.2.28</td><td>Security check: Undo never fills a drive (files stay on their own drive when it is full, files from C: go to a second drive, and a copy is refused when no drive has room); old copies left in Program Files after an update are removed</td></tr>

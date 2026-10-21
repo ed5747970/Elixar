@@ -38,7 +38,7 @@ namespace CDriveCleaner
                 using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                     foreach (var h in Handlers)
                         using (var k = hklm.OpenSubKey(VolumeCaches + h, true))
-                            if (k != null) { k.SetValue(FlagName, 2, RegistryValueKind.DWord); set.Add(h); }
+                            if (k != null) { RegLog.Set(k, FlagName, 2, RegistryValueKind.DWord, "Previous Windows installation: tells Windows Disk Cleanup what to remove (taken off again right after)"); set.Add(h); }
                 if (log != null) log("  Windows Disk Cleanup is removing the previous Windows installation (" + string.Join(", ", set) + "). This can take 10-30 minutes...");
                 string o = Sys.Run("cleanmgr.exe", "/sagerun:" + Slot, 2 * 60 * 60 * 1000);
                 var left = Folders.Where(Directory.Exists).ToList();
@@ -55,7 +55,7 @@ namespace CDriveCleaner
                     using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                         foreach (var h in set)
                             using (var k = hklm.OpenSubKey(VolumeCaches + h, true))
-                                if (k != null) k.DeleteValue(FlagName, false);
+                                if (k != null) RegLog.Delete(k, FlagName, "Previous Windows installation: Windows Disk Cleanup left as it was");
                 }
                 catch { }
             }

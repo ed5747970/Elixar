@@ -204,9 +204,13 @@ namespace CDriveCleaner
                 if (!p.WaitForExit(timeoutMs))
                 {
                     try { p.Kill(); } catch { }
+                    ChangeLog.Command(exe, args, "timed out", -1);
                     return "timed out";
                 }
-                return (o.Result + " " + e.Result).Trim();
+                string r = (o.Result + " " + e.Result).Trim();
+                int code = 0; try { code = p.ExitCode; } catch { }
+                ChangeLog.Command(exe, args, r, code);
+                return r;
             }
         }
 
@@ -236,7 +240,9 @@ namespace CDriveCleaner
         public static string RunPowerShell(string script, int timeoutMs)
         {
             string enc = Convert.ToBase64String(Encoding.Unicode.GetBytes(PsSafe(script)));
-            return Run("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc, timeoutMs);
+            string r = Run("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc, timeoutMs);
+            ChangeLog.PowerShell(script, r);
+            return r;
         }
 
         // Stops the services that are running; returns their names so they can be started again.

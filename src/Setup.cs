@@ -49,7 +49,7 @@ namespace CDriveCleaner
                 using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                 using (var k = hklm.CreateSubKey(UninstallKey))
                     foreach (var kv in Entry(Install.Exe, v.Major + "." + v.Minor + "." + v.Build, new FileInfo(Install.Exe).Length))
-                        k.SetValue(kv.Key, kv.Value, kv.Value is int ? RegistryValueKind.DWord : RegistryValueKind.String);
+                        RegLog.Set(k, kv.Key, kv.Value, kv.Value is int ? RegistryValueKind.DWord : RegistryValueKind.String, "Elixar installed: its entry in Windows' installed apps list");
                 IPhone.Sta(() =>
                 {
                     var sh = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
@@ -75,7 +75,16 @@ namespace CDriveCleaner
             try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
             try { MicrosoftAuth.SignOut(); OtherMail.Forget(); MailAccount.Disconnect(); } catch { }
             try { File.Delete(StartMenuLink); } catch { }
-            try { using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) hklm.DeleteSubKeyTree(UninstallKey, false); } catch { }
+            try
+            {
+                using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                {
+                    int vals = 0; using (var k = hklm.OpenSubKey(UninstallKey)) if (k != null) vals = k.ValueCount;
+                    hklm.DeleteSubKeyTree(UninstallKey, false);
+                    if (vals > 0) RegLog.ClearedKey(hklm, UninstallKey, vals, 0, "Elixar removed from this PC: its entry in Windows' installed apps list");
+                }
+            }
+            catch { }
             // the running file can't delete itself: Windows removes the folder a moment after Elixar closes
             try
             {

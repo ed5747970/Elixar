@@ -4,6 +4,8 @@ The cure for a cluttered PC. Made by Elisar.
 
 Elixar shows what fills drive C:, from Critical to Safe, and removes only what you choose: caches, temp files,
 old drivers, Windows.old, apps you don't use, phone clutter and more, with Undo for anything risky.
+Every change it makes (registry values with before and after, files, commands, apps, settings) is listed in
+the Logs tab, where a registry change can be undone with one click.
 The full user guide is in `guide/UserGuide.html` (also built into the app: press F1).
 
 ## Build

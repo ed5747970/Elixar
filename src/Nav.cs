@@ -56,7 +56,8 @@ namespace CDriveCleaner
                 {
                     int gs = S(16);
                     var gr = M(new Rectangle(r.X + S(12), r.Y + (r.Height - gs) / 2, gs, gs));
-                    Gear(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
+                    if (it.Glyph == "list") ListGlyph(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
+                    else Gear(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
                     tr = M(new Rectangle(r.X + S(20), r.Y, r.Width - S(20), r.Height));
                 }
                 if (bold == null || bold.Size != Font.Size) bold = new Font(Font, FontStyle.Bold);
@@ -81,6 +82,21 @@ namespace CDriveCleaner
                 }
                 g.DrawEllipse(p, cx - R * .7f, cy - R * .7f, R * 1.4f, R * 1.4f);
                 g.DrawEllipse(p, cx - ri, cy - ri, ri * 2, ri * 2);
+            }
+        }
+
+        // a page with lines: the change log
+        static void ListGlyph(Graphics g, Rectangle r, Color c, float w)
+        {
+            using (var p = new Pen(c, w) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            {
+                float x = r.X + r.Width * .14f, y = r.Y + r.Height * .06f, pw = r.Width * .72f, ph = r.Height * .88f;
+                g.DrawRectangle(p, x, y, pw, ph);
+                for (int i = 0; i < 3; i++)
+                {
+                    float ly = y + ph * (.3f + .22f * i);
+                    g.DrawLine(p, x + pw * .25f, ly, x + pw * .75f, ly);
+                }
             }
         }
 
@@ -119,6 +135,7 @@ namespace CDriveCleaner
         Panel tabHost;
         public List<string> NavEnabled { get { return nav.Items.Where(i => i.Enabled).Select(i => i.Text).ToList(); } }
         public List<string> NavGreyed { get { return nav.Items.Where(i => !i.Enabled).Select(i => i.Text).ToList(); } }
+        public List<string> NavRightItems { get { return nav.Items.Where(i => i.Right).Select(i => i.Text).ToList(); } }
         public string NavRight { get { var r = nav.Items.FirstOrDefault(i => i.Right); return r == null ? "" : r.Text; } }
 
         // the pages stay in the (hidden-header) tab control, so every "show this tab" keeps working
@@ -137,6 +154,7 @@ namespace CDriveCleaner
             nav.Items.Add(item("Automation", pageAuto, true, ""));
             nav.Items.Add(item("Linux", pageLinux, lx, "Only on Linux: this PC runs " + OsInfo.Current.Name + "."));
             nav.Items.Add(new NavBar.Item { Text = "Settings", Page = pageSettings, Right = true, Glyph = "gear" });
+            nav.Items.Add(new NavBar.Item { Text = "Logs", Page = pageLogs, Right = true, Glyph = "list" });
             nav.Selected = nav.Items[0];
             nav.Picked += it => tabs.SelectedTab = it.Page;
             tabs.SelectedIndexChanged += (o, e) => nav.Select(tabs.SelectedTab);

@@ -140,7 +140,9 @@ namespace CDriveCleaner
                 foreach (var it in order)
                 {
                     Write(Lang.T(it.Name) + "...");
-                    try { it.Clean(m => Write(m)); } catch (Exception e) { Write("  " + Lang.T("Skipped: ") + e.Message); }
+                    string problem = null;
+                    try { it.Clean(m => Write(m)); } catch (Exception e) { Write("  " + Lang.T("Skipped: ") + e.Message); problem = e.Message; }
+                    ChangeLog.Cleaned(it, 0, problem, "Golden image cleanup");
                 }
                 Write(Lang.T("Image cleanup finished."));
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>

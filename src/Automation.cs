@@ -150,7 +150,7 @@ namespace CDriveCleaner
         public static int RunSchtasks(string args, out string output)
         {
             output = "";
-            if (Lx.On) return LxTimers.Apply(args, out output);
+            if (Lx.On) { int lc = LxTimers.Apply(args, out output); ChangeLog.Command("schtasks", args, output, lc); return lc; }
             try
             {
                 var psi = new ProcessStartInfo(Win.SystemExe("schtasks.exe"), args)
@@ -162,8 +162,9 @@ namespace CDriveCleaner
                 {
                     var o = p.StandardOutput.ReadToEndAsync();
                     var e = p.StandardError.ReadToEndAsync();
-                    if (!p.WaitForExit(30000)) { try { p.Kill(); } catch { } output = "timed out"; return -1; }
+                    if (!p.WaitForExit(30000)) { try { p.Kill(); } catch { } output = "timed out"; ChangeLog.Command("schtasks.exe", args, output, -1); return -1; }
                     output = (o.Result + " " + e.Result).Trim();
+                    ChangeLog.Command("schtasks.exe", args, output, p.ExitCode);
                     return p.ExitCode;
                 }
             }
@@ -333,9 +334,10 @@ namespace CDriveCleaner
                     results.Add(new MailReports.CleanResult { Name = it.Name, Skipped = Lang.Hebrew ? "האפליקציה הייתה פתוחה" : "the app was open" });
                     continue;
                 }
-                long before = Sys.Free();
-                try { it.Clean(m => Log(m)); } catch (Exception ex) { Log("  Problem with " + it.Name + ": " + ex.Message); }
+                long before = Sys.Free(); string problem = null;
+                try { it.Clean(m => Log(m)); } catch (Exception ex) { Log("  Problem with " + it.Name + ": " + ex.Message); problem = ex.Message; }
                 long got = Math.Max(0, Sys.Free() - before);
+                ChangeLog.Cleaned(it, got, problem, "Weekly clean");
                 results.Add(new MailReports.CleanResult { Name = it.Name, Freed = got });
                 Log("  " + it.Name + ": freed " + Fs.Fmt(got));
             }

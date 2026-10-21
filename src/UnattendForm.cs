@@ -217,7 +217,9 @@ namespace CDriveCleaner
             try
             {
                 string xml = Unattend.Build(s);
+                bool existed = File.Exists(target);
                 File.WriteAllText(target, xml, new UTF8Encoding(false));
+                ChangeLog.Add("Files", existed ? "Saved over an answer file" : "Saved an answer file", target, "", "", "Sysprep", false);
                 path = target; loaded = Unattend.Read(xml); lPath.Text = Lang.T("File: " + path);
                 if (Log != null) Log(Lang.T("Sysprep: answer file saved: " + target));
                 Lang.Box(this, Lang.T("Saved: " + target), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -241,6 +243,7 @@ namespace CDriveCleaner
             {
                 Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe) });
                 if (Log != null) Log("Sysprep: started with " + args);
+                ChangeLog.Command(exe, args, "", 0);
                 Close();
             }
             catch (Exception ex) { Lang.Box(this, Lang.T("Sysprep could not be started: ") + ex.Message, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); }

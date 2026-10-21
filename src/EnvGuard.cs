@@ -74,7 +74,7 @@ namespace CDriveCleaner
             {
                 int i = f.LastIndexOf('\\');
                 if (i <= 0) continue;
-                try { using (var k = Registry.CurrentUser.OpenSubKey(f.Substring(0, i), true)) if (k != null) { k.DeleteValue(f.Substring(i + 1), false); n++; } } catch { }
+                try { using (var k = Registry.CurrentUser.OpenSubKey(f.Substring(0, i), true)) if (k != null && RegLog.Delete(k, f.Substring(i + 1), "Security: removed a risky environment variable from your account (not put back on purpose)", false, false)) n++; } catch { }
             }
             // tell Windows (Explorer) so programs started from now on don't get them either
             try { IntPtr r; SendMessageTimeoutW(new IntPtr(0xFFFF), 0x001A /* WM_SETTINGCHANGE */, IntPtr.Zero, "Environment", 0x0002, 3000, out r); } catch { }

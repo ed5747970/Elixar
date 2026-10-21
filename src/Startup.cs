@@ -210,7 +210,7 @@ namespace CDriveCleaner
                 string name = s.Folder ? Path.GetFileName(e.ItemPath) : e.ItemPath;
                 using (var bk = RegistryKey.OpenBaseKey(s.ApprovedHive, RegistryView.Registry64))
                 using (var k = bk.CreateSubKey(s.ApprovedKey))
-                    k.SetValue(name, SwitchValue(on), RegistryValueKind.Binary);
+                    RegLog.Set(k, name, SwitchValue(on), RegistryValueKind.Binary, "Startup: " + (on ? "turned on " : "turned off ") + e.Name);
                 e.Enabled = on;
                 return true;
             }
@@ -255,7 +255,7 @@ namespace CDriveCleaner
                         {
                             if (k == null) continue;
                             b.Items.Add(new[] { Encode(e), s.Label + ": " + e.Name, "0" });
-                            k.DeleteValue(e.ItemPath, false);
+                            RegLog.Delete(k, e.ItemPath, "Startup: removed a leftover entry whose program is gone (also kept in Tools > Undo)");
                             n++;
                             if (log != null) log("  Removed startup entry " + e.Name + " (" + e.Command + ")");
                         }
@@ -279,7 +279,7 @@ namespace CDriveCleaner
                 using (var k = bk.CreateSubKey(s.Key))
                 {
                     if (k.GetValue(name) != null) return true;
-                    k.SetValue(name, cmd, RegistryValueKind.String);
+                    RegLog.Set(k, name, cmd, RegistryValueKind.String, "Startup: put back from Undo");
                 }
                 if (log != null) log("  Restored startup entry " + name);
                 return true;
