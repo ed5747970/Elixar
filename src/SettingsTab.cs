@@ -75,7 +75,7 @@ namespace CDriveCleaner
             t.Controls.Add(head("Theme"), 0, 4); t.Controls.Add(themeRow, 0, 5);
             t.Controls.Add(btnApplySettings, 0, 6);
             t.Controls.Add(head("Email account"), 0, 7); t.Controls.Add(BuildEmailBox(), 0, 8);
-            t.Controls.Add(head("Security"), 0, 9); t.Controls.Add(BuildPinBox(), 0, 10);
+            t.Controls.Add(head("Security and protection"), 0, 9); t.Controls.Add(BuildPinBox(), 0, 10);
             t.Controls.Add(head("This PC"), 0, 11); t.Controls.Add(pcButtons, 0, 12);
             var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 13);
             pageSettings.Controls.Add(t);
@@ -104,30 +104,38 @@ namespace CDriveCleaner
         }
 
         // ---------- Security: an optional PIN for opening Elixar ----------
-        Label lblPin; Button btnPinSet, btnPinChange, btnPinRemove;
+        Label lblPin; CheckBox chkPin; Button btnPinChange; bool pinSyncing;
+        public CheckBox PinSwitch { get { return chkPin; } }   // self-test and previews
         Control BuildPinBox()
         {
             var box = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
-            lblPin = new Label { AutoSize = true, MaximumSize = new Size(S(900), 0), Margin = new Padding(S(2), 0, 0, S(6)) };
-            var row = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
-            btnPinSet = MakeButton("Set a PIN..."); btnPinSet.Font = new Font("Segoe UI Semibold", 9f);
-            btnPinChange = MakeButton("Change the PIN..."); btnPinRemove = MakeButton("Remove the PIN...");
-            row.Controls.AddRange(new Control[] { btnPinSet, btnPinChange, btnPinRemove });
-            var note = Note("The PIN stops other people who use this PC from opening Elixar and removing things. It doesn't encrypt your files. Scheduled cleans and emails keep running without it. When you set it, you get a recovery code for a forgotten PIN.");
-            note.Margin = new Padding(S(2), S(6), 0, 0);
-            box.Controls.AddRange(new Control[] { lblPin, row, note });
-            btnPinSet.Click += (o, e) => { if (!testMode && PinForm.SetNew(this)) Log(Lang.T("A PIN now protects Elixar.")); UpdatePinUi(); };
+            // the switch: ticking it sets up the PIN, unticking it removes the PIN (after the PIN is entered)
+            chkPin = new CheckBox { AutoSize = true, Text = Lang.T("Secure your data with a PIN or password"), Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(S(4), S(2), 0, S(4)) };
+            lblPin = new Label { AutoSize = true, MaximumSize = new Size(S(900), 0), Margin = new Padding(S(24), 0, 0, S(6)) };
+            btnPinChange = MakeButton("Change the PIN or password..."); btnPinChange.Margin = new Padding(S(24), S(2), 0, 0);
+            var note = Note("Choose a 4, 6 or 8 digit PIN, or a password. Elixar asks for it every time it opens, so other people who use this PC can't open it to see your email account, Undo or reports, or to remove things. It doesn't encrypt files on the disk. Scheduled cleans and emails keep running. When you set it, you get a recovery code in case you forget it.");
+            note.Margin = new Padding(S(24), S(6), 0, 0);
+            box.Controls.AddRange(new Control[] { chkPin, lblPin, btnPinChange, note });
+            chkPin.CheckedChanged += (o, e) =>
+            {
+                if (pinSyncing || testMode) { if (testMode && !pinSyncing) UpdatePinUi(); return; }
+                if (chkPin.Checked)
+                {
+                    if (!PinLock.IsSet && PinForm.SetNew(this)) Log(Lang.T("A PIN or password now protects Elixar."));
+                }
+                else if (PinLock.IsSet)
+                {
+                    if (PinLock.Unlock(this) &&
+                        Lang.Box(this, "Turn off the PIN or password? Anyone who can use this PC can then open Elixar.", "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.OK)
+                    { PinLock.Remove(); Log(Lang.T("The PIN or password was removed.")); }
+                }
+                UpdatePinUi();   // back to what is really set (a cancelled setup unticks it again)
+            };
             btnPinChange.Click += (o, e) =>
             {
                 if (testMode || !PinLock.Unlock(this)) return;
-                if (PinForm.SetNew(this)) Log(Lang.T("The PIN was changed."));
+                if (PinForm.SetNew(this)) Log(Lang.T("The PIN or password was changed."));
                 UpdatePinUi();
-            };
-            btnPinRemove.Click += (o, e) =>
-            {
-                if (testMode || !PinLock.Unlock(this)) return;
-                if (Lang.Box(this, "Remove the PIN? Anyone who can use this PC can then open Elixar.", "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
-                PinLock.Remove(); Log(Lang.T("The PIN was removed.")); UpdatePinUi();
             };
             UpdatePinUi();
             return box;
@@ -137,10 +145,14 @@ namespace CDriveCleaner
         {
             if (lblPin == null) return;
             bool on = PinLock.IsSet;
-            lblPin.Text = Lang.T(on ? "PIN: on. Elixar asks for it every time it opens, and when it comes back from the icon next to the clock." : "No PIN: anyone who can use this PC can open Elixar.");
+            pinSyncing = true; chkPin.Checked = on; pinSyncing = false;
+            var k = PinLock.Current;
+            string what = !k.HasValue ? "" : k.Value == PinLock.Kind.Password ? "On: a password." : k.Value == PinLock.Kind.Pin4 ? "On: a 4-digit PIN." : k.Value == PinLock.Kind.Pin8 ? "On: an 8-digit PIN." : k.Value == PinLock.Kind.Pin6 ? "On: a 6-digit PIN." : "On: a PIN.";
+            lblPin.Text = on ? Lang.T(what) + " " + Lang.T("Elixar asks for it every time it opens, and when it comes back from the icon next to the clock.")
+                             : Lang.T("Off: anyone who can use this PC can open Elixar.");
             lblPin.ForeColor = Theme.MapFore(on ? SafeColor : Color.DimGray);
-            btnPinSet.Visible = !on; btnPinChange.Visible = btnPinRemove.Visible = on;
-            btnPinSet.Enabled = btnPinChange.Enabled = btnPinRemove.Enabled = !testMode;
+            btnPinChange.Visible = on;
+            chkPin.Enabled = btnPinChange.Enabled = !testMode;
         }
 
         // the first time Elixar opens: offered once, never forced
@@ -148,10 +160,10 @@ namespace CDriveCleaner
         {
             if (testMode || PinLock.IsSet || Settings.Get("PinOffered", "") == "1") return;
             Settings.Set("PinOffered", "1");
-            var r = NiceBox.ShowWith(this, Lang.T("Add a PIN, so other people who use this PC can't open Elixar and remove things?") + "\n\n" +
-                                           Lang.T("Elixar asks for it every time it opens. You can set it, change it or remove it any time in Settings > Security."),
-                                     Lang.T("Protect Elixar with a PIN"), MessageBoxButtons.YesNo, MessageBoxIcon.Question, 0, new[] { Lang.T("Set a PIN..."), Lang.T("Not now") });
-            if (r == DialogResult.Yes && PinForm.SetNew(this)) Log(Lang.T("A PIN now protects Elixar."));
+            var r = NiceBox.ShowWith(this, Lang.T("Add a PIN or password, so other people who use this PC can't open Elixar and remove things?") + "\n\n" +
+                                           Lang.T("Choose a 4, 6 or 8 digit PIN, or a password. Elixar asks for it every time it opens. You can change it or turn it off any time in Settings > Security and protection."),
+                                     Lang.T("Protect Elixar with a PIN or password"), MessageBoxButtons.YesNo, MessageBoxIcon.Question, 0, new[] { Lang.T("Set it up..."), Lang.T("Not now") });
+            if (r == DialogResult.Yes && PinForm.SetNew(this)) Log(Lang.T("A PIN or password now protects Elixar."));
             UpdatePinUi();
         }
 

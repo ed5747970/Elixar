@@ -962,8 +962,24 @@ namespace CDriveCleaner
                             pk &= PinLock.Recover(code.ToLowerInvariant().Replace("-", " ")) == PinLock.Result.Ok && !PinLock.IsSet;   // the code removes the PIN
                             PinLock.WriteTicket(); pk &= PinLock.TakeTicket() && !PinLock.TakeTicket();                            // once only
                             PinLock.WriteTicket(); clock = clock.AddMinutes(5); pk &= !PinLock.TakeTicket();                       // and not later
+                            // 4, 6 or 8 digits, or a password; each checked by its own rules
+                            PinLock.Set(PinLock.Kind.Pin4, "4321");
+                            pk &= PinLock.Current == PinLock.Kind.Pin4 && PinLock.Check("4321") == PinLock.Result.Ok && PinLock.Check("432100") == PinLock.Result.Wrong;
+                            PinLock.Set(PinLock.Kind.Pin8, "87654321");
+                            pk &= PinLock.Current == PinLock.Kind.Pin8 && PinLock.Check("87654321") == PinLock.Result.Ok;
+                            PinLock.Set(PinLock.Kind.Password, "Blue river 77!");
+                            pk &= PinLock.Current == PinLock.Kind.Password && PinLock.Check("Blue river 77!") == PinLock.Result.Ok && PinLock.Check("blue river 77!") == PinLock.Result.Wrong &&
+                                  !File.ReadAllText(Path.Combine(pdir, "pin.dat")).Contains("Blue river");
+                            bool threw = false; try { PinLock.Set(PinLock.Kind.Password, "short"); } catch (ArgumentException) { threw = true; }
+                            pk &= threw && !PinLock.Valid(PinLock.Kind.Pin6, "12345") && !PinLock.Valid(PinLock.Kind.Pin6, "12345a") && PinLock.Valid(PinLock.Kind.Pin6, "123456");
+                            // a PIN saved by the first build with a PIN (no kind) still works
+                            PinLock.Remove(); PinLock.Set("2580");
+                            string v2 = File.ReadAllText(Path.Combine(pdir, "pin.dat")); var parts = v2.Split('|');
+                            File.WriteAllText(Path.Combine(pdir, "pin.dat"), "v1|" + string.Join("|", parts.Skip(2)));
+                            pk &= PinLock.Current == PinLock.Kind.PinAny && PinLock.Check("2580") == PinLock.Result.Ok;
+                            PinLock.Remove();
                             foreach (var m in new[] { PinForm.Mode.Enter, PinForm.Mode.Recover, PinForm.Mode.Set }) using (var pf = new PinForm(m)) pk &= pf.Text == "Elixar";
-                            check(pk, "PIN: kept only as a slow salted hash, wrong PINs wait longer each time (also after a restart), the recovery code removes it, and Elixar restarting itself doesn't ask twice");
+                            check(pk, "PIN or password: 4, 6 or 8 digits or a password, kept only as a slow salted hash, wrong PINs wait longer each time (also after a restart), the recovery code removes it, and Elixar restarting itself doesn't ask twice");
                         }
                         finally { PinLock.OverrideDir = null; PinLock.NowOverride = null; }
                     }
@@ -1350,6 +1366,18 @@ namespace CDriveCleaner
                         var odEmpty = new MainForm(true);   // no OneDrive signed in here: no tab
                         check(!odEmpty.OneDriveShown || OneDrive.Accounts().Count > 0, "OneDrive: the tab appears only when OneDrive is signed in on this PC");
                         odEmpty.Dispose();
+                        // Settings > Security and protection: the PIN switch shows what is really set
+                        {
+                            string sp = Path.Combine(root, "pin-ui"); Directory.CreateDirectory(sp); PinLock.OverrideDir = sp;
+                            try
+                            {
+                                var f1 = new MainForm(true); bool off = f1.PinSwitch != null && !f1.PinSwitch.Checked && f1.PinSwitch.Text.Contains("PIN"); f1.Dispose();
+                                PinLock.Set("2468");
+                                var f2 = new MainForm(true); bool on = f2.PinSwitch.Checked; f2.Dispose();
+                                check(off && on, "Settings: \"Secure your data with a PIN\" under Security and protection is ticked only when a PIN is set");
+                            }
+                            finally { PinLock.OverrideDir = null; }
+                        }
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

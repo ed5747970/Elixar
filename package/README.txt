@@ -17,12 +17,13 @@ NEW IN 1.2.31
 - Email: Gmail can connect with an app password (Settings > Email account >
   Gmail > "Use a Gmail app password instead"), for copies without Google's
   sign-in built in. Needs 2-Step Verification on the Google account.
-- Optional PIN (Settings > Security, also offered the first time Elixar
-  opens): 4-8 digits, asked whenever Elixar opens or comes back from the
-  tray. Kept only as a slow salted hash; wrong PINs make you wait longer
-  each time; a recovery code (shown once) removes a forgotten PIN. Scheduled
-  cleans and emails keep running without it. It stops other people using
-  this PC; it doesn't encrypt files.
+- Optional lock: Settings > Security and protection > "Secure your data
+  with a PIN or password" (also offered the first time Elixar opens).
+  Choose a 4, 6 or 8 digit PIN, or a password (8-64 characters). Asked
+  whenever Elixar opens or comes back from the tray. Kept only as a slow
+  salted hash; wrong tries make you wait longer each time; a recovery code
+  (shown once) removes a forgotten one. Scheduled cleans and emails keep
+  running. It stops other people using this PC; it doesn't encrypt files.
 - Fixed: in dark mode a list group title (e.g. "Caution - leftovers") could
   be drawn over a row instead of above the group.
 - After the first scan Elixar invites you once to connect your email
