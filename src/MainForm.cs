@@ -342,7 +342,10 @@ namespace CDriveCleaner
                     CheckDisksQuietly();
                     if (!testMode && Win.IsWindows && Sys.IsAdmin())
                         Task.Factory.StartNew(() => Automation.UpgradeElevatedTasks()).ContinueWith(t =>
-                        { if (!t.IsFaulted && t.Result.Count > 0) UI(() => Log("Secured the " + string.Join(" and ", t.Result) + " schedule (it now starts through Elixar's protected launcher).")); });
+                        {
+                            if (!t.IsFaulted && t.Result.Count > 0) UI(() => Log("Secured the " + string.Join(" and ", t.Result) + " schedule (it now starts through Elixar's protected launcher)."));
+                            StartupSchedules();
+                        });
                     try
                     {
                         int lvl = 0; string ml = GoogleAuth.SignedInEmail != null ? MailStatus.Line(out lvl) : null;

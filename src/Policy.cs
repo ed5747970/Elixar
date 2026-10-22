@@ -21,6 +21,8 @@ namespace CDriveCleaner
         public string[] Values = new string[0], Labels = new string[0];
         public string Label(string v) { int i = Array.IndexOf(Values, v); return i < 0 ? v : Labels[i]; }
         public bool Valid(string v) { return v != null && Values.Contains(v); }
+        // the value as Elixar writes it, whatever the letter case in a file or the registry ("sunday" -> "Sunday"); null if not allowed
+        public string Canon(string v) { v = (v ?? "").Trim(); return Values.FirstOrDefault(x => string.Equals(x, v, StringComparison.OrdinalIgnoreCase)); }
     }
 
     public static class Policy
@@ -34,6 +36,17 @@ namespace CDriveCleaner
         }
 
         static readonly string[] Allow = { "allow", "Allowed", "block", "Not allowed" };
+
+        // every hour of the day as value / label pairs, after an optional first choice ("Off")
+        static string[] Times(string firstValue, string firstLabel, string labelPrefix)
+        {
+            var l = new List<string>();
+            if (firstValue != null) { l.Add(firstValue); l.Add(firstLabel); }
+            for (int m = 0; m < 24 * 60; m += 30) { string t = (m / 60).ToString("00", CultureInfo.InvariantCulture) + ":" + (m % 60).ToString("00", CultureInfo.InvariantCulture); l.Add(t); l.Add(labelPrefix + t); }
+            return l.ToArray();
+        }
+
+        public static bool IsSchedule(string key) { return key.StartsWith("sched."); }
 
         // the Default values are exactly how Elixar works without a policy, so nothing changes until you choose a stricter rule
         public static readonly PolicyRule[] Rules =
@@ -58,6 +71,15 @@ namespace CDriveCleaner
               "choice", "Your choice (Settings)", "required", "Required"),
             R("pin.policy", "Access", "PIN or password to change this policy", "Needed: changing the policy asks for the PIN or password first.", "off",
               "off", "Not needed", "on", "Needed"),
+            R("sched.check", "Schedule: when each action runs", "Low-space check", "Warns when C: drops under the limit in Automation.", "off", Times("off", "Off", "Every day at ")),
+            R("sched.logon", "Schedule: when each action runs", "Low-space check after sign-in", "A few minutes after you sign in to Windows.", "off", "off", "Off", "on", "On"),
+            R("sched.clean.day", "Schedule: when each action runs", "Weekly clean", "The Safe items, ticked by default; open apps are skipped.", "off",
+              "off", "Off", "Monday", "Every Monday", "Tuesday", "Every Tuesday", "Wednesday", "Every Wednesday", "Thursday", "Every Thursday", "Friday", "Every Friday", "Saturday", "Every Saturday", "Sunday", "Every Sunday"),
+            R("sched.clean.time", "Schedule: when each action runs", "Weekly clean time", "When the weekly clean starts.", "20:00", Times(null, null, "")),
+            R("sched.tidy", "Schedule: when each action runs", "Daily tidy time", "Old Recycle Bin items, expired Undo and the clean when C: is low (when they are on).", "12:00", Times(null, null, "")),
+            R("sched.mail.time", "Schedule: when each action runs", "Email reports time", "Alerts are checked and reports sent at this time (when email reports are on).", "09:00", Times(null, null, "")),
+            R("sched.mail.day", "Schedule: when each action runs", "Weekly email summary day", "The day the weekly summary is sent.", "Sunday",
+              "Monday", "Monday", "Tuesday", "Tuesday", "Wednesday", "Wednesday", "Thursday", "Thursday", "Friday", "Friday", "Saturday", "Saturday", "Sunday", "Sunday"),
         };
 
         public static PolicyRule Rule(string key) { return Rules.FirstOrDefault(r => r.Key == key); }
@@ -90,13 +112,15 @@ namespace CDriveCleaner
         static string File_ { get { return OverrideFile ?? Paths.FileIn("policy.txt"); } }
 
         public static bool UseCustom;
+        public static bool SchedulesMoved;   // the schedules set in Automation before they moved here were taken over once
+        public static bool Moved { get { Ensure(); return SchedulesMoved; } }
         public static Dictionary<string, string> Custom = Defaults();
         static bool loaded;
         public static event Action Changed;
 
         public static void Load()
         {
-            UseCustom = false; Custom = Defaults(); orgCache = null;
+            UseCustom = false; Custom = Defaults(); orgCache = null; SchedulesMoved = false;
             try
             {
                 string f = File_;
@@ -106,6 +130,7 @@ namespace CDriveCleaner
                         int i = line.IndexOf('='); if (i <= 0) continue;
                         string k = line.Substring(0, i).Trim(), v = line.Substring(i + 1).Trim();
                         if (k == "mode") UseCustom = v == "custom";
+                        else if (k == "schedules") SchedulesMoved = v == "moved";
                         else if (k.StartsWith("custom.")) { var r = Rule(k.Substring(7)); if (r != null && r.Valid(v)) Custom[r.Key] = v; }
                     }
             }
@@ -131,7 +156,7 @@ namespace CDriveCleaner
                 using (var b = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                 using (var k = b.OpenSubKey(@"SOFTWARE\Policies\Elixar"))
                     if (k != null)
-                        foreach (var r in Rules) { var v = k.GetValue(r.Key) as string; if (v != null && r.Valid(v.Trim().ToLowerInvariant())) d[r.Key] = v.Trim().ToLowerInvariant(); }
+                        foreach (var r in Rules) { var v = r.Canon(k.GetValue(r.Key) as string); if (v != null) d[r.Key] = v; }
             }
             catch { }
             return d;
@@ -192,6 +217,7 @@ namespace CDriveCleaner
             bool wasCustom = UseCustom;
             var sb = new StringBuilder("# Elixar policy (Policy manager). Only administrators can change this file.\n");
             sb.Append("mode=").Append(useCustom ? "custom" : "default").Append('\n');
+            if (SchedulesMoved) sb.Append("schedules=moved\n");
             foreach (var r in Rules) sb.Append("custom.").Append(r.Key).Append('=').Append(clean[r.Key]).Append('\n');
             try { File.WriteAllText(File_, sb.ToString()); } catch (Exception e) { return e.Message; }
             UseCustom = useCustom; Custom = clean; loaded = true;
@@ -235,12 +261,13 @@ namespace CDriveCleaner
                 string line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith("#")) continue;
                 int i = line.IndexOf('='); if (i <= 0) { res.Problems.Add("Not understood: " + Cut(line)); continue; }
-                string k = line.Substring(0, i).Trim(), v = line.Substring(i + 1).Trim().ToLowerInvariant();
+                string k = line.Substring(0, i).Trim(), rawV = line.Substring(i + 1).Trim(), v = rawV.ToLowerInvariant();
                 if (k == "fingerprint") { fp = line.Substring(i + 1).Trim(); continue; }
                 var r = Rule(k);
                 if (r == null) { res.Problems.Add("Unknown rule: " + Cut(k)); continue; }
-                if (!r.Valid(v)) { res.Problems.Add(r.Name + ": \"" + Cut(v) + "\" is not allowed, kept the default"); continue; }
-                res.Rules[k] = v; known++;
+                string cv = r.Canon(rawV);
+                if (cv == null) { res.Problems.Add(r.Name + ": \"" + Cut(v) + "\" is not allowed, kept the default"); continue; }
+                res.Rules[k] = cv; known++;
             }
             if (known == 0) res.Problems.Insert(0, "Not an Elixar policy file.");
             res.HadFingerprint = fp != null;
@@ -264,6 +291,37 @@ namespace CDriveCleaner
             if (Get("pin.open") == "required" && !PinLock.IsSet) l.Add("A PIN or password is required to open Elixar, but none is set.");
             if (Get("pin.policy") == "on" && !PinLock.IsSet) l.Add("A PIN or password is needed to change the policy, but none is set.");
             return l;
+        }
+
+        // a time Windows' Task Scheduler gives back, as one of the policy's times (down to the half hour)
+        public static string HalfHour(TimeSpan t) { int m = (int)t.TotalMinutes / 30 * 30; return (m / 60).ToString("00", CultureInfo.InvariantCulture) + ":" + (m % 60).ToString("00", CultureInfo.InvariantCulture); }
+
+        // once, when this version first runs as administrator: the schedules set in Automation become the policy's schedule,
+        // so nothing runs at another time than before (if they differ from Default, they go into Custom)
+        public static bool MoveSchedules(Func<string, TaskState> query, string mailDay)
+        {
+            Ensure();
+            if (SchedulesMoved) return false;
+            Func<TaskState, string> at = t => t.Start.HasValue ? HalfHour(t.Start.Value.TimeOfDay) : null;
+            var check = query(Automation.CheckTask); var logon = query(Automation.LogonTask); var clean = query(Automation.CleanTask);
+            var tidy = query(Automation.TidyTask); var mail = query(Automation.MailTask);
+            var found = new Dictionary<string, string>();
+            if (check.Exists && at(check) != null) found["sched.check"] = at(check);
+            if (logon.Exists) found["sched.logon"] = "on";
+            if (clean.Exists && Automation.Days.Contains(clean.Day) && at(clean) != null) { found["sched.clean.day"] = clean.Day; found["sched.clean.time"] = at(clean); }
+            if (tidy.Exists && at(tidy) != null) found["sched.tidy"] = at(tidy);
+            if (mail.Exists && at(mail) != null) found["sched.mail.time"] = at(mail);
+            if (Automation.Days.Contains(mailDay ?? "")) found["sched.mail.day"] = mailDay;
+            var differ = found.Where(kv => Rule(kv.Key).Valid(kv.Value) && kv.Value != Rule(kv.Key).Default).ToList();
+            SchedulesMoved = true;
+            if (differ.Count == 0) { Save(UseCustom, Custom); return false; }
+            var c = UseCustom ? new Dictionary<string, string>(Custom) : Defaults();
+            foreach (var kv in differ) c[kv.Key] = kv.Value;
+            using (ChangeLog.In("Policy"))
+                ChangeLog.Add("Settings", "Policy: the schedules from Automation moved here", "Policy manager", "", string.Join(", ", differ.Select(kv => Rule(kv.Key).Name + " " + Rule(kv.Key).Label(kv.Value))),
+                              "Times are now set in Policy manager. They are the same as before, so nothing runs at another time.", false);
+            Save(true, c);
+            return true;
         }
 
         public static int Differences(Dictionary<string, string> rules) { return Rules.Count(r => rules.ContainsKey(r.Key) && rules[r.Key] != r.Default); }

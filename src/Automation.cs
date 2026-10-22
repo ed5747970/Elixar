@@ -94,6 +94,41 @@ namespace CDriveCleaner
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
 
+        // ---------- the schedules, from the policy (Policy manager sets every time) ----------
+        public class SchedStep { public string Task = "", What = "", Args = "", Time = "", Day = ""; public bool Remove; }
+
+        // what Task Scheduler should hold: one step for each schedule, either create it at the policy's time or remove it
+        public static List<SchedStep> Plan(string exe, int percent, bool tidyOn, bool mailOn)
+        {
+            var l = new List<SchedStep>();
+            Action<string, string, bool, Func<string>, string, string> step = (task, what, on, args, time, wday) =>
+                l.Add(on ? new SchedStep { Task = task, What = what, Args = args(), Time = time, Day = wday } : new SchedStep { Task = task, What = "remove " + what, Args = DeleteArgs(task), Remove = true });
+            string chk = Policy.Get("sched.check"), day = Policy.Get("sched.clean.day"), ct = Policy.Get("sched.clean.time"), tt = Policy.Get("sched.tidy"), mt = Policy.Get("sched.mail.time");
+            step(CheckTask, "daily space check", chk != "off", () => CreateCheckArgs(exe, percent, chk), chk, "");
+            step(LogonTask, "space check at sign-in", Policy.Get("sched.logon") == "on", () => CreateLogonArgs(exe, percent), "", "");
+            step(TidyTask, "daily tidy", tidyOn, () => CreateTidyArgs(exe, tt), tt, "");
+            step(CleanTask, "weekly clean", day != "off", () => CreateCleanArgs(exe, day, ct), ct, day);
+            step(MailTask, "email reports", mailOn, () => CreateMailArgs(exe, mt), mt, "");
+            return l;
+        }
+
+        // where Task Scheduler differs from the plan (an empty list: it follows the policy)
+        public static List<string> ScheduleDifferences(List<SchedStep> plan, Func<string, TaskState> query)
+        {
+            var d = new List<string>();
+            foreach (var s in plan)
+            {
+                var t = query(s.Task);
+                string name = s.Remove ? s.What.Substring(7) : s.What;
+                name = char.ToUpperInvariant(name[0]) + name.Substring(1);
+                if (s.Remove) { if (t.Exists) d.Add(name + ": scheduled, but off in the policy."); continue; }
+                if (!t.Exists) { d.Add(name + ": not scheduled yet."); continue; }
+                if (s.Time.Length > 0 && t.Start.HasValue && Policy.HalfHour(t.Start.Value.TimeOfDay) != s.Time) d.Add(name + ": runs at " + t.Start.Value.ToString("HH:mm") + ", the policy says " + s.Time + ".");
+                if (s.Day.Length > 0 && t.Day.Length > 0 && t.Day != s.Day) d.Add(name + ": runs on " + t.Day + ", the policy says " + s.Day + ".");
+            }
+            return d;
+        }
+
         public static int PercentFromArgs(string args, int fallback)
         {
             var parts = (args ?? "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -372,7 +407,8 @@ namespace CDriveCleaner
         Button btnSaveAuto, btnTestAlert, btnRunAuto, btnTidyNow;
         CheckBox chkBin, chkLowClean;
         ComboBox cmbBinDays, cmbUndoDays;
-        Label lblTidyState;
+        Label lblTidyState, lblSchedCheck, lblSchedClean;
+        int alertPercent;   // 0 = not read yet
         public string TidyStateText { get { return lblTidyState == null ? "" : lblTidyState.Text; } }   // self-test
 
         void BuildAutomation()
@@ -396,11 +432,16 @@ namespace CDriveCleaner
             var r1 = Row();
             chkAlert = new CheckBox { AutoSize = true, Text = !LinuxUi ? "Warn me when C: (or another internal drive) has less than" : "Warn me when the system disk has less than", Margin = new Padding(0, S(4), S(4), 0) };
             numPercent = new NumericUpDown { Minimum = 5, Maximum = 50, Value = 15, Width = S(56) };
-            r1.Controls.AddRange(new Control[] { chkAlert, numPercent, Lbl("% free") });
+            // when it checks is set in Policy manager; here only how low is too low
+            chkAlert.Visible = false;
+            r1.Controls.AddRange(new Control[] { chkAlert, Lbl(chkAlert.Text), numPercent, Lbl("% free") });
             var r2 = Row();
-            timeCheck = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(12) };
-            chkLogon = new CheckBox { AutoSize = true, Checked = true, Text = "and a few minutes after I sign in", Margin = new Padding(S(10), S(4), 0, 0) };
-            r2.Controls.AddRange(new Control[] { Lbl("Check every day at", S(22)), timeCheck, chkLogon });
+            timeCheck = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(12), Visible = false };
+            chkLogon = new CheckBox { AutoSize = true, Checked = true, Text = "and a few minutes after I sign in", Margin = new Padding(S(10), S(4), 0, 0), Visible = false };
+            lblSchedCheck = new Label { AutoSize = true, Margin = new Padding(S(2), S(6), S(10), 0), UseMnemonic = false, Font = new Font("Segoe UI Semibold", 9f) };
+            var btnTimes1 = MakeButton("Change the times in Policy manager...");
+            btnTimes1.Click += (o, e) => ShowPolicy();
+            r2.Controls.AddRange(new Control[] { lblSchedCheck, timeCheck, chkLogon, btnTimes1 });
             lblAlertState = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(22), S(6), 0, 0), Text = "Checking..." };
             fa.Controls.AddRange(new Control[] { r1, r2, lblAlertState });
             gAlert.Controls.Add(fa);
@@ -414,7 +455,11 @@ namespace CDriveCleaner
             cmbDay.Items.AddRange(Automation.Days);
             cmbDay.SelectedIndex = 6;   // Sunday (by position: the names are translated in Hebrew)
             timeClean = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(20) };
-            r3.Controls.AddRange(new Control[] { chkClean, cmbDay, Lbl("at"), timeClean });
+            chkClean.Visible = cmbDay.Visible = timeClean.Visible = false;
+            lblSchedClean = new Label { AutoSize = true, Margin = new Padding(S(2), S(6), S(10), 0), UseMnemonic = false, Font = new Font("Segoe UI Semibold", 9f) };
+            var btnTimes2 = MakeButton("Change in Policy manager...");
+            btnTimes2.Click += (o, e) => ShowPolicy();
+            r3.Controls.AddRange(new Control[] { chkClean, cmbDay, timeClean, lblSchedClean, btnTimes2 });
             lblAutoItems = new Label
             {
                 AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(22), S(6), 0, 0),
@@ -535,8 +580,7 @@ namespace CDriveCleaner
                 exe = Install.Exe;
             }
             if (!p.Save()) return "The settings could not be saved.";
-            string outp, hhmm = "12:00";
-            try { var ck = Automation.Query(Automation.CheckTask); if (ck.Start.HasValue) hhmm = ck.Start.Value.ToString("HH:mm"); } catch { }
+            string outp, hhmm = Policy.Get("sched.tidy");   // the daily tidy runs at the policy's time
             int code = Automation.RunSchtasks(p.AnyDaily ? Automation.CreateTidyArgs(exe, hhmm) : Automation.DeleteArgs(Automation.TidyTask), out outp);
             return code == 0 || !p.AnyDaily ? null : "Task Scheduler said: " + outp;
         }
@@ -639,66 +683,110 @@ namespace CDriveCleaner
                     lblAlertState.ForeColor = CautionColor;
                 }
                 lblCleanState.Text = Lang.T((clean.Exists ? "On: every " + cmbDay.SelectedItem + " at " + timeClean.Value.ToString("HH:mm") + ".  " : "Off.  ") + last);
+                alertPercent = pct;
+                ShowScheduleText();
+                // Task Scheduler against the policy's times (email reports are checked in Policy manager)
+                var states = new Dictionary<string, TaskState> { { Automation.CheckTask, check }, { Automation.LogonTask, logon }, { Automation.CleanTask, clean }, { Automation.TidyTask, t.Result[6] } };
+                var diff = Automation.ScheduleDifferences(Automation.Plan(Install.Exe, pct, TidyPrefs.Load().AnyDaily, false).Where(x => x.Task != Automation.MailTask).ToList(),
+                                                          task => states.ContainsKey(task) ? states[task] : new TaskState());
+                if (diff.Count > 0 && !fromOld)
+                {
+                    lblAlertState.Text = Lang.T(lblAlertState.Text) + "\n" + Lang.T("Task Scheduler doesn't follow the policy yet: click Save.") + "\n  " + string.Join("\n  ", diff.Select(Lang.T));
+                    lblAlertState.ForeColor = CautionColor;
+                }
                 if (lblAlertState.Text == "Off.") lblAlertState.Text = Lang.T("Off.");
                 tidyUnscheduled = TidyPrefs.Load().AnyDaily && !tidyTask.Exists && !testMode;
                 LoadTidyState(false);
             }));
         }
 
+        // the times, as the policy sets them
+        void ShowScheduleText()
+        {
+            if (lblSchedCheck == null) return;
+            string chk = Policy.Get("sched.check"), day = Policy.Get("sched.clean.day");
+            bool logon = Policy.Get("sched.logon") == "on";
+            lblSchedCheck.Text = Lang.T(chk == "off" && !logon ? "When: off (set in Policy manager)" :
+                                        "When: " + (chk != "off" ? "every day at " + chk : "") + (chk != "off" && logon ? " and " : "") + (logon ? "a few minutes after you sign in" : "") + " (set in Policy manager)");
+            lblSchedClean.Text = Lang.T(day == "off" ? "Weekly clean: off (set in Policy manager)" : "Weekly clean: every " + day + " at " + Policy.Get("sched.clean.time") + " (set in Policy manager)");
+        }
+
+        // how low is too low (the % in Automation), from the schedule when it isn't on screen yet
+        int AlertPercent()
+        {
+            if (alertPercent > 0) return alertPercent;
+            try
+            {
+                var t = Automation.Query(Automation.CheckTask); if (!t.Exists) t = Automation.Query(Automation.LogonTask);
+                return alertPercent = Automation.PercentFromArgs(t.Arguments, 15);
+            }
+            catch { return 15; }
+        }
+
+        // puts Task Scheduler in line with the policy: each schedule at the policy's time, or removed. Returns what didn't work.
+        public List<string> ApplySchedules(Action<string> log)
+        {
+            var errors = new List<string>();
+            if (testMode) return errors;
+            int pct = AlertPercent();
+            var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();
+            bool mailOn = MailAccount.Email != null && (mp.Alerts || mp.Summary) && Policy.Allowed("email");
+            var plan = Automation.Plan(Application.ExecutablePath, pct, tidy.AnyDaily, mailOn);
+            if (plan.Any(s => !s.Remove))
+            {
+                // schedules always start the protected copy in Program Files, which only administrators can change
+                string ierr = Install.Ensure();
+                if (ierr != null) { errors.Add("Elixar could not put its protected copy in " + Install.Dir + ": " + ierr + ". The schedules were not changed."); return errors; }
+                plan = Automation.Plan(Install.Exe, pct, tidy.AnyDaily, mailOn);
+            }
+            foreach (var s in plan)
+            {
+                if (s.Remove && !Automation.Query(s.Task).Exists) continue;   // nothing to remove
+                string outp;
+                int code = Automation.RunSchtasks(s.Args, out outp);
+                if (code != 0) errors.Add(s.What + ": " + outp);
+                if (log != null) log((code == 0 ? "Saved: " : "Could not save: ") + s.What + (s.Remove || s.Time.Length == 0 ? "" : " (" + (s.Day.Length > 0 ? s.Day + " " : "") + s.Time + ")") + (code == 0 ? "" : " (" + outp + ")"));
+            }
+            // clean up schedules left from the old name
+            foreach (var oldTask in Automation.OldTasks)
+                if (Automation.Query(oldTask).Exists) { string o2; if (Automation.RunSchtasks(Automation.DeleteArgs(oldTask), out o2) == 0 && log != null) log("Removed old schedule: " + oldTask); }
+            return errors;
+        }
+
+        // once, when Elixar starts as administrator: the schedules from Automation move into the policy;
+        // and when an organization sets the times, Task Scheduler is put in line with them
+        void StartupSchedules()
+        {
+            try
+            {
+                if (!Policy.Moved && Policy.MoveSchedules(Automation.Query, MailPrefs.Load().Day))
+                    UI(() => { Log(Lang.T("Your schedules moved to Policy manager (Custom policy), with the same times as before.")); PolicyLoadUi(); ShowScheduleText(); });
+                if (Policy.Org().Keys.Any(Policy.IsSchedule))
+                {
+                    var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();
+                    var plan = Automation.Plan(Install.Exe, AlertPercent(), tidy.AnyDaily, MailAccount.Email != null && (mp.Alerts || mp.Summary) && Policy.Allowed("email"));
+                    if (Automation.ScheduleDifferences(plan, Automation.Query).Count > 0)
+                    {
+                        var errs = ApplySchedules(null);
+                        UI(() => Log(Lang.T(errs.Count == 0 ? "Schedules set to your organization's policy." : "Your organization's schedules could not be set: " + string.Join("; ", errs))));
+                    }
+                }
+            }
+            catch { }
+        }
+
         void SaveAutomation()
         {
             if (testMode) return;
-            // schedules always start the protected copy in Program Files, which only administrators can change
-            string exe = Application.ExecutablePath;
             var tidy = TidyPrefs.Load();
             tidy.UndoDays = TidyPrefs.UndoChoices[Math.Max(0, cmbUndoDays.SelectedIndex)];
             tidy.BinDays = chkBin.Checked ? BinDaysChosen : 0;
             tidy.BinChoice = BinDaysChosen;
             tidy.LowClean = chkLowClean.Checked;
-            if (chkAlert.Checked || chkClean.Checked || tidy.AnyDaily)
-            {
-                string ierr = Install.Ensure();
-                if (ierr != null)
-                {
-                    Lang.Box(this, "Elixar could not put its protected copy in " + Install.Dir + ":\n" + ierr + "\n\nThe schedules were not changed.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                exe = Install.Exe;
-                Log("Protected copy ready: " + exe);
-            }
+            alertPercent = (int)numPercent.Value;
             var errors = new List<string>();
-            Action<string, string> run = (what, args) =>
-            {
-                string outp;
-                int code = Automation.RunSchtasks(args, out outp);
-                if (code != 0 && !args.StartsWith("/Delete")) errors.Add(what + ": " + outp);
-                Log((code == 0 ? "Saved: " : "Could not save: ") + what + (code == 0 ? "" : " (" + outp + ")"));
-            };
-
-            int pct = (int)numPercent.Value;
-            if (chkAlert.Checked)
-            {
-                run("daily space check", Automation.CreateCheckArgs(exe, pct, timeCheck.Value.ToString("HH:mm")));
-                if (chkLogon.Checked) run("space check at sign-in", Automation.CreateLogonArgs(exe, pct));
-                else run("remove sign-in check", Automation.DeleteArgs(Automation.LogonTask));
-            }
-            else
-            {
-                run("remove daily space check", Automation.DeleteArgs(Automation.CheckTask));
-                run("remove sign-in check", Automation.DeleteArgs(Automation.LogonTask));
-            }
             if (!tidy.Save()) errors.Add("Recycle Bin and Undo settings: could not be saved");
-            if (tidy.AnyDaily) run("daily tidy", Automation.CreateTidyArgs(exe, timeCheck.Value.ToString("HH:mm")));
-            else run("remove daily tidy", Automation.DeleteArgs(Automation.TidyTask));
-            if (chkClean.Checked) run("weekly clean", Automation.CreateCleanArgs(exe, Automation.Days[Math.Max(0, cmbDay.SelectedIndex)], timeClean.Value.ToString("HH:mm")));
-            else run("remove weekly clean", Automation.DeleteArgs(Automation.CleanTask));
-            // clean up schedules left from the old name
-            foreach (var oldTask in Automation.OldTasks)
-            {
-                string o2;
-                if (Automation.RunSchtasks(Automation.DeleteArgs(oldTask), out o2) == 0) Log("Removed old schedule: " + oldTask);
-            }
-
+            errors.AddRange(ApplySchedules(Log));
             LoadAutomationState();
             if (errors.Count > 0)
                 Lang.Box(this, "Some settings could not be saved:\n\n" + string.Join("\n", errors), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);

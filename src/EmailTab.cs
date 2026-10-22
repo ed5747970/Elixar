@@ -19,7 +19,7 @@ namespace CDriveCleaner
         Button btnGmailApp;
         Button btnMailSignIn, btnMailSetup, btnMsSignIn, btnMsSetup, btnOtherConnect, btnMailTest, btnMailOut, btnMailSave, btnMailCleanOn;
         TextBox txtOtherEmail, txtOtherPass, txtOtherImap, txtOtherSmtp;
-        CheckBox chkMailClean, chkMailAlerts, chkMailSummary; ComboBox cmbMailDay; TimeBox timeMail;
+        CheckBox chkMailClean, chkMailAlerts, chkMailSummary; ComboBox cmbMailDay; TimeBox timeMail; Label lblMailWhen;
         CancellationTokenSource mailCts;
 
         Control BuildEmailBox()
@@ -79,14 +79,18 @@ namespace CDriveCleaner
             chkMailClean = new CheckBox { AutoSize = true, Checked = p.CleanReport, Text = "Weekly auto-clean report: what was cleaned, how much it freed, and what is left for you to decide" };
             chkMailAlerts = new CheckBox { AutoSize = true, Checked = p.Alerts, Text = Lx.Words("Alerts: C: almost full (your limit in Automation, or 15%), or a drive that may fail") };
             var sumRow = Row();
-            chkMailSummary = new CheckBox { AutoSize = true, Checked = p.Summary, Text = "Weekly summary every", Margin = new Padding(S(3), S(5), S(4), 0) };
+            chkMailSummary = new CheckBox { AutoSize = true, Checked = p.Summary, Text = "Weekly summary", Margin = new Padding(S(3), S(5), S(4), 0) };
             cmbMailDay = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(110) };
             cmbMailDay.Items.AddRange(Automation.Days); cmbMailDay.SelectedIndex = Math.Max(0, Array.IndexOf(Automation.Days, p.Day));
             timeMail = new TimeBox { Width = S(80) };
             DateTime tm; timeMail.Value = DateTime.TryParse(p.Time, out tm) ? DateTime.Today.Add(tm.TimeOfDay) : DateTime.Today.AddHours(9);
-            var at = new Label { AutoSize = true, Text = "at", Margin = new Padding(S(4), S(6), S(4), 0) };
-            var also = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = "(alerts are checked daily at this time too)", Margin = new Padding(S(6), S(6), 0, 0) };
-            sumRow.Controls.AddRange(new Control[] { chkMailSummary, cmbMailDay, at, timeMail, also });
+            // the day and time are set in Policy manager
+            cmbMailDay.Visible = timeMail.Visible = false;
+            lblMailWhen = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(6), S(6), 0, 0), UseMnemonic = false };
+            var btnMailTimes = new LinkLabel { AutoSize = true, Text = "Change in Policy manager", Margin = new Padding(S(8), S(6), 0, 0) };
+            btnMailTimes.LinkClicked += (o, e2) => ShowPolicy();
+            sumRow.Controls.AddRange(new Control[] { chkMailSummary, cmbMailDay, timeMail, lblMailWhen, btnMailTimes });
+            ShowMailWhen();
             var row2 = Row();
             btnMailSave = MakeButton("Save email settings"); btnMailSave.Margin = new Padding(S(2), S(8), 0, 0);
             row2.Controls.Add(btnMailSave);
@@ -160,6 +164,7 @@ namespace CDriveCleaner
             btnMailTest.Enabled = btnMailOut.Enabled = signed && !busy && !testMode;
             btnMailSave.Enabled = signed && !busy && !testMode;
             foreach (Control c in new Control[] { chkMailClean, chkMailAlerts, chkMailSummary, cmbMailDay, timeMail }) c.Enabled = signed;
+            ShowMailWhen();
             mailCleanState.Text = Lang.T(!signed ? "Email cleaning: off. Connect your email first." :
                                          cleaning ? "Email cleaning: on. Use the Email tab to scan and clean." :
                                          "Email cleaning: off. Optional: lets Elixar find old ads, notifications and spam in your " + MailAccount.ProviderName + ".");
@@ -296,24 +301,23 @@ namespace CDriveCleaner
             }));
         }
 
-        // saves the choices and the daily email schedule (it starts the protected copy in Program Files, as administrator)
+        // the day and time the policy sets for the reports
+        void ShowMailWhen()
+        {
+            if (lblMailWhen == null) return;
+            lblMailWhen.Text = Lang.T("every " + Policy.Get("sched.mail.day") + "; alerts are checked daily at " + Policy.Get("sched.mail.time"));
+        }
+
+        // saves the choices; the daily email schedule runs at the policy's time (it starts the protected copy in Program Files, as administrator)
         void SaveMail()
         {
             if (testMode || MailAccount.Email == null) return;
             var p = MailPrefs.Load();
             p.CleanReport = chkMailClean.Checked; p.Alerts = chkMailAlerts.Checked; p.Summary = chkMailSummary.Checked;
-            p.Day = Automation.Days[Math.Max(0, cmbMailDay.SelectedIndex)];   // by position: the names are translated in Hebrew
-            p.Time = timeMail.Value.ToString("HH:mm");
             p.Save();
-            string outp;
-            if (p.Alerts || p.Summary)
-            {
-                string ierr = Install.Ensure();
-                if (ierr != null) { Lang.Box(this, "Elixar could not put its protected copy in " + Install.Dir + ":\n" + ierr, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
-                int code = Automation.RunSchtasks(Automation.CreateMailArgs(Install.Exe, p.Time), out outp);
-                Log(code == 0 ? "Email reports saved: daily check at " + p.Time + "." : "Could not save the email schedule: " + outp);
-            }
-            else Automation.RunSchtasks(Automation.DeleteArgs(Automation.MailTask), out outp);
+            var errs = ApplySchedules(Log);
+            if (errs.Count > 0) { Lang.Box(this, string.Join("\n", errs), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            Log((p.Alerts || p.Summary) ? "Email reports saved: daily check at " + p.Time + "." : "Email reports are off.");
             mailStatus.Text = Lang.T("Email settings saved.");
         }
     }

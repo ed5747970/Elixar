@@ -1599,6 +1599,44 @@ namespace CDriveCleaner
                                 Policy.Save(false, c2);
                                 work &= Automation.AutoItems().Count >= Automation.AutoItems().Count(i => i.Tier != Tier.Caution);
                                 if (!work) pwhy += " [at work]";
+                                // schedules: every time is set in the policy; Task Scheduler gets exactly those times
+                                Policy.Save(false, Policy.Defaults()); Policy.Load();
+                                var plan0 = Automation.Plan(@"C:\Program Files\Elixar\Elixar.exe", 15, false, false);
+                                bool sched = plan0.Count == 5 && plan0.All(x => x.Remove) && plan0.All(x => x.Args.StartsWith("/Delete"));
+                                var cs = Policy.Defaults(); cs["sched.check"] = "07:30"; cs["sched.logon"] = "on"; cs["sched.clean.day"] = "Sunday"; cs["sched.clean.time"] = "20:00";
+                                cs["sched.tidy"] = "03:00"; cs["sched.mail.time"] = "08:00"; cs["sched.mail.day"] = "Friday";
+                                Policy.Save(true, cs);
+                                var plan1 = Automation.Plan(@"C:\Program Files\Elixar\Elixar.exe", 12, true, true);
+                                Func<string, Automation.SchedStep> st = task => plan1.First(x => x.Task == task);
+                                sched &= st(Automation.CheckTask).Args.Contains("/SC DAILY /ST 07:30") && st(Automation.CheckTask).Args.Contains("--check-space 12") && !st(Automation.LogonTask).Remove &&
+                                         st(Automation.CleanTask).Args.Contains("/SC WEEKLY /D SUN /ST 20:00") && st(Automation.TidyTask).Args.Contains("/ST 03:00") && st(Automation.MailTask).Args.Contains("/ST 08:00");
+                                // what Task Scheduler holds is compared with the policy
+                                var fake = new Dictionary<string, TaskState> {
+                                    { Automation.CheckTask, new TaskState { Exists = true, Start = DateTime.Today.AddHours(7.5) } }, { Automation.LogonTask, new TaskState { Exists = true } },
+                                    { Automation.CleanTask, new TaskState { Exists = true, Start = DateTime.Today.AddHours(21), Day = "Sunday" } }, { Automation.TidyTask, new TaskState { Exists = true, Start = DateTime.Today.AddHours(3) } } };
+                                Func<string, TaskState> fq = task => fake.ContainsKey(task) ? fake[task] : new TaskState();
+                                var sdiff = Automation.ScheduleDifferences(plan1, fq);
+                                sched &= sdiff.Count == 2 && sdiff.Any(x => x.StartsWith("Weekly clean") && x.Contains("21:00")) && sdiff.Any(x => x.StartsWith("Email reports") && x.Contains("not scheduled"));
+                                // the email day and time follow the policy once the schedules moved here
+                                Policy.SchedulesMoved = true; Policy.Save(true, cs);
+                                var mpx = MailPrefs.Load();
+                                sched &= mpx.Day == "Friday" && mpx.Time == "08:00" && Policy.Import("sched.clean.day=sunday\nsched.check=7:30").Rules["sched.clean.day"] == "Sunday";
+                                // once: the schedules set in Automation before move into the policy, with the same times (half hours)
+                                Policy.SchedulesMoved = false; Policy.Save(false, Policy.Defaults()); Policy.Load();
+                                var old = new Dictionary<string, TaskState> {
+                                    { Automation.CheckTask, new TaskState { Exists = true, Start = DateTime.Today.AddHours(12) } }, { Automation.LogonTask, new TaskState { Exists = true } },
+                                    { Automation.CleanTask, new TaskState { Exists = true, Start = DateTime.Today.AddHours(21.25), Day = "Wednesday" } } };
+                                bool movedNow = Policy.MoveSchedules(task => old.ContainsKey(task) ? old[task] : new TaskState(), "Sunday");
+                                Policy.Load();
+                                sched &= movedNow && Policy.UseCustom && Policy.Moved && Policy.Get("sched.check") == "12:00" && Policy.Get("sched.logon") == "on" && Policy.Get("sched.clean.day") == "Wednesday" &&
+                                         Policy.Get("sched.clean.time") == "21:00" && Policy.Get("clean.level") == "everything" && !Policy.MoveSchedules(task => old.ContainsKey(task) ? old[task] : new TaskState(), "Sunday") &&
+                                         ChangeLog.Read().Any(e => e.Action == "Policy: the schedules from Automation moved here");
+                                // nothing scheduled before: Default stays, and it is done once
+                                Policy.SchedulesMoved = false; Policy.Save(false, Policy.Defaults()); Policy.Load();
+                                sched &= !Policy.MoveSchedules(task => new TaskState(), "Sunday") && !Policy.UseCustom && Policy.Moved;
+                                if (!sched) pwhy += " [schedules]";
+                                work &= sched;
+                                Policy.SchedulesMoved = false; Policy.Save(false, Policy.Defaults());
                                 // the Policy manager tab, next to Logs
                                 var f = new MainForm(true);
                                 pui = f.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && !f.PolicyComboEnabled("phone") && !f.PolicyDirty && f.PolicyStatusText.StartsWith(Lang.T("Default policy"));
@@ -1626,7 +1664,7 @@ namespace CDriveCleaner
                             }
                             check(model, "Policy: Default is how Elixar works without a policy; Custom rules work, are written to Logs, and are kept when you switch back to Default; an organization's rule wins" + (model ? "" : pwhy));
                             check(files, "Policy: export and import take only known rules with allowed values, a changed file is noticed, and the .reg file for IT sets HKLM\\SOFTWARE\\Policies\\Elixar" + (files ? "" : pwhy));
-                            check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level" + (work ? "" : pwhy));
+                            check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level, and every schedule runs at the time the policy sets (the times set in Automation move into the policy once, unchanged)" + (work ? "" : pwhy));
                             check(pui, "Policy: the Policy manager tab sits next to Logs, switches between Default and Custom, uses presets and imports, asks before making rules looser, and turns tabs off" + (pui ? "" : pwhy));
                         }
                     }

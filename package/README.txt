@@ -11,6 +11,10 @@ NEW IN 1.2.40
   which tools are allowed, required PIN. Export / import a policy file,
   or export a .reg for IT (HKLM\SOFTWARE\Policies\Elixar via Group Policy /
   Intune): those rules are locked as "Set by your organization".
+- Schedules moved to Policy manager: the time of every action Elixar runs
+  by itself (low-space check, weekly clean, daily tidy, email reports and
+  the weekly summary day) is set there, and Task Scheduler follows when
+  you save. Your existing times move over once, unchanged.
 - Logs (next to Settings): every change Elixar makes to this PC, newest
   first, grouped by day, each under its own section on the left (Cleaner,
   Duplicates, Smart scan, Startup, Phone, Sysprep... plus "Can be undone"

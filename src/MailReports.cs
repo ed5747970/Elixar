@@ -20,7 +20,15 @@ namespace CDriveCleaner
 
         static string File_ { get { var d = GoogleAuth.Dir; return d == null ? null : Path.Combine(d, "prefs.txt"); } }
 
+        // the day and time come from Policy manager once the schedules moved there
         public static MailPrefs Load()
+        {
+            var p = LoadSaved();
+            try { if (Policy.Moved) { p.Day = Policy.Get("sched.mail.day"); p.Time = Policy.Get("sched.mail.time"); } } catch { }
+            return p;
+        }
+
+        static MailPrefs LoadSaved()
         {
             var p = new MailPrefs();
             try

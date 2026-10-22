@@ -24,6 +24,7 @@ namespace CDriveCleaner
         Dictionary<string, string> polEdit = Policy.Defaults();
         bool polCustom, polFilling;
         Label sysprepBlocked;
+        List<string> polSchedDiff = new List<string>();   // where Task Scheduler differs from the policy's times
         public static Func<string, DialogResult> PolicyConfirmHook;   // self-test: answers the questions
 
         // for the self-test and previews
@@ -35,6 +36,8 @@ namespace CDriveCleaner
         public string PolicySave() { return PolicySaveNow(); }
         public bool PolicyComboEnabled(string key) { return polCombos[key].Enabled; }
         public void ShowPolicy() { tabs.SelectedTab = pagePolicy; }
+        public void PolicyScrollTo(string key) { var sp = polGrid.Parent as ScrollableControl; if (sp != null) sp.ScrollControlIntoView(polCombos[key]); }
+        public void ShowAutomationTab() { tabs.SelectedTab = pageAuto; }
 
         DialogResult PolAsk(string text, bool warn)
         {
@@ -134,11 +137,41 @@ namespace CDriveCleaner
             btnPolExport.Click += (o, e) => PolicyExport(false);
             btnPolReg.Click += (o, e) => PolicyExport(true);
             btnPolImport.Click += (o, e) => PolicyImport();
-            btnPolFix.Click += (o, e) => { if (!testMode && PinForm.SetNew(this)) { Log(Lang.T("A PIN or password now protects Elixar.")); UpdatePinUi(); } PolicyRefresh(); };
+            btnPolFix.Click += (o, e) =>
+            {
+                if (Policy.Check().Count > 0) { if (!testMode && PinForm.SetNew(this)) { Log(Lang.T("A PIN or password now protects Elixar.")); UpdatePinUi(); } PolicyRefresh(); return; }
+                PolicyApplySchedules();
+            };
             PolicyLoadUi();
         }
 
-        void OnPolicyTab() { Policy.Load(); PolicyLoadUi(); PolSegColors(); }
+        void OnPolicyTab() { Policy.Load(); PolicyLoadUi(); PolSegColors(); PolicyCheckSchedules(); }
+
+        // compares Task Scheduler with the policy's times, in the background
+        void PolicyCheckSchedules()
+        {
+            if (testMode || !(Win.IsWindows || Lx.On)) return;
+            System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();
+                var plan = Automation.Plan(Install.Exe, AlertPercent(), tidy.AnyDaily, MailAccount.Email != null && (mp.Alerts || mp.Summary) && Policy.Allowed("email"));
+                return Automation.ScheduleDifferences(plan, Automation.Query);
+            }).ContinueWith(t => UI(() => { polSchedDiff = t.IsFaulted ? new List<string>() : t.Result; PolicyRefresh(); }));
+        }
+
+        void PolicyApplySchedules()
+        {
+            if (testMode) return;
+            btnPolFix.Enabled = false;
+            System.Threading.Tasks.Task.Factory.StartNew(() => ChangeLog.Within("Policy", () => ApplySchedules(Log))).ContinueWith(t => UI(() =>
+            {
+                btnPolFix.Enabled = true;
+                var errs = t.IsFaulted ? new List<string> { t.Exception.GetBaseException().Message } : t.Result;
+                if (errs.Count > 0) Lang.Box(this, Lang.T("Some schedules could not be set:") + "\n\n" + string.Join("\n", errs), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowScheduleText(); ShowMailWhen(); if (alertPercent > 0) LoadAutomationState();
+                PolicyCheckSchedules();
+            }));
+        }
 
         // the chosen side of the Default / Custom switch is filled with the accent colour
         void PolSegColors()
@@ -187,7 +220,9 @@ namespace CDriveCleaner
             polPreset.Enabled = btnPolPreset.Enabled = polCustom;
             bool dirty = polCustom != Policy.UseCustom || Policy.Rules.Any(r => polEdit[r.Key] != (Policy.Custom.ContainsKey(r.Key) ? Policy.Custom[r.Key] : r.Default));
             btnPolSave.Enabled = btnPolDiscard.Enabled = dirty;
-            var probs = Policy.Check();
+            var pinProbs = Policy.Check();
+            var probs = pinProbs.Concat(polSchedDiff).ToList();
+            btnPolFix.Text = Lang.T(pinProbs.Count > 0 ? "Set a PIN or password now..." : "Apply the schedules now");
             polCheck.Text = dirty ? Lang.T("Not saved yet: click Save the policy.") : probs.Count == 0 ? "✔ " + Lang.T("This PC follows its policy.") : "⚠ " + string.Join("  ", probs.Select(Lang.T));
             polCheck.ForeColor = Theme.MapFore(dirty ? Color.FromArgb(196, 120, 0) : probs.Count == 0 ? Color.FromArgb(0, 125, 70) : Color.FromArgb(190, 40, 40));
             btnPolFix.Visible = !dirty && probs.Count > 0;
@@ -209,11 +244,14 @@ namespace CDriveCleaner
             if (Policy.Get("pin.policy") == "on" && PinLock.IsSet && PolicyConfirmHook == null && !testMode)
                 if (!PinLock.Unlock(this)) return "";
             if (loosens && PolAsk(Lang.T("This makes the rules less strict. Save it?") + "\n\n" + Lang.T("Elixar writes every change to the policy in Logs."), true) != DialogResult.Yes) return "";
+            var schedBefore = Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)).ToList();
             string err = Policy.Save(polCustom, polEdit);
             if (err != null) return err;
             Log(Lang.T(polCustom ? "Policy saved: Custom." : "Policy saved: Default."));
             ApplyPolicyUi();
             PolicyLoadUi();
+            // new times: Task Scheduler follows right away
+            if (!schedBefore.SequenceEqual(Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)))) { ShowScheduleText(); ShowMailWhen(); PolicyApplySchedules(); }
             // a rule now asks for a PIN that isn't set
             if (!testMode && PolicyConfirmHook == null && Policy.Check().Count > 0 && !PinLock.IsSet &&
                 PolAsk(Lang.T("The policy needs a PIN or password. Set one now?"), false) == DialogResult.Yes && PinForm.SetNew(this)) { UpdatePinUi(); PolicyRefresh(); }
