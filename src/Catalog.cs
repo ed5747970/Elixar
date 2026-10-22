@@ -22,7 +22,10 @@ namespace CDriveCleaner
     public static class Catalog
     {
         public static bool WindowsOnLinux;   // self-test only: check the Windows list's logic on a Linux test machine
-        public static List<CleanItem> Build()
+        // the items, with the policy's age limits on them
+        public static List<CleanItem> Build() { return Policy.Wrap(BuildRaw()); }
+
+        static List<CleanItem> BuildRaw()
         {
             if (Lx.On && !WindowsOnLinux) return LinuxCatalog.Build();
             string L = UserDirs.Local;

@@ -134,7 +134,9 @@ namespace CDriveCleaner
 
             foreach (var it in items)
             {
-                var lvi = new ListViewItem(Lang.T(it.Name)) { UseItemStyleForSubItems = false, Checked = it.DefaultOn, Tag = it };
+                bool never = Policy.Never(it);
+                var lvi = new ListViewItem(Lang.T(it.Name) + (never ? "  (" + Lang.T("never, by the policy") + ")" : "")) { UseItemStyleForSubItems = false, Checked = it.DefaultOn && !never, Tag = it };
+                if (never) lvi.ForeColor = Color.Gray;
                 var tierSub = lvi.SubItems.Add(Lang.T(it.Tier.ToString()));
                 tierSub.ForeColor = it.Tier == Tier.Safe ? SafeColor : it.Tier == Tier.Review ? ReviewColor : CautionColor;
                 lvi.SubItems.Add("...");
@@ -312,6 +314,8 @@ namespace CDriveCleaner
             };
 
             list.ItemChecked += (o, e) => { if (ready) UpdateTotals(); };
+            // an item the policy says never to touch can't be ticked
+            list.ItemCheck += (o, e) => { var ci = list.Items[e.Index].Tag as CleanItem; if (ci != null && e.NewValue == CheckState.Checked && Policy.Never(ci)) e.NewValue = CheckState.Unchecked; };
             list.SelectedIndexChanged += (o, e) =>
             {
                 if (list.SelectedItems.Count > 0)

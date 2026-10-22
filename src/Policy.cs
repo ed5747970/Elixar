@@ -25,7 +25,7 @@ namespace CDriveCleaner
         public string Canon(string v) { v = (v ?? "").Trim(); return Values.FirstOrDefault(x => string.Equals(x, v, StringComparison.OrdinalIgnoreCase)); }
     }
 
-    public static class Policy
+    public static partial class Policy
     {
         static PolicyRule R(string key, string group, string name, string help, string def, params string[] valuesAndLabels)
         {
@@ -131,6 +131,7 @@ namespace CDriveCleaner
                         string k = line.Substring(0, i).Trim(), v = line.Substring(i + 1).Trim();
                         if (k == "mode") UseCustom = v == "custom";
                         else if (k == "schedules") SchedulesMoved = v == "moved";
+                        else if (k.StartsWith("custom." + ItemPrefix)) { string ik = k.Substring(7), cv = CanonItem(ik, v); if (cv != null) Custom[ik] = cv; }
                         else if (k.StartsWith("custom.")) { var r = Rule(k.Substring(7)); if (r != null && r.Valid(v)) Custom[r.Key] = v; }
                     }
             }
@@ -156,7 +157,10 @@ namespace CDriveCleaner
                 using (var b = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                 using (var k = b.OpenSubKey(@"SOFTWARE\Policies\Elixar"))
                     if (k != null)
+                    {
                         foreach (var r in Rules) { var v = r.Canon(k.GetValue(r.Key) as string); if (v != null) d[r.Key] = v; }
+                        foreach (var n in k.GetValueNames().Where(x => x.StartsWith(ItemPrefix))) { var v = CanonItem(n, k.GetValue(n) as string); if (v != null) d[n] = v; }
+                    }
             }
             catch { }
             return d;
@@ -165,8 +169,14 @@ namespace CDriveCleaner
         public static string Get(string key)
         {
             Ensure();
-            var r = Rule(key); if (r == null) return null;
             string v;
+            if (IsItemKey(key))
+            {
+                if (Org().TryGetValue(key, out v)) return v;
+                if (UseCustom && Custom.TryGetValue(key, out v)) return v;
+                return ItemRule.DefaultText;
+            }
+            var r = Rule(key); if (r == null) return null;
             if (Org().TryGetValue(key, out v)) return v;
             if (UseCustom && Custom.TryGetValue(key, out v) && r.Valid(v)) return v;
             return r.Default;
@@ -212,13 +222,20 @@ namespace CDriveCleaner
         {
             Ensure();
             var clean = Defaults();
-            foreach (var kv in custom ?? new Dictionary<string, string>()) { var r = Rule(kv.Key); if (r != null && r.Valid(kv.Value)) clean[kv.Key] = kv.Value; }
+            foreach (var kv in custom ?? new Dictionary<string, string>())
+            {
+                if (IsItemKey(kv.Key)) { string cv = CanonItem(kv.Key, kv.Value); if (cv != null && cv != ItemRule.DefaultText) clean[kv.Key] = cv; continue; }
+                var r = Rule(kv.Key); if (r != null && r.Valid(kv.Value)) clean[kv.Key] = kv.Value;
+            }
+            var itemKeys = Custom.Keys.Concat(clean.Keys).Concat(Org().Keys).Where(IsItemKey).Distinct().ToList();
             var before = Rules.ToDictionary(r => r.Key, r => Get(r.Key));
+            foreach (var ik in itemKeys) before[ik] = Get(ik);
             bool wasCustom = UseCustom;
             var sb = new StringBuilder("# Elixar policy (Policy manager). Only administrators can change this file.\n");
             sb.Append("mode=").Append(useCustom ? "custom" : "default").Append('\n');
             if (SchedulesMoved) sb.Append("schedules=moved\n");
             foreach (var r in Rules) sb.Append("custom.").Append(r.Key).Append('=').Append(clean[r.Key]).Append('\n');
+            foreach (var kv in clean.Where(x => IsItemKey(x.Key)).OrderBy(x => x.Key, StringComparer.Ordinal)) sb.Append("custom.").Append(kv.Key).Append('=').Append(kv.Value).Append('\n');
             try { File.WriteAllText(File_, sb.ToString()); } catch (Exception e) { return e.Message; }
             UseCustom = useCustom; Custom = clean; loaded = true;
             using (ChangeLog.In("Policy"))
@@ -229,13 +246,23 @@ namespace CDriveCleaner
                     string now = Get(r.Key);
                     if (before[r.Key] != now) ChangeLog.Add("Settings", "Policy: " + r.Name, "Policy manager", r.Label(before[r.Key]), r.Label(now), Source(r.Key) == "organization" ? "Set by your organization" : "", false);
                 }
+                foreach (var ik in itemKeys)
+                {
+                    string now = Get(ik);
+                    if (before[ik] != now) ChangeLog.Add("Settings", "Policy: " + ik.Substring(ItemPrefix.Length), "Policy manager", ItemRule.Parse(before[ik]).Words(), ItemRule.Parse(now).Words(), "Cleaning item", false);
+                }
             }
             if (Changed != null) try { Changed(); } catch { }
             return null;
         }
 
         // ---------------- export / import ----------------
-        static string Lines(Dictionary<string, string> rules) { return string.Join("\n", Rules.Select(r => r.Key + "=" + (rules.ContainsKey(r.Key) ? rules[r.Key] : r.Default))); }
+        static string Lines(Dictionary<string, string> rules)
+        {
+            var l = Rules.Select(r => r.Key + "=" + (rules.ContainsKey(r.Key) ? rules[r.Key] : r.Default)).ToList();
+            l.AddRange(rules.Where(kv => IsItemKey(kv.Key) && kv.Value != ItemRule.DefaultText).OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value));
+            return string.Join("\n", l);
+        }
         public static string Fingerprint(Dictionary<string, string> rules)
         {
             using (var h = SHA256.Create()) return BitConverter.ToString(h.ComputeHash(Encoding.UTF8.GetBytes(Lines(rules)))).Replace("-", "").Substring(0, 16);
@@ -263,6 +290,12 @@ namespace CDriveCleaner
                 int i = line.IndexOf('='); if (i <= 0) { res.Problems.Add("Not understood: " + Cut(line)); continue; }
                 string k = line.Substring(0, i).Trim(), rawV = line.Substring(i + 1).Trim(), v = rawV.ToLowerInvariant();
                 if (k == "fingerprint") { fp = line.Substring(i + 1).Trim(); continue; }
+                if (IsItemKey(k))
+                {
+                    string iv = CanonItem(k, rawV);
+                    if (iv == null) { res.Problems.Add(Cut(k.Substring(ItemPrefix.Length)) + ": \"" + Cut(rawV) + "\" is not allowed, kept the default"); continue; }
+                    res.Rules[k] = iv; known++; continue;
+                }
                 var r = Rule(k);
                 if (r == null) { res.Problems.Add("Unknown rule: " + Cut(k)); continue; }
                 string cv = r.Canon(rawV);
@@ -281,6 +314,8 @@ namespace CDriveCleaner
         {
             var sb = new StringBuilder("Windows Registry Editor Version 5.00\r\n\r\n; Elixar policy for every PC. Elixar shows these rules as \"Set by your organization\".\r\n[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Elixar]\r\n");
             foreach (var r in Rules) sb.Append('"').Append(r.Key).Append("\"=\"").Append(rules.ContainsKey(r.Key) ? rules[r.Key] : r.Default).Append("\"\r\n");
+            foreach (var kv in rules.Where(x => IsItemKey(x.Key) && x.Value != ItemRule.DefaultText).OrderBy(x => x.Key, StringComparer.Ordinal))
+                sb.Append('"').Append(kv.Key.Replace("\\", "\\\\").Replace("\"", "\\\"")).Append("\"=\"").Append(kv.Value).Append("\"\r\n");
             return sb.ToString();
         }
 
@@ -324,6 +359,9 @@ namespace CDriveCleaner
             return true;
         }
 
-        public static int Differences(Dictionary<string, string> rules) { return Rules.Count(r => rules.ContainsKey(r.Key) && rules[r.Key] != r.Default); }
+        public static int Differences(Dictionary<string, string> rules)
+        {
+            return Rules.Count(r => rules.ContainsKey(r.Key) && rules[r.Key] != r.Default) + rules.Count(kv => IsItemKey(kv.Key) && kv.Value != ItemRule.DefaultText);
+        }
     }
 }

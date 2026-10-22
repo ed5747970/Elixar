@@ -33,6 +33,7 @@ namespace CDriveCleaner
         public const string CleanTask = Folder + "Weekly clean";
         public const string MailTask = Folder + "Email reports";
         public const string TidyTask = Folder + "Daily tidy";
+        public const string PolicyCleanTask = Folder + "Policy cleaning";
         // schedules saved before the rename (version 1.3/1.4 was called "C Drive Cleaner")
         public const string OldFolder = @"C Drive Cleaner\";
         public static readonly string[] OldTasks = { OldFolder + "Low space check", OldFolder + "Low space check at sign-in", OldFolder + "Weekly clean" };
@@ -94,6 +95,12 @@ namespace CDriveCleaner
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
 
+        // every half hour, as administrator, through the launcher: it cleans only the items whose time has come (the policy decides)
+        public static string CreatePolicyCleanArgs(string exe)
+        {
+            return "/Create /F /TN " + Quote(PolicyCleanTask) + " /TR " + Quote(ElevatedAction(exe, "--policy-clean")) + " /SC MINUTE /MO 30 /RL HIGHEST";
+        }
+
         // ---------- the schedules, from the policy (Policy manager sets every time) ----------
         public class SchedStep { public string Task = "", What = "", Args = "", Time = "", Day = ""; public bool Remove; }
 
@@ -109,6 +116,7 @@ namespace CDriveCleaner
             step(TidyTask, "daily tidy", tidyOn, () => CreateTidyArgs(exe, tt), tt, "");
             step(CleanTask, "weekly clean", day != "off", () => CreateCleanArgs(exe, day, ct), ct, day);
             step(MailTask, "email reports", mailOn, () => CreateMailArgs(exe, mt), mt, "");
+            step(PolicyCleanTask, "policy cleaning", Policy.AnyAuto(), () => CreatePolicyCleanArgs(exe), "", "");
             return l;
         }
 
@@ -352,7 +360,7 @@ namespace CDriveCleaner
             // Windows' own update leftovers ($GetCurrent, $WinREAgent), and only when they are ticked: no update or upgrade is
             // running and nothing waits for a restart. They go to Undo first.
             // (Linux: only what runs as you; the system parts need your password, so they're never done unattended)
-            return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name)) && i.Tier <= Policy.MaxTier).ToList();
+            return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name)) && i.Tier <= Policy.MaxTier && !Policy.Never(i)).ToList();
         }
 
         public static int AutoClean(bool notify) { using (ChangeLog.In("Weekly clean")) return AutoCleanIn(notify); }

@@ -26,7 +26,7 @@ namespace CDriveCleaner
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
-            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb");
+            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean");
             if (Win.IsWindows)
             {
                 // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
@@ -68,7 +68,7 @@ namespace CDriveCleaner
                     "This is how the low-space alert looks. " + Fs.Fmt(Sys.Free()) + " is free on C: right now.", ToolTipIcon.Info, false);
                 return 0;
             }
-            if (args.Contains("--mail-daily") || args.Contains("--auto-clean") || args.Contains("--daily-tidy")) Install.HideLauncherWindow();
+            if (args.Contains("--mail-daily") || args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--policy-clean")) Install.HideLauncherWindow();
             if (args.Contains("--daily-tidy"))
             {
                 Application.EnableVisualStyles();
@@ -79,6 +79,11 @@ namespace CDriveCleaner
                 Application.EnableVisualStyles();
                 if (!Policy.Allowed("email")) return 0;   // the policy turned email off: no reports
                 return MailReports.Daily();
+            }
+            if (args.Contains("--policy-clean"))
+            {
+                Application.EnableVisualStyles();
+                return Policy.RunDue(m => Automation.Log(m));   // the items the policy cleans by themselves, when they are due
             }
             if (args.Contains("--auto-clean"))
             {

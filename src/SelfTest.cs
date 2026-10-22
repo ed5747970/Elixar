@@ -1602,7 +1602,7 @@ namespace CDriveCleaner
                                 // schedules: every time is set in the policy; Task Scheduler gets exactly those times
                                 Policy.Save(false, Policy.Defaults()); Policy.Load();
                                 var plan0 = Automation.Plan(@"C:\Program Files\Elixar\Elixar.exe", 15, false, false);
-                                bool sched = plan0.Count == 5 && plan0.All(x => x.Remove) && plan0.All(x => x.Args.StartsWith("/Delete"));
+                                bool sched = plan0.Count == 6 && plan0.All(x => x.Remove) && plan0.All(x => x.Args.StartsWith("/Delete"));
                                 var cs = Policy.Defaults(); cs["sched.check"] = "07:30"; cs["sched.logon"] = "on"; cs["sched.clean.day"] = "Sunday"; cs["sched.clean.time"] = "20:00";
                                 cs["sched.tidy"] = "03:00"; cs["sched.mail.time"] = "08:00"; cs["sched.mail.day"] = "Friday";
                                 Policy.Save(true, cs);
@@ -1637,7 +1637,57 @@ namespace CDriveCleaner
                                 if (!sched) pwhy += " [schedules]";
                                 work &= sched;
                                 Policy.SchedulesMoved = false; Policy.Save(false, Policy.Defaults());
+                                // cleaning items: what to do with each, when, and how old its files must be
+                                bool itemsOk = ItemRule.TryParse("auto|sunday|20:00|7") != null && ItemRule.TryParse("auto|Sunday|20:15|7") == null && ItemRule.TryParse("delete|daily|03:00|0") == null &&
+                                               ItemRule.TryParse("ask|daily|03:00|5") == null && ItemRule.Parse("auto|Sunday|20:00|7").ToString() == "auto|Sunday|20:00|7";
+                                var mon = new DateTime(2026, 10, 19, 10, 0, 0);   // a Monday
+                                itemsOk &= new ItemRule { Do = "auto", When = "daily", Time = "03:00" }.LastDue(mon) == new DateTime(2026, 10, 19, 3, 0, 0) &&
+                                           new ItemRule { Do = "auto", When = "daily", Time = "11:00" }.LastDue(mon) == new DateTime(2026, 10, 18, 11, 0, 0) &&
+                                           new ItemRule { Do = "auto", When = "Sunday", Time = "20:00" }.LastDue(mon) == new DateTime(2026, 10, 18, 20, 0, 0) &&
+                                           new ItemRule { Do = "auto", When = "Monday", Time = "12:00" }.LastDue(mon) == new DateTime(2026, 10, 12, 12, 0, 0) &&
+                                           new ItemRule { Do = "auto", When = "monthly", Time = "03:00" }.LastDue(mon) == new DateTime(2026, 10, 1, 3, 0, 0);
+                                var ci = Policy.Defaults(); ci[Policy.ItemKey("Thumbnail cache")] = "never|daily|03:00|0"; ci[Policy.ItemKey("Error reports")] = "auto|Sunday|20:00|7";
+                                ci[Policy.ItemKey("Bad=name")] = "auto|daily|03:00|0"; ci[Policy.ItemKey("Crash dumps")] = "auto|everyday|25:00|3";
+                                Policy.Save(true, ci); Policy.Load();
+                                itemsOk &= Policy.GetItem("Thumbnail cache").Do == "never" && Policy.GetItem("Error reports").Age == 7 && Policy.GetItem("Crash dumps").Do == "ask" && Policy.GetItem("Bad=name").Do == "ask" &&
+                                           Policy.AnyAuto() && !Automation.AutoItems().Any(i => i.Name == "Thumbnail cache") && Policy.Differences(Policy.Custom) == 2 &&
+                                           Automation.Plan(@"C:\x\Elixar.exe", 15, false, false).Any(x => x.Task == Automation.PolicyCleanTask && !x.Remove && x.Args.Contains("/SC MINUTE /MO 30") && x.Args.Contains("--policy-clean")) &&
+                                           ChangeLog.Read().Any(e => e.Action == "Policy: Error reports" && e.After.Contains("every sunday at 20:00") && e.After.Contains("older than 7 days"));
+                                var exi = Policy.ExportText(Policy.Custom); var imi = Policy.Import(exi);
+                                itemsOk &= imi.FingerprintOk && imi.Rules[Policy.ItemKey("Error reports")] == "auto|Sunday|20:00|7" && Policy.RegText(Policy.Custom).Contains("\"item:Thumbnail cache\"=\"never|daily|03:00|0\"") &&
+                                           Policy.Import("item:Temp files=auto|daily|03:00|9").Problems.Count > 0;
+                                // due: a new rule waits for its next time; then it runs once per time
+                                var cat = Catalog.Build(); var runs = new Dictionary<string, DateTime>(); bool firstSeen;
+                                var d1 = Policy.Due(cat, mon, runs, out firstSeen);
+                                itemsOk &= d1.Count == 0 && firstSeen && runs.ContainsKey("Error reports");
+                                runs["Error reports"] = mon.AddDays(-3);
+                                itemsOk &= Policy.Due(cat, mon, runs, out firstSeen).Select(i => i.Name).SequenceEqual(new[] { "Error reports" }) && !firstSeen;
+                                runs["Error reports"] = mon.AddHours(-1);
+                                itemsOk &= Policy.Due(cat, mon, runs, out firstSeen).Count == 0;
+                                // only files older than the limit: newer ones stay, also when moved to Undo
+                                string ad = Path.Combine(pd, "age"); Directory.CreateDirectory(Path.Combine(ad, "sub"));
+                                File.WriteAllBytes(Path.Combine(ad, "old.bin"), new byte[100]); File.SetLastWriteTimeUtc(Path.Combine(ad, "old.bin"), DateTime.UtcNow.AddDays(-10));
+                                File.WriteAllBytes(Path.Combine(ad, "new.bin"), new byte[50]);
+                                File.WriteAllBytes(Path.Combine(ad, "sub", "old2.bin"), new byte[30]); File.SetLastWriteTimeUtc(Path.Combine(ad, "sub", "old2.bin"), DateTime.UtcNow.AddDays(-10));
+                                File.WriteAllBytes(Path.Combine(ad, "sub", "new2.bin"), new byte[20]);
+                                long oldBytes = Fs.WithMinAge(7, () => Fs.MeasureIn(ad));
+                                var olds = new List<string>(); Fs.WithMinAge(7, () => { olds = Fs.OldOnly(new[] { ad }); return 0L; });
+                                Fs.WithMinAge(7, () => { Fs.ClearIn(ad); return 0L; });
+                                itemsOk &= oldBytes == 130 && olds.Count == 2 && olds.All(x => x.EndsWith("old.bin") || x.EndsWith("old2.bin")) &&
+                                           !File.Exists(Path.Combine(ad, "old.bin")) && !File.Exists(Path.Combine(ad, "sub", "old2.bin")) && File.Exists(Path.Combine(ad, "new.bin")) && File.Exists(Path.Combine(ad, "sub", "new2.bin"));
+                                var wrapped = cat.First(i => i.Name == "Error reports");
+                                itemsOk &= (wrapped.Info ?? "").Contains("older than 7 days");
+                                if (!itemsOk) pwhy += " [items]";
+                                work &= itemsOk;
                                 // the Policy manager tab, next to Logs
+                                var fi = new MainForm(true);
+                                bool itemUi = fi.PolicyItemRows > 10 && fi.CleanerRowTexts.Any(x => x.Contains("Thumbnail cache") && x.Contains("never") && !x.EndsWith("[x]")) && fi.PolicyItemWhenEnabled("Error reports") && !fi.PolicyItemWhenEnabled("Your temp files");
+                                fi.PolicySetItem("Your temp files", "auto|daily|04:30|1");
+                                itemUi &= fi.PolicyDirty && fi.PolicyItemWhenEnabled("Your temp files");
+                                fi.Dispose();
+                                if (!itemUi) pwhy += " [item tab]";
+                                work &= itemUi;
+                                Policy.Save(false, Policy.Defaults()); Policy.Custom = Policy.Defaults(); Policy.Save(false, Policy.Defaults());
                                 var f = new MainForm(true);
                                 pui = f.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && !f.PolicyComboEnabled("phone") && !f.PolicyDirty && f.PolicyStatusText.StartsWith(Lang.T("Default policy"));
                                 bool phoneBase = f.NavGreyed.Contains("Phone");   // on Linux the Phone tab is greyed out anyway
@@ -1664,7 +1714,7 @@ namespace CDriveCleaner
                             }
                             check(model, "Policy: Default is how Elixar works without a policy; Custom rules work, are written to Logs, and are kept when you switch back to Default; an organization's rule wins" + (model ? "" : pwhy));
                             check(files, "Policy: export and import take only known rules with allowed values, a changed file is noticed, and the .reg file for IT sets HKLM\\SOFTWARE\\Policies\\Elixar" + (files ? "" : pwhy));
-                            check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level, and every schedule runs at the time the policy sets (the times set in Automation move into the policy once, unchanged)" + (work ? "" : pwhy));
+                            check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level, every schedule runs at the time the policy sets (the times set in Automation move into the policy once, unchanged), and each cleaning item can be asked, cleaned by itself at its own time, or never touched, keeping files newer than its age limit" + (work ? "" : pwhy));
                             check(pui, "Policy: the Policy manager tab sits next to Logs, switches between Default and Custom, uses presets and imports, asks before making rules looser, and turns tabs off" + (pui ? "" : pwhy));
                         }
                     }

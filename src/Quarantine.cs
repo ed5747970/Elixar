@@ -365,6 +365,7 @@ namespace CDriveCleaner
         public static long MoveToUndo(string label, IEnumerable<string> paths, Action<string> log, int keepDays)
         {
             var list = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+            if (Fs.MinAgeDays > 0) list = Fs.OldOnly(list);   // the policy keeps newer files for this item
             if (list.Count == 0) return 0;
             var b = BeginFor(label, "files", list);
             b.Keep = Math.Max(1, Math.Min(365, keepDays));

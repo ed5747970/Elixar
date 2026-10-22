@@ -11,6 +11,10 @@ NEW IN 1.2.40
   which tools are allowed, required PIN. Export / import a policy file,
   or export a .reg for IT (HKLM\SOFTWARE\Policies\Elixar via Group Policy /
   Intune): those rules are locked as "Set by your organization".
+- Policy manager > Cleaning items: for every item in the Cleaner, by its
+  warning sign, choose Ask me, Clean it by itself (every day / week / month
+  at the time you pick) or Never touch it, and keep files newer than
+  1-90 days. Items cleaned by the policy are listed in Logs.
 - Schedules moved to Policy manager: the time of every action Elixar runs
   by itself (low-space check, weekly clean, daily tidy, email reports and
   the weekly summary day) is set there, and Task Scheduler follows when

@@ -19,6 +19,7 @@ namespace CDriveCleaner
         ComboBox polPreset;
         Button btnPolPreset, btnPolSave, btnPolDiscard, btnPolExport, btnPolImport, btnPolReg, btnPolFix;
         TableLayoutPanel polGrid;
+        TabControl polTabs;
         readonly Dictionary<string, ComboBox> polCombos = new Dictionary<string, ComboBox>();
         readonly Dictionary<string, Label> polMarks = new Dictionary<string, Label>();
         Dictionary<string, string> polEdit = Policy.Defaults();
@@ -74,7 +75,7 @@ namespace CDriveCleaner
             t.Controls.Add(presetRow, 0, 3);
 
             // the rules, grouped
-            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0, S(4), 0, S(4)), BorderStyle = BorderStyle.FixedSingle, BackColor = Theme.Panel };
+            var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0, S(4), 0, S(4)), BackColor = Theme.Panel };
             polGrid = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 4, Location = new Point(0, 0), Padding = new Padding(S(10), S(6), S(10), S(6)), BackColor = Theme.Panel };
             polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(380))); polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(270)));
             polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(240))); polGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -110,7 +111,15 @@ namespace CDriveCleaner
                 row++;
             }
             scroll.Controls.Add(polGrid);
-            t.Controls.Add(scroll, 0, 4);
+            // two pages: the rules, and what to do with each cleaning item
+            polTabs = new TabControl { Dock = DockStyle.Fill, Margin = new Padding(0, S(4), 0, S(4)) };
+            var pRules = new TabPage("Rules") { BackColor = Theme.Panel }; scroll.Margin = new Padding(0); pRules.Controls.Add(scroll);
+            var pItems = new TabPage("Cleaning items") { BackColor = Theme.Panel };
+            var scroll2 = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Panel };
+            var itemsGrid = BuildPolicyItems(); itemsGrid.Location = new Point(0, 0);
+            scroll2.Controls.Add(itemsGrid); pItems.Controls.Add(scroll2);
+            polTabs.TabPages.Add(pRules); polTabs.TabPages.Add(pItems);
+            t.Controls.Add(polTabs, 0, 4);
 
             var checkRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, S(2), 0, S(4)) };
             polCheck = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 9.5f), Margin = new Padding(S(2), S(7), S(10), 0), UseMnemonic = false, MaximumSize = new Size(S(900), 0) };
@@ -218,7 +227,9 @@ namespace CDriveCleaner
                              Lang.T(!polCustom ? "Elixar's own rules" : diff == 0 ? "same as Default" : diff == 1 ? "1 rule differs from Default" : diff + " rules differ from Default");
             polOrg.Text = org.Count == 0 ? "" : Lang.T(org.Count == 1 ? "1 rule is set by your organization and can't be changed here." : org.Count + " rules are set by your organization and can't be changed here.");
             polPreset.Enabled = btnPolPreset.Enabled = polCustom;
-            bool dirty = polCustom != Policy.UseCustom || Policy.Rules.Any(r => polEdit[r.Key] != (Policy.Custom.ContainsKey(r.Key) ? Policy.Custom[r.Key] : r.Default));
+            PolicyRefreshItems();
+            bool dirty = polCustom != Policy.UseCustom || Policy.Rules.Any(r => polEdit[r.Key] != (Policy.Custom.ContainsKey(r.Key) ? Policy.Custom[r.Key] : r.Default)) ||
+                         polEdit.Keys.Concat(Policy.Custom.Keys).Where(Policy.IsItemKey).Distinct().Any(k => ItemOf(polEdit, k) != ItemOf(Policy.Custom, k));
             btnPolSave.Enabled = btnPolDiscard.Enabled = dirty;
             var pinProbs = Policy.Check();
             var probs = pinProbs.Concat(polSchedDiff).ToList();
@@ -243,6 +254,9 @@ namespace CDriveCleaner
             // a PIN is needed to change the policy (the rule in force now decides)
             if (Policy.Get("pin.policy") == "on" && PinLock.IsSet && PolicyConfirmHook == null && !testMode)
                 if (!PinLock.Unlock(this)) return "";
+            var risky = items.Where(it => it.Tier != Tier.Safe && polCustom && ItemRule.Parse(ItemOf(target, Policy.ItemKey(it.Name))).Do == "auto" && Policy.GetItem(it.Name).Do != "auto").ToList();
+            if (risky.Count > 0 && PolAsk(Lang.T("These items will be cleaned by themselves, without asking each time:") + "\n\n" + string.Join("\n", risky.Select(it => "  - " + Lang.T(it.Name) + "  (" + Lang.T(it.Tier == Tier.Review ? "Check first" : "Can't be undone") + ")")) +
+                                          "\n\n" + Lang.T("They are not Safe items. Save the policy anyway?"), true) != DialogResult.Yes) return "";
             if (loosens && PolAsk(Lang.T("This makes the rules less strict. Save it?") + "\n\n" + Lang.T("Elixar writes every change to the policy in Logs."), true) != DialogResult.Yes) return "";
             var schedBefore = Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)).ToList();
             string err = Policy.Save(polCustom, polEdit);
@@ -378,6 +392,13 @@ namespace CDriveCleaner
         List<CleanItem> PolicyFilter(List<CleanItem> sel)
         {
             var max = Policy.MaxTier;
+            var never = sel.Where(Policy.Never).ToList();
+            if (never.Count > 0)
+            {
+                Log(Lang.T("Not cleaned (the policy says never touch them): ") + string.Join(", ", never.Select(i => Lang.T(i.Name))));
+                if (!testMode) Lang.Box(this, Lang.T("The policy says never touch these, so they are left out:") + "\n\n" + string.Join("\n", never.Select(i => "  - " + Lang.T(i.Name))), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                sel = sel.Except(never).ToList();
+            }
             var no = sel.Where(i => i.Tier > max).ToList();
             if (no.Count == 0) return sel;
             Log(Lang.T("Not cleaned (the policy doesn't allow them): ") + string.Join(", ", no.Select(i => Lang.T(i.Name))));
@@ -396,5 +417,107 @@ namespace CDriveCleaner
             if (r == DialogResult.Yes && PinForm.SetNew(this)) Log(Lang.T("A PIN or password now protects Elixar."));
             UpdatePinUi(); ApplyPolicyUi();
         }
+
+        // ================= Cleaning items: what to do with each one, when, and how old its files must be =================
+        class PolItemRow { public CleanItem Item; public ComboBox Do, When, Time, Age; public Label Mark; }
+        readonly List<PolItemRow> polItems = new List<PolItemRow>();
+
+        static string ItemOf(Dictionary<string, string> d, string key) { string v; return d.TryGetValue(key, out v) ? v : ItemRule.DefaultText; }
+
+        Control BuildPolicyItems()
+        {
+            var g = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 6, Padding = new Padding(S(10), S(14), S(10), S(10)), BackColor = Theme.Panel, Margin = new Padding(0) };
+            foreach (int w in new[] { 330, 190, 210, 90, 170 }) g.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(w)));
+            g.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            int row = 0;
+            Action<Control, int> add = (c, col) => g.Controls.Add(c, col, row);
+            g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var head = new Label { AutoSize = true, Text = "Cleaning items: what to do with each one", Font = new Font("Segoe UI Semibold", 11f), ForeColor = Theme.MapFore(Theme.Accent), Margin = new Padding(0, S(4), 0, S(2)) };
+            add(head, 0); g.SetColumnSpan(head, 6); row++;
+            g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var note = new Label { AutoSize = true, MaximumSize = new Size(S(1000), 0), ForeColor = Theme.Quiet, Margin = new Padding(0, 0, 0, S(6)),
+                                   Text = "Every item in the Cleaner, by its warning sign. Ask me: it waits for you, as now. Clean it by itself: Elixar cleans it on its own at the time you choose (it is checked every half hour, also after the PC was off). Never touch it: it can't be ticked or cleaned. Only files older than: newer files stay, also when you clean by hand (for items made of files)." };
+            add(note, 0); g.SetColumnSpan(note, 6); row++;
+            g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            foreach (var h in new[] { "Item", "What to do", "When", "Time", "Only files" })
+                add(new Label { AutoSize = true, Text = h, Font = new Font("Segoe UI Semibold", 9f), ForeColor = Theme.Quiet, Margin = new Padding(0, S(2), 0, S(4)) }, Array.IndexOf(new[] { "Item", "What to do", "When", "Time", "Only files" }, h));
+            row++;
+            string[] times = Enumerable.Range(0, 48).Select(i => (i / 2).ToString("00") + ":" + (i % 2 == 0 ? "00" : "30")).ToArray();
+            Func<CleanItem, int> order = it => it.Drive != null ? 4 : it.Privacy ? 3 : (int)it.Tier;
+            string group = null;
+            foreach (var it in items.OrderBy(order).ThenBy(i => Lang.T(i.Name)))
+            {
+                string grp = it.Drive != null ? "Drive " + it.Drive : it.Privacy ? "Privacy" : it.Tier == Tier.Safe ? "Safe" : it.Tier == Tier.Review ? "Check first" : "Can't be undone";
+                if (grp != group)
+                {
+                    group = grp;
+                    g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                    Color c = it.Privacy || it.Drive != null ? Theme.Ink : it.Tier == Tier.Safe ? SafeColor : it.Tier == Tier.Review ? ReviewColor : CautionColor;
+                    string sign = it.Drive != null ? "\u25A3 " : it.Privacy ? "\u25CF " : it.Tier == Tier.Safe ? "\u2714 " : it.Tier == Tier.Review ? "\u26A0 " : "\u26D4 ";
+                    var gh = new Label { AutoSize = true, Text = sign + Lang.T(grp), Font = new Font("Segoe UI Semibold", 10f), ForeColor = Theme.MapFore(c), Margin = new Padding(0, S(10), 0, S(4)) };
+                    add(gh, 0); g.SetColumnSpan(gh, 6); row++;
+                }
+                g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                var r = new PolItemRow { Item = it };
+                add(new Label { AutoSize = true, Text = Lang.T(it.Name), MaximumSize = new Size(S(320), 0), UseMnemonic = false, Margin = new Padding(0, S(6), S(8), S(4)) }, 0);
+                Func<int, object[], ComboBox> combo = (w, opts) => { var cb = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(w), Margin = new Padding(0, S(3), S(6), S(2)) }; cb.Items.AddRange(opts); return cb; };
+                r.Do = combo(180, ItemRule.DoLabels.Cast<object>().ToArray());
+                r.When = combo(200, ItemRule.WhenLabels.Cast<object>().ToArray());
+                r.Time = combo(80, times.Cast<object>().ToArray());
+                r.Age = combo(160, ItemRule.AgeLabels.Cast<object>().ToArray());
+                r.Mark = new Label { AutoSize = true, Margin = new Padding(S(4), S(7), 0, 0), Font = new Font("Segoe UI Semibold", 9f), UseMnemonic = false };
+                add(r.Do, 1); add(r.When, 2); add(r.Time, 3); add(r.Age, 4); add(r.Mark, 5);
+                var row_ = r;
+                EventHandler changed = (o, e) =>
+                {
+                    if (polFilling) return;
+                    var ir = new ItemRule { Do = ItemRule.Dos[Math.Max(0, row_.Do.SelectedIndex)], When = ItemRule.Whens[Math.Max(0, row_.When.SelectedIndex)],
+                                            Time = times[Math.Max(0, row_.Time.SelectedIndex)], Age = ItemRule.Ages[Math.Max(0, row_.Age.SelectedIndex)] };
+                    string k = Policy.ItemKey(row_.Item.Name);
+                    if (ir.ToString() == ItemRule.DefaultText) polEdit.Remove(k); else polEdit[k] = ir.ToString();
+                    PolicyRefresh();
+                };
+                r.Do.SelectedIndexChanged += changed; r.When.SelectedIndexChanged += changed; r.Time.SelectedIndexChanged += changed; r.Age.SelectedIndexChanged += changed;
+                polItems.Add(r);
+                row++;
+            }
+            return g;
+        }
+
+        void PolicyRefreshItems()
+        {
+            if (polItems.Count == 0) return;
+            var org = Policy.Org();
+            bool was = polFilling; polFilling = true;
+            string[] times = Enumerable.Range(0, 48).Select(i => (i / 2).ToString("00") + ":" + (i % 2 == 0 ? "00" : "30")).ToArray();
+            foreach (var r in polItems)
+            {
+                string k = Policy.ItemKey(r.Item.Name);
+                bool byOrg = org.ContainsKey(k);
+                var ir = ItemRule.Parse(byOrg ? org[k] : polCustom ? ItemOf(polEdit, k) : ItemRule.DefaultText);
+                r.Do.SelectedIndex = Array.IndexOf(ItemRule.Dos, ir.Do);
+                r.When.SelectedIndex = Array.IndexOf(ItemRule.Whens, ir.When);
+                r.Time.SelectedIndex = Math.Max(0, Array.IndexOf(times, ir.Time));
+                r.Age.SelectedIndex = Math.Max(0, Array.IndexOf(ItemRule.Ages, ir.Age));
+                bool edit = polCustom && !byOrg;
+                r.Do.Enabled = r.Age.Enabled = edit && ir.Do != "never";
+                r.Do.Enabled = edit;
+                r.When.Enabled = r.Time.Enabled = edit && ir.Do == "auto";
+                if (byOrg) { r.Mark.Text = "\uD83D\uDD12 " + Lang.T("Set by your organization"); r.Mark.ForeColor = Theme.MapFore(Color.FromArgb(150, 90, 0)); }
+                else if (ir.ToString() != ItemRule.DefaultText) { r.Mark.Text = "\u25CF " + Lang.T("Changed"); r.Mark.ForeColor = Theme.MapFore(Theme.Accent); }
+                else r.Mark.Text = "";
+            }
+            polFilling = was;
+        }
+
+        // for the self-test and previews
+        public void PolicySetItem(string name, string rule) { var r = polItems.First(x => x.Item.Name == name); var ir = ItemRule.Parse(rule);
+            r.Do.SelectedIndex = Array.IndexOf(ItemRule.Dos, ir.Do); r.When.SelectedIndex = Array.IndexOf(ItemRule.Whens, ir.When);
+            r.Time.SelectedIndex = ir.Time == "00:00" ? 0 : Array.IndexOf(Enumerable.Range(0, 48).Select(i => (i / 2).ToString("00") + ":" + (i % 2 == 0 ? "00" : "30")).ToArray(), ir.Time);
+            r.Age.SelectedIndex = Array.IndexOf(ItemRule.Ages, ir.Age); }
+        public int PolicyItemRows { get { return polItems.Count; } }
+        public bool PolicyItemWhenEnabled(string name) { return polItems.First(x => x.Item.Name == name).When.Enabled; }
+        public void PolicyShowItems() { polTabs.SelectedIndex = 1; }
+        public List<string> CleanerRowTexts { get { return list.Items.Cast<ListViewItem>().Select(i => i.Text + (i.Checked ? " [x]" : "")).ToList(); } }
     }
 }

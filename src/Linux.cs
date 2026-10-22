@@ -609,6 +609,7 @@ namespace CDriveCleaner
                 when = "OnCalendar=" + dd + " *-*-* " + st + ":00\nPersistent=true";
             }
             else if (sc == "ONLOGON") when = "OnStartupSec=3min";
+            else if (sc == "MINUTE") when = "OnCalendar=*:0/30\nPersistent=true";
             else return null;
             string timer = "[Unit]\nDescription=Elixar: " + tn.Replace(Automation.Folder, "") + "\n\n[Timer]\n" + when + "\n\n[Install]\nWantedBy=timers.target\n";
             return new[] { service, timer };

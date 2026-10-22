@@ -89,15 +89,88 @@ namespace CDriveCleaner
         public static long MeasureIn(string dir, string pattern = "*")
         {
             long t = 0;
-            foreach (var c in Children(dir, pattern)) t += SizeOf(c);
+            foreach (var c in Children(dir, pattern)) t += MinAgeDays > 0 ? OldSize(c, Cutoff) : SizeOf(c);
             return t;
         }
 
         // Deletes everything inside dir that matches pattern. The folder itself stays.
-        // Files that are in use are skipped.
+        // Files that are in use are skipped. With an age limit from the policy, only files older than it go.
         public static void ClearIn(string dir, string pattern = "*")
         {
-            foreach (var c in Children(dir, pattern)) Delete(c);
+            foreach (var c in Children(dir, pattern)) { if (MinAgeDays > 0) DeleteOld(c, Cutoff); else Delete(c); }
+        }
+
+        // ---- the policy's age limit for one item: "only files older than N days" ----
+        [ThreadStatic] public static int MinAgeDays;
+        static DateTime Cutoff { get { return DateTime.UtcNow.AddDays(-MinAgeDays); } }
+        public static long WithMinAge(int days, Func<long> work)
+        {
+            int was = MinAgeDays; MinAgeDays = days;
+            try { return work(); } finally { MinAgeDays = was; }
+        }
+
+        // a file older than the cutoff, or a folder with nothing newer in it (a link inside counts as new: it is left alone)
+        public static bool IsOld(string path, DateTime cutoffUtc)
+        {
+            try
+            {
+                if (File.Exists(path)) return File.GetLastWriteTimeUtc(path) < cutoffUtc;
+                if (!Directory.Exists(path)) return false;
+                var stack = new Stack<string>(); stack.Push(path);
+                while (stack.Count > 0)
+                {
+                    var di = new DirectoryInfo(stack.Pop());
+                    if ((di.Attributes & FileAttributes.ReparsePoint) != 0) return false;
+                    foreach (var f in di.EnumerateFiles()) if (f.LastWriteTimeUtc >= cutoffUtc || (f.Attributes & FileAttributes.ReparsePoint) != 0) return false;
+                    foreach (var d in di.EnumerateDirectories()) stack.Push(d.FullName);
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        static void DeleteOld(string path, DateTime cutoffUtc)
+        {
+            try
+            {
+                if (File.Exists(path)) { if (File.GetLastWriteTimeUtc(path) < cutoffUtc) Delete(path); return; }
+                if (!Directory.Exists(path) || (new DirectoryInfo(path).Attributes & FileAttributes.ReparsePoint) != 0) return;
+                if (IsOld(path, cutoffUtc)) { Delete(path); return; }
+                foreach (var c in Directory.GetFileSystemEntries(path)) DeleteOld(c, cutoffUtc);
+            }
+            catch { }
+        }
+
+        static long OldSize(string path, DateTime cutoffUtc)
+        {
+            try
+            {
+                if (File.Exists(path)) return File.GetLastWriteTimeUtc(path) < cutoffUtc ? new FileInfo(path).Length : 0;
+                if (!Directory.Exists(path) || (new DirectoryInfo(path).Attributes & FileAttributes.ReparsePoint) != 0) return 0;
+                long t = 0;
+                foreach (var c in Directory.GetFileSystemEntries(path)) t += OldSize(c, cutoffUtc);
+                return t;
+            }
+            catch { return 0; }
+        }
+
+        // the paths (or, inside a folder that has newer files, the files and folders) old enough to go
+        public static List<string> OldOnly(IEnumerable<string> paths)
+        {
+            var cutoff = Cutoff; var res = new List<string>();
+            Action<string> walk = null;
+            walk = p =>
+            {
+                try
+                {
+                    if (IsOld(p, cutoff)) { res.Add(p); return; }
+                    if (Directory.Exists(p) && (new DirectoryInfo(p).Attributes & FileAttributes.ReparsePoint) == 0)
+                        foreach (var c in Directory.GetFileSystemEntries(p)) walk(c);
+                }
+                catch { }
+            };
+            foreach (var p in paths) walk(p);
+            return res;
         }
 
         // Deletes a file or a whole folder. Junctions/symlinks are removed as links, never followed.

@@ -57,7 +57,7 @@ namespace CDriveCleaner
         public static readonly string[] Sections =
         {
             "Cleaner", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "Drivers", "Phone", "Move folders",
-            "System space", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Other"
+            "System space", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Other"
         };
 
         [ThreadStatic] static string scope;
@@ -80,6 +80,7 @@ namespace CDriveCleaner
         public static string Derive(Entry e)
         {
             string a = e.Action ?? "", d = e.Detail ?? "", t = e.Target ?? "", all = a + " | " + d + " | " + t, k = e.Kind ?? "";
+            if (a.StartsWith("Policy cleaning") || Hs(d, "Cleaned by the policy")) return "Policy cleaning";
             if (a.StartsWith("Policy")) return "Policy";
             if (Hs(a, "restore point")) return "Restore points";
             if (k == "Phone") return "Phone";
