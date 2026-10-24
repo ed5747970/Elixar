@@ -20,6 +20,11 @@ jobs:
             $lines = Get-Content build-log.txt | Where-Object { $_ -match 'error|FAIL|Exception|failed|throw' } | Select-Object -First 40
             if (-not $lines) { $lines = Get-Content build-log.txt | Select-Object -Last 20 }
             foreach ($l in $lines) { Write-Host ("::error::" + ($l -replace '%','%25' -replace "`r",'' -replace "`n",' ')) }
+            # a crash: Windows keeps the .NET error with its stack in the Application log (one annotation, newlines as %0A)
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = '.NET Runtime' } -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object {
+              $m = $_.Message; if ($m.Length -gt 6000) { $m = $m.Substring(0, 6000) }
+              Write-Host ("::error title=.NET crash::" + ($m -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'))
+            }
             exit 1
           }
         env:
