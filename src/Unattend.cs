@@ -266,8 +266,15 @@ namespace CDriveCleaner
         {
             if (string.IsNullOrEmpty(v)) return false;
             if (Regex.IsMatch(v, @"^[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}$")) return true;
-            try { var c = CultureInfo.GetCultureInfo(v); return c != null && !c.Equals(CultureInfo.InvariantCulture) && c.Name.Equals(v, StringComparison.OrdinalIgnoreCase); } catch { return false; }
+            // only languages Windows really knows: Windows 10 and later make up a culture for any well-formed name ("xx-YY")
+            return KnownCultures.Value.Contains(v);
         }
+        static readonly Lazy<HashSet<string>> KnownCultures = new Lazy<HashSet<string>>(() =>
+        {
+            var h = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try { foreach (var c in CultureInfo.GetCultures(CultureTypes.AllCultures)) if (!string.IsNullOrEmpty(c.Name) && (c.CultureTypes & CultureTypes.UserCustomCulture) == 0) h.Add(c.Name); } catch { }
+            return h;
+        });
 
         public static List<UnattendProblem> Check(UnattendSpec s)
         {

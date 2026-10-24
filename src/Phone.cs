@@ -755,11 +755,13 @@ namespace CDriveCleaner
 
         // copies one file (phone path or normal path) into a PC folder; true when the copy is there at full size
         // copies one file into root (keeping the iPhone's folders), the same careful way as for Android
+        public static string LastError;   // why the last copy didn't work (for the self-test's report)
         public static bool CopyTo(string itemPath, string name, long bytes, string root, string folder)
         {
-            if (!PhoneBackup.PlainName(name)) return false;
+            LastError = null;
+            if (!PhoneBackup.PlainName(name)) { LastError = "not a plain name"; return false; }
             string box = PhoneBackup.Box(root);
-            if (box == null) return false;
+            if (box == null) { LastError = "no safe folder to copy into"; return false; }
             try
             {
                 string target = Path.Combine(box, name);
@@ -770,11 +772,15 @@ namespace CDriveCleaner
                     op.PerformOperations();
                     return !op.GetAnyOperationsAborted();
                 });
-                if (!ok || !File.Exists(target) || (bytes > 0 && new FileInfo(target).Length != bytes)) return false;
+                if (!ok || !File.Exists(target) || (bytes > 0 && new FileInfo(target).Length != bytes))
+                {
+                    LastError = !ok ? "Windows stopped the copy" : !File.Exists(target) ? "the copy isn't there" : "the copy has the wrong size (" + new FileInfo(target).Length + ")";
+                    return false;
+                }
                 PhoneBackup.Deliver(target, PhoneBackup.LocalFor(root, folder), name);
                 return true;
             }
-            catch { return false; }
+            catch (Exception e) { LastError = e.GetType().Name + ": " + e.Message; return false; }
             finally { PhoneBackup.Unbox(root, box); }
         }
 

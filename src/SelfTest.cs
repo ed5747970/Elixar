@@ -505,12 +505,13 @@ namespace CDriveCleaner
                         File.WriteAllBytes(Path.Combine(isrc, "100APPLE", "IMG_0002.HEIC"), new byte[1000]);
                         var media = IPhone.ListMedia(isrc, 100000, null);
                         check(media.Count == 1 && media[0].Name == "IMG_0001.MOV" && media[0].Bytes == 300000 && media[0].Folder == "DCIM/100APPLE",
-                              "iPhone: Windows' shell lists photos and videos with their sizes");
+                              "iPhone: Windows' shell lists photos and videos with their sizes" + (media.Count == 1 && media[0].Bytes == 300000 ? "" :
+                              "  (" + media.Count + " found: " + string.Join(", ", media.Select(m => m.Name + " " + m.Bytes + " " + m.Folder)) + ")"));
                         bool copied = IPhone.CopyTo(media[0].Path, media[0].Name, media[0].Bytes, idst, media[0].Folder);
                         bool deleted = copied && IPhone.Delete(media[0].Path) && !File.Exists(Path.Combine(isrc, "100APPLE", "IMG_0001.MOV"));
                         string icopy = Path.Combine(Path.Combine(Path.Combine(idst, "DCIM"), "100APPLE"), "IMG_0001.MOV");
                         check(copied && deleted && File.Exists(icopy) && new FileInfo(icopy).Length == 300000 && !Directory.Exists(Path.Combine(idst, PhoneBackup.Incoming)),
-                              "iPhone: copy, check and delete work without pop-ups (through a protected folder)");
+                              "iPhone: copy, check and delete work without pop-ups (through a protected folder)" + (copied && deleted ? "" : "  (copied " + copied + ", deleted " + deleted + (IPhone.LastError != null ? ": " + IPhone.LastError : "") + ")"));
                         IPhone.Found ip = null; Exception ipe = null;
                         try { ip = IPhone.Find(); } catch (Exception e) { ipe = e; }
                         check(ipe == null, "iPhone: looking for an iPhone works" + (ip != null ? " (found " + ip.Name + (ip.Error != null ? ", " + ip.Error : "") + ")" : " (none plugged in)") + (ipe != null ? " ERROR: " + ipe.Message : ""));
@@ -1188,14 +1189,15 @@ namespace CDriveCleaner
                     {
                         string hp = Path.Combine(root, "hold"), hf = Path.Combine(hp, "inner", "f.txt");
                         Directory.CreateDirectory(Path.GetDirectoryName(hf)); File.WriteAllText(hf, "x");
-                        bool blocked = false, freed = false;
+                        bool blocked = false, freed = false; string holdWhy = "";
                         using (var hold = SafeDelete.HoldParents(hf))
                         {
-                            try { Directory.Move(Path.Combine(hp, "inner"), Path.Combine(hp, "swapped")); } catch (IOException) { blocked = true; } catch (UnauthorizedAccessException) { blocked = true; }
+                            if (hold == null) holdWhy = "nothing held";
+                            try { Directory.Move(Path.Combine(hp, "inner"), Path.Combine(hp, "swapped")); holdWhy += " moved while held"; } catch (IOException) { blocked = true; } catch (UnauthorizedAccessException) { blocked = true; }
                             if (hold == null) blocked = false;
                         }
                         try { Directory.Move(Path.Combine(hp, "inner"), Path.Combine(hp, "swapped")); freed = true; } catch { }
-                        check(blocked && freed, "Security: while a duplicate goes to the Recycle Bin, the folders above it can't be swapped for a link");
+                        check(blocked && freed, "Security: while a duplicate goes to the Recycle Bin, the folders above it can't be swapped for a link" + (blocked && freed ? "" : "  (" + holdWhy.Trim() + (freed ? "" : " still held after") + ")"));
                     }
                 } catch (Exception ex) { check(false, "Security review tests stopped: " + ex.GetType().Name + ": " + ex.Message); Imap.OpenOverride = null; }
 
@@ -1279,8 +1281,17 @@ namespace CDriveCleaner
                         form.DiskHealthDone += () => { diskDone = true; maybeClose(); };
                         form.StoreDone += () => form.ShowUndo();
                         form.Shown += (o, e) => { form.RefreshApps(); form.ShowStoreTab(); };
-                        var timeout = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
-                        timeout.Tick += (o, e) => { timeout.Stop(); form.Close(); };
+                        var timeout = new System.Windows.Forms.Timer { Interval = 12 * 60 * 1000 };   // a PC with many apps and a full C: takes a while
+                        timeout.Tick += (o, e) =>
+                        {
+                            timeout.Stop();
+                            var waiting = new List<string>();
+                            if (scans < 2) waiting.Add("scans " + scans); if (!dashDone) waiting.Add("dashboard"); if (!appsDone) waiting.Add("apps"); if (!storeDone) waiting.Add("store apps");
+                            if (!undoDone) waiting.Add("undo"); if (!phoneDone) waiting.Add("phone"); if (!startDone) waiting.Add("startup"); if (!moveDone) waiting.Add("move");
+                            if (!diskDone) waiting.Add("disk health"); if (!overDone) waiting.Add("overview"); if (!driveDone) waiting.Add("drives");
+                            uiErr = "timed out after " + timeout.Interval / 60000 + " minutes waiting for: " + string.Join(", ", waiting);
+                            form.Close();
+                        };
                         timeout.Start();
                         Application.Run(form);
                         timeout.Dispose();
