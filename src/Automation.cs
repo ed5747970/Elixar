@@ -365,6 +365,38 @@ namespace CDriveCleaner
             return Catalog.Build().Where(i => i.DefaultOn && i.RootScript == null && (i.Tier == Tier.Safe || AutoLeftovers.Contains(i.Name)) && i.Tier <= Policy.MaxTier && !Policy.Never(i)).ToList();
         }
 
+        public static int SavedPercent()
+        {
+            try { var t = Query(CheckTask); if (!t.Exists) t = Query(LogonTask); return PercentFromArgs(t.Arguments, 15); } catch { return 15; }
+        }
+
+        public static List<string> ApplySchedules(int pct, Action<string> log)
+        {
+            var errors = new List<string>();
+            var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();
+            bool mailOn = MailAccount.Email != null && (mp.Alerts || mp.Summary) && Policy.Allowed("email");
+            var plan = Plan(Application.ExecutablePath, pct, tidy.AnyDaily, mailOn);
+            if (plan.Any(s => !s.Remove))
+            {
+                // schedules always start the protected copy in Program Files, which only administrators can change
+                string ierr = Install.Ensure();
+                if (ierr != null) { errors.Add("Elixar could not put its protected copy in " + Install.Dir + ": " + ierr + ". The schedules were not changed."); return errors; }
+                plan = Plan(Install.Exe, pct, tidy.AnyDaily, mailOn);
+            }
+            foreach (var s in plan)
+            {
+                if (s.Remove && !Query(s.Task).Exists) continue;   // nothing to remove
+                string outp;
+                int code = RunSchtasks(s.Args, out outp);
+                if (code != 0) errors.Add(s.What + ": " + outp);
+                if (log != null) log((code == 0 ? "Saved: " : "Could not save: ") + s.What + (s.Remove || s.Time.Length == 0 ? "" : " (" + (s.Day.Length > 0 ? s.Day + " " : "") + s.Time + ")") + (code == 0 ? "" : " (" + outp + ")"));
+            }
+            // clean up schedules left from the old name
+            foreach (var oldTask in OldTasks)
+                if (Query(oldTask).Exists) { string o2; if (RunSchtasks(DeleteArgs(oldTask), out o2) == 0 && log != null) log("Removed old schedule: " + oldTask); }
+            return errors;
+        }
+
         public static int AutoClean(bool notify) { using (ChangeLog.In("Weekly clean")) return AutoCleanIn(notify); }
         static int AutoCleanIn(bool notify)
         {
@@ -736,31 +768,8 @@ namespace CDriveCleaner
         // puts Task Scheduler in line with the policy: each schedule at the policy's time, or removed. Returns what didn't work.
         public List<string> ApplySchedules(Action<string> log)
         {
-            var errors = new List<string>();
-            if (testMode) return errors;
-            int pct = AlertPercent();
-            var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();
-            bool mailOn = MailAccount.Email != null && (mp.Alerts || mp.Summary) && Policy.Allowed("email");
-            var plan = Automation.Plan(Application.ExecutablePath, pct, tidy.AnyDaily, mailOn);
-            if (plan.Any(s => !s.Remove))
-            {
-                // schedules always start the protected copy in Program Files, which only administrators can change
-                string ierr = Install.Ensure();
-                if (ierr != null) { errors.Add("Elixar could not put its protected copy in " + Install.Dir + ": " + ierr + ". The schedules were not changed."); return errors; }
-                plan = Automation.Plan(Install.Exe, pct, tidy.AnyDaily, mailOn);
-            }
-            foreach (var s in plan)
-            {
-                if (s.Remove && !Automation.Query(s.Task).Exists) continue;   // nothing to remove
-                string outp;
-                int code = Automation.RunSchtasks(s.Args, out outp);
-                if (code != 0) errors.Add(s.What + ": " + outp);
-                if (log != null) log((code == 0 ? "Saved: " : "Could not save: ") + s.What + (s.Remove || s.Time.Length == 0 ? "" : " (" + (s.Day.Length > 0 ? s.Day + " " : "") + s.Time + ")") + (code == 0 ? "" : " (" + outp + ")"));
-            }
-            // clean up schedules left from the old name
-            foreach (var oldTask in Automation.OldTasks)
-                if (Automation.Query(oldTask).Exists) { string o2; if (Automation.RunSchtasks(Automation.DeleteArgs(oldTask), out o2) == 0 && log != null) log("Removed old schedule: " + oldTask); }
-            return errors;
+            if (testMode) return new List<string>();
+            return Automation.ApplySchedules(AlertPercent(), log);
         }
 
         // once, when Elixar starts as administrator: the schedules from Automation move into the policy;
@@ -771,6 +780,7 @@ namespace CDriveCleaner
             {
                 if (!Policy.Moved && Policy.MoveSchedules(Automation.Query, MailPrefs.Load().Day))
                     UI(() => { Log(Lang.T("Your schedules moved to Policy manager (Custom policy), with the same times as before.")); PolicyLoadUi(); ShowScheduleText(); });
+                if (!testMode && !LinuxUi && Tweaks.ApplyPolicy(m => UI(() => Log(m))) > 0) UI(() => { if (pageTweaks != null) RefreshTweaks(); });
                 if (Policy.Org().Keys.Any(k => Policy.IsSchedule(k) || Policy.IsItemKey(k)))
                 {
                     var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();

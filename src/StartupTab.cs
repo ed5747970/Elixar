@@ -16,6 +16,7 @@ namespace CDriveCleaner
         ListView startList; Label startStatus;
         Button btnStartOff, btnStartOn, btnStartLeft, btnStartScan, btnStartOpen, btnStartRefresh;
         bool startBusy, startLoaded;
+        StartupImpactData startImpact;
         public event Action StartupDone;
         static readonly Color DangerColor = Color.FromArgb(199, 54, 47);
 
@@ -27,7 +28,7 @@ namespace CDriveCleaner
             startStatus = Note("Everything that starts by itself when you sign in. Elixar checks who signed each program and where it runs from. " +
                                "Turning one off works like Task Manager's Startup tab and can be turned back on any time.");
             startList = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
-            startList.Columns.Add("Program", S(220)); startList.Columns.Add("Starts", S(60)); startList.Columns.Add("Check", S(430));
+            startList.Columns.Add("Program", S(220)); startList.Columns.Add("Starts", S(60)); startList.Columns.Add("Slows startup by", S(130)); startList.Columns.Add("Check", S(400));
             startList.Columns.Add("File", S(380)); startList.Columns.Add("Where", S(200));
             startList.ItemChecked += (o, e) => UpdateStartButtons();
             var row = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, S(6), 0, 0) };
@@ -71,9 +72,17 @@ namespace CDriveCleaner
             if (startBusy) return;
             startBusy = true; startLoaded = true; UpdateStartButtons();
             startStatus.Text = "Reading startup programs and checking their signatures...";
-            Task.Factory.StartNew(() => StartupApps.Read(true), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            StartupImpactData impact = null;
+            Task.Factory.StartNew(() =>
+            {
+                var read = Task.Factory.StartNew(() => { try { impact = StartupImpact.Read(); } catch { } });
+                var list = StartupApps.Read(true);
+                read.Wait(70000);
+                return list;
+            }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 startBusy = false;
+                startImpact = impact;
                 if (t.IsFaulted) startStatus.Text = "Could not read startup programs: " + t.Exception.GetBaseException().Message;
                 else ShowStartupList(t.Result);
                 UpdateStartButtons();
@@ -93,6 +102,10 @@ namespace CDriveCleaner
                 var g = e.Flag == StartupFlag.Leftover ? gLeft : e.Flag == StartupFlag.Ok ? gOk : gLook;
                 var r = new ListViewItem(e.Name) { Tag = e, Group = g, UseItemStyleForSubItems = false, ToolTipText = e.Command };
                 r.SubItems.Add(e.Enabled ? "On" : "Off").ForeColor = e.Enabled ? Color.Black : Color.Gray;
+                var imp = startImpact == null ? null : startImpact.For(e.File);
+                var si = r.SubItems.Add(StartupImpact.Words(imp));
+                si.ForeColor = imp == null ? Color.Gray : imp.AvgMs >= 3000 ? DangerColor : imp.AvgMs >= 1000 ? CautionColor : Color.Black;
+                if (imp != null) r.ToolTipText = e.Command + "\n" + Lang.T("Windows saw it slow startup " + imp.Times + " times in 90 days, the last on " + imp.Last.ToString("d MMM")) + ".";
                 var c = r.SubItems.Add(e.Why);
                 c.ForeColor = e.Flag == StartupFlag.Danger ? DangerColor : e.Flag == StartupFlag.Ok ? SafeColor : CautionColor;
                 r.SubItems.Add(e.File);
@@ -105,7 +118,8 @@ namespace CDriveCleaner
             startStatus.Text = list.Count + " programs start with Windows (" + list.Count(x => x.Enabled) + " turned on). " +
                 (danger + review + left == 0 ? "All are signed by known publishers." :
                  (danger > 0 ? danger + " look unusual, " : "") + (review > 0 ? review + " are not signed, " : "") + (left > 0 ? left + " are leftovers. " : "") +
-                 "Not signed doesn't mean harmful: many small tools aren't signed. Turn off what you don't recognise, or scan it with Microsoft Defender.");
+                 "Not signed doesn't mean harmful: many small tools aren't signed. Turn off what you don't recognise, or scan it with Microsoft Defender.") +
+                (startImpact != null && startImpact.Boots.Count > 0 ? "\n" + StartupImpact.Summary(startImpact) + " \"Slows startup by\" is what Windows measured when that program made startup slower than usual." : "");
         }
 
         void SwitchStartup(bool on)

@@ -52,7 +52,7 @@ namespace CDriveCleaner
         public static DialogResult Show(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, int defaultButton)
         {
             if (!Enabled) return MessageBox.Show(owner, text, caption, buttons, icon, defaultButton == 1 ? MessageBoxDefaultButton.Button2 : MessageBoxDefaultButton.Button1,
-                                                 Lang.Hebrew ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0);
+                                                 Lang.Rtl ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0);
             using (var f = new NiceBox(text ?? "", string.IsNullOrEmpty(caption) ? "Elixar" : caption, buttons, icon, defaultButton))
             {
                 if (TestHook != null) return TestHook(f);
@@ -78,7 +78,7 @@ namespace CDriveCleaner
             Font = new Font("Segoe UI", 9.75f);
             BackColor = Theme.Panel; ForeColor = Theme.Ink;
             KeyPreview = true;
-            if (Lang.Hebrew) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
+            if (Lang.Rtl) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
 
             Color tone = icon == MessageBoxIcon.Error ? Theme.Danger : icon == MessageBoxIcon.Warning ? Theme.MapFore(Color.FromArgb(196, 120, 0)) : Theme.Accent;
             DangerStyle = (icon == MessageBoxIcon.Warning || icon == MessageBoxIcon.Error) && buttons != MessageBoxButtons.OK;

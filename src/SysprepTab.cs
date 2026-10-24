@@ -114,7 +114,7 @@ namespace CDriveCleaner
                 b.Click += (o, e) => SysprepFix(c);
                 card.Controls.Add(b, 2, 0);
             }
-            card.Paint += (o, e) => { using (var p = new Pen(Theme.Grid)) e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1); using (var br = new SolidBrush(tone)) e.Graphics.FillRectangle(br, Lang.Hebrew ? card.Width - S(4) : 0, 0, S(4), card.Height); };
+            card.Paint += (o, e) => { using (var p = new Pen(Theme.Grid)) e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1); using (var br = new SolidBrush(tone)) e.Graphics.FillRectangle(br, Lang.Rtl ? card.Width - S(4) : 0, 0, S(4), card.Height); };
             return card;
         }
 

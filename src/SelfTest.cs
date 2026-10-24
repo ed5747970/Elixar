@@ -1751,6 +1751,8 @@ namespace CDriveCleaner
                             check(xmlSafe && saveSafe && sqlSafe, "Hardening: task XML can't pull in other files, a Save box never writes the unsafe way, and a damaged password database is refused" +
                                   (xmlSafe && saveSafe && sqlSafe ? "" : "  (" + xmlSafe + "/" + saveSafe + "/" + sqlSafe + ")"));
                         }
+                        // 1.2.50: app updates, space map, safe-to-delete, tweaks, uninstall + leftovers, startup impact, savings, fleet, command line, languages, sponsor
+                        SelfTest1250.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

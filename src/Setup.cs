@@ -39,10 +39,17 @@ namespace CDriveCleaner
             };
         }
 
+        // installed by the MSI (IT): Windows Installer owns the Start menu entry and the installed-apps entry
+        public static bool ByMsi
+        {
+            get { try { using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) using (var k = hklm.OpenSubKey(@"Software\Elixar\Msi")) return k != null; } catch { return false; } }
+        }
+
         public static string InstallHere(Action<string> log)
         {
             string err = Install.Ensure();
             if (err != null) return err;
+            if (ByMsi) { if (log != null) log("Elixar was installed with its MSI: the Start menu and the installed-apps entry come from Windows Installer."); return null; }
             try
             {
                 var v = Updates.Current;
@@ -66,15 +73,17 @@ namespace CDriveCleaner
         }
 
         // removes the schedules, Start menu entry, apps-list entry and the Program Files copy; your Undo backups stay until they expire
-        public static int Uninstall(bool quiet)
+        public static int Uninstall(bool quiet) { return Uninstall(quiet, false); }
+        // msi: run by the MSI while it uninstalls; Windows Installer removes the files and the Start menu entry itself
+        public static int Uninstall(bool quiet, bool msi)
         {
             if (!quiet && Lang.Box(null, "Remove Elixar from this PC?\n\nThe schedules, the Start menu entry and the copy in Program Files are removed. Undo backups are kept until their 7 days are up.",
                     "Elixar", System.Windows.Forms.MessageBoxButtons.OKCancel, System.Windows.Forms.MessageBoxIcon.Question) != System.Windows.Forms.DialogResult.OK) return 1;
             string o;
-            foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask, Automation.TidyTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
+            foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask, Automation.TidyTask, Automation.PolicyCleanTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
             try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
             try { MicrosoftAuth.SignOut(); OtherMail.Forget(); MailAccount.Disconnect(); } catch { }
-            try { File.Delete(StartMenuLink); } catch { }
+            if (!msi) try { File.Delete(StartMenuLink); } catch { }
             try
             {
                 using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
@@ -86,7 +95,7 @@ namespace CDriveCleaner
             }
             catch { }
             // the running file can't delete itself: Windows removes the folder a moment after Elixar closes
-            try
+            if (!msi) try
             {
                 // full paths and System32 as the working folder: a "ping" in the current folder would otherwise run as administrator;
                 // /d: cmd skips the AutoRun commands any program can set for your account

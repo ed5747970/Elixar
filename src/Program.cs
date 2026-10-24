@@ -26,7 +26,7 @@ namespace CDriveCleaner
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
-            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean");
+            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean") || Cli.IsCli(args) || args.Contains("--msi");
             if (Win.IsWindows)
             {
                 // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
@@ -91,6 +91,11 @@ namespace CDriveCleaner
                 return Automation.AutoClean(true);
             }
 
+            if (Cli.IsCli(args))
+            {
+                if (droppedEnv.Count > 0) { Console.WriteLine("Elixar: started with .NET settings that load extra code; not running."); return 1; }
+                return Cli.Run(args);
+            }
             bool testUi = args.Contains("--test");
             bool noElevate = testUi || args.Contains("--no-elevate") || !Win.IsWindows;
             if (Lx.IsRoot && !testUi)
@@ -150,7 +155,7 @@ namespace CDriveCleaner
 
             int au = Array.IndexOf(args, "--apply-update");
             if (au >= 0 && au + 2 < args.Length) { int pid; int.TryParse(args[au + 2], out pid); return Updates.Apply(args[au + 1], pid); }
-            if (args.Contains("--uninstall")) { Application.EnableVisualStyles(); return Setup.Uninstall(args.Contains("--quiet")); }
+            if (args.Contains("--uninstall")) { Application.EnableVisualStyles(); return Setup.Uninstall(args.Contains("--quiet"), args.Contains("--msi")); }
             if (args.Contains("--install"))
             {
                 Application.EnableVisualStyles();

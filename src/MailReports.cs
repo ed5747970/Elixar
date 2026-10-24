@@ -176,7 +176,7 @@ namespace CDriveCleaner
 
         static IEnumerable<string[]> Rows(IEnumerable<CleanItem> items, int max, string note)
         {
-            return items.Where(i => i.Size > (1L << 20)).OrderByDescending(i => i.Size).Take(max).Select(i => new[] { Lang.T(i.Name), Fs.Fmt(i.Size), note });
+            return items.Where(i => i.Size > (1L << 20)).OrderByDescending(i => i.Size).Take(max).Select(i => new[] { Lang.MailT(i.Name), Fs.Fmt(i.Size), note });
         }
 
         static void WhatToDelete(Doc d, List<CleanItem> items)
@@ -205,14 +205,14 @@ namespace CDriveCleaner
                 long ch = free - weekAgo.Free;
                 d.Big(L("Change in a week", "שינוי בשבוע"), (ch >= 0 ? "+" : "-") + Fs.Fmt(Math.Abs(ch)), ch < -(1L << 30) ? "#be6900" : "#18202b");
             }
-            if (fc.Text.Length > 0) d.P(Lang.T(fc.Text));
+            if (fc.Text.Length > 0) d.P(Lang.MailT(fc.Text));
         }
 
         static void DiskLines(Doc d, DiskReport r)
         {
             if (r == null || r.Error != null || r.Disks.Count == 0) return;
             d.Heading(L("Disk health", "בריאות הכוננים"));
-            d.Table(r.Disks.Select(x => new[] { x.Label, Lang.T(DiskHealth.LevelText(x.Level)),
+            d.Table(r.Disks.Select(x => new[] { x.Label, Lang.MailT(DiskHealth.LevelText(x.Level)),
                 (x.LifeLeft >= 0 ? L(x.LifeLeft + "% life left", "נותרו " + x.LifeLeft + "% חיים") : "") + (x.Temp > 0 ? (x.LifeLeft >= 0 ? ", " : "") + x.Temp + " °C" : "") }));
         }
 
@@ -238,8 +238,8 @@ namespace CDriveCleaner
             if (w.Count == 0) return;
             d.Heading(L("Keep an eye on", "במעקב"));
             d.P(L("These folders keep growing. Look at them as often as shown, in Elixar > Dashboard > Watch.", "התיקיות האלה ממשיכות לגדול. בדקו אותן בתדירות שמוצגת, ב-Elixar > לוח בקרה > במעקב."));
-            d.Table(w.Take(5).Select(x => new[] { Lang.T(x.Name), "+" + Fs.Fmt(Math.Max(0, x.PerMonth)) + L(" a month", " בחודש"),
-                                                  x.Due ? L("look now (" + Growth.EveryText(x.EveryDays) + ")", "לבדוק עכשיו (" + Lang.T(Growth.EveryText(x.EveryDays)) + ")")
+            d.Table(w.Take(5).Select(x => new[] { Lang.MailT(x.Name), "+" + Fs.Fmt(Math.Max(0, x.PerMonth)) + L(" a month", " בחודש"),
+                                                  x.Due ? L("look now (" + Growth.EveryText(x.EveryDays) + ")", "לבדוק עכשיו (" + Lang.MailT(Growth.EveryText(x.EveryDays)) + ")")
                                                         : L("next look " + x.NextCheck.ToString("d MMM"), "הבדיקה הבאה " + x.NextCheck.ToString("d.M")) }));
         }
 
@@ -251,12 +251,12 @@ namespace CDriveCleaner
             d.Big(L("Freed", "התפנו"), Fs.Fmt(freed), "#007d46");
             d.Big(L("Free on C: now", "פנוי ב-C: עכשיו"), Fs.Fmt(free) + " (" + Pct(free, total) + ")", "#18202b");
             d.Heading(L("What was cleaned", "מה נוקה"));
-            d.Table(results.Where(r => r.Skipped == null && r.Freed > 0).OrderByDescending(r => r.Freed).Select(r => new[] { Lang.T(r.Name), Fs.Fmt(r.Freed), "" }));
+            d.Table(results.Where(r => r.Skipped == null && r.Freed > 0).OrderByDescending(r => r.Freed).Select(r => new[] { Lang.MailT(r.Name), Fs.Fmt(r.Freed), "" }));
             var skipped = results.Where(r => r.Skipped != null).ToList();
             if (skipped.Count > 0)
             {
                 d.Heading(L("Skipped", "דולגו"));
-                d.Table(skipped.Select(r => new[] { Lang.T(r.Name), "", r.Skipped }));
+                d.Table(skipped.Select(r => new[] { Lang.MailT(r.Name), "", r.Skipped }));
             }
             if (left != null) WhatToDelete(d, left.Where(i => i.Tier != Tier.Safe || !i.DefaultOn).ToList());
             return d;
@@ -277,9 +277,9 @@ namespace CDriveCleaner
             var x = r.Disks.First(k => k.Level == w);
             var d = new Doc(w == HealthLevel.Failing ? L("A drive may fail soon: back up now", "כונן עלול להיכשל בקרוב: גבו עכשיו") : L("A drive needs attention", "כונן דורש תשומת לב"),
                             w == HealthLevel.Failing ? "#c7362f" : "#be6900");
-            d.P(x.Label + " - " + Lang.T(DiskHealth.LevelText(w)));
-            d.Table(x.Reasons.Select(s => new[] { Lang.T(s), "", "" }));
-            d.P(L("What to do: ", "מה לעשות: ") + Lang.T(x.Advice));
+            d.P(x.Label + " - " + Lang.MailT(DiskHealth.LevelText(w)));
+            d.Table(x.Reasons.Select(s => new[] { Lang.MailT(s), "", "" }));
+            d.P(L("What to do: ", "מה לעשות: ") + Lang.MailT(x.Advice));
             DiskLines(d, r);
             return d;
         }

@@ -58,8 +58,8 @@ namespace CDriveCleaner
                 // only when Elixar is the window in front and no other question is open
                 if (IsDisposed || !Visible || WindowState == FormWindowState.Minimized || Form.ActiveForm != this || cleaningNow) { nudgeDone = false; return; }
                 if (MailAccount.Email != null) return;
-                var r = NiceBox.ShowWith(this, MailNudge.Text(Lang.T), Lang.T("Get more from Elixar"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information, 0,
-                                         new[] { Lang.T("Connect email..."), Lang.T("Not now"), Lang.T("Don't ask again") });
+                var r = NiceBox.ShowWith(this, MailNudge.Text(Lang.T), Lang.MailT("Get more from Elixar"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information, 0,
+                                         new[] { Lang.MailT("Connect email..."), Lang.MailT("Not now"), Lang.MailT("Don't ask again") });
                 Settings.Set("MailNudge", MailNudge.After(state, r, DateTime.Today));
                 if (r == DialogResult.Yes) OpenMailSettings();
             };

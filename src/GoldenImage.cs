@@ -814,7 +814,7 @@ namespace CDriveCleaner
         {
             Func<string, string> T = Lang.T;
             var sb = new StringBuilder();
-            sb.Append("<!DOCTYPE html><html lang=\"").Append(Lang.Hebrew ? "he\" dir=\"rtl" : "en").Append("\"><head><meta charset=\"utf-8\"><title>")
+            sb.Append("<!DOCTYPE html><html lang=\"").Append(Lang.Code + (Lang.Rtl ? "\" dir=\"rtl" : "")).Append("\"><head><meta charset=\"utf-8\"><title>")
               .Append(H(T("Image passport") + " - " + d.Computer)).Append("</title><style>")
               .Append("body{font-family:'Segoe UI',Arial,sans-serif;margin:24px;color:#1d2433;background:#fff}h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:22px 0 6px;border-bottom:1px solid #dde2ea;padding-bottom:4px}")
               .Append(".q{color:#6b7280}table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:4px 8px;border-bottom:1px solid #eef1f5;text-align:start;vertical-align:top}th{background:#f4f6f9}")

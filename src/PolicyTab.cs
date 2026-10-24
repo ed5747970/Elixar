@@ -122,7 +122,7 @@ namespace CDriveCleaner
             var scroll3 = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Panel };
             var foldersGrid = BuildPolicyFolders(); foldersGrid.Location = new Point(0, 0);
             scroll3.Controls.Add(foldersGrid); pFolders.Controls.Add(scroll3);
-            polTabs.TabPages.Add(pRules); polTabs.TabPages.Add(pFolders); polTabs.TabPages.Add(pItems);
+            polTabs.TabPages.Add(pRules); polTabs.TabPages.Add(pFolders); polTabs.TabPages.Add(pItems); polTabs.TabPages.Add(BuildPolicyFleet());
             t.Controls.Add(polTabs, 0, 4);
 
             var checkRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, S(2), 0, S(4)) };
@@ -270,6 +270,9 @@ namespace CDriveCleaner
             PolicyLoadUi();
             // new times: Task Scheduler follows right away
             if (!schedBefore.SequenceEqual(Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)).Concat(new[] { Policy.AnyAuto().ToString() }))) { ShowScheduleText(); ShowMailWhen(); PolicyApplySchedules(); }
+            // the Windows tweaks the policy now fixes are set right away
+            if (!testMode && !LinuxUi && Tweaks.ApplyPolicy(Log) > 0) RefreshTweaks();
+            else if (pageTweaks != null) RefreshTweaks();
             // a rule now asks for a PIN that isn't set
             if (!testMode && PolicyConfirmHook == null && Policy.Check().Count > 0 && !PinLock.IsSet &&
                 PolAsk(Lang.T("The policy needs a PIN or password. Set one now?"), false) == DialogResult.Yes && PinForm.SetNew(this)) { UpdatePinUi(); PolicyRefresh(); }
@@ -285,7 +288,8 @@ namespace CDriveCleaner
                 case "clean.restore": return v == "always" ? 1 : 0;
                 case "pin.open": return v == "required" ? 1 : 0;
                 case "pin.policy": return v == "on" ? 1 : 0;
-                default: return v == "block" ? 1 : 0;
+                default:
+                    if (r.Key.StartsWith("tweak.")) return v == "choice" ? 0 : 1; return v == "block" ? 1 : 0;
             }
         }
 

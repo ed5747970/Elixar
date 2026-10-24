@@ -49,7 +49,7 @@ namespace CDriveCleaner
         public static bool IsSchedule(string key) { return key.StartsWith("sched."); }
 
         // the Default values are exactly how Elixar works without a policy, so nothing changes until you choose a stricter rule
-        public static readonly PolicyRule[] Rules =
+        public static readonly PolicyRule[] Rules = new[]
         {
             R("clean.level", "Cleaning", "What the Cleaner may delete", "Safe items are always fine; Check first and Can't be undone items need a look first.", "everything",
               "everything", "Everything (each clean asks first)", "review", "Safe and Check first", "safe", "Safe only"),
@@ -62,6 +62,7 @@ namespace CDriveCleaner
             R("low.clean", "Undo and Recycle Bin", "Safe clean by itself when C: is low", "At most once a day, when C: drops under the alert limit.", "choice",
               "choice", "Your choice (Automation)", "on", "Always on", "off", "Always off"),
             R("apps.remove", "What Elixar may change", "Remove apps", "Apps tab: uninstallers and built-in or Store apps.", "allow", Allow),
+            R("apps.update", "What Elixar may change", "Update apps", "Apps > Updates: newer versions through Windows' package manager (winget).", "allow", Allow),
             R("startup.change", "What Elixar may change", "Change startup programs", "Tools > Startup: turn programs on or off, remove leftovers.", "allow", Allow),
             R("drivers.remove", "What Elixar may change", "Remove drivers", "Tools > Drivers: old and unused driver packages.", "allow", Allow),
             R("phone", "What Elixar may change", "Phone tools", "The Phone tab: clean, move files and remove apps on a phone.", "allow", Allow),
@@ -80,7 +81,8 @@ namespace CDriveCleaner
             R("sched.mail.time", "Schedule: when each action runs", "Email reports time", "Alerts are checked and reports sent at this time (when email reports are on).", "09:00", Times(null, null, "")),
             R("sched.mail.day", "Schedule: when each action runs", "Weekly email summary day", "The day the weekly summary is sent.", "Sunday",
               "Monday", "Monday", "Tuesday", "Tuesday", "Wednesday", "Wednesday", "Thursday", "Thursday", "Friday", "Friday", "Saturday", "Saturday", "Sunday", "Sunday"),
-        };
+        }.Concat(Tweaks.All.Select(t => R(Tweaks.PolicyKey(t), "Windows tweaks", t.Name, t.Help, "choice",
+              "choice", "Your choice (Tools > Windows tweaks)", "on", "Always on", "off", "Always Windows' default"))).ToArray();
 
         public static PolicyRule Rule(string key) { return Rules.FirstOrDefault(r => r.Key == key); }
         public static Dictionary<string, string> Defaults() { return Rules.ToDictionary(r => r.Key, r => r.Default); }
@@ -98,6 +100,7 @@ namespace CDriveCleaner
                 case "Deep clean":
                     s("clean.restore", "always"); s("undo.days", "7"); s("bin.days", "30"); s("low.clean", "on"); break;
                 case "Golden image (IT)":
+                    foreach (var t in Tweaks.All) s(Tweaks.PolicyKey(t), "on");
                     s("clean.restore", "never"); s("undo.days", "7"); s("bin.days", "off"); s("low.clean", "off"); s("phone", "block"); s("email", "block"); s("pin.policy", "on"); break;
                 case "Locked down (shared PC)":
                     s("clean.level", "safe"); s("clean.restore", "always"); s("apps.remove", "block"); s("startup.change", "block"); s("drivers.remove", "block");

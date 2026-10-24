@@ -21,7 +21,7 @@ $gid = "$env:ELIXAR_GOOGLE_ID".Trim(); $gsec = "$env:ELIXAR_GOOGLE_SECRET".Trim(
 if ($gid -and -not $gid.EndsWith(".apps.googleusercontent.com")) { throw "ELIXAR_GOOGLE_ID doesn't look like a Google client ID" }
 $msid = "$env:ELIXAR_MS_ID".Trim()
 if ($msid -and -not ($msid -as [guid])) { throw "ELIXAR_MS_ID must be the Application (client) ID" }
-[IO.File]::WriteAllText($cfg, "repo=$($env:GITHUB_REPOSITORY)`nkey=$key`ngoogle-id=$gid`ngoogle-secret=$gsec`nms-id=$msid", (New-Object Text.UTF8Encoding $false))
+[IO.File]::WriteAllText($cfg, "repo=$($env:GITHUB_REPOSITORY)`nkey=$key`ngoogle-id=$gid`ngoogle-secret=$gsec`nms-id=$msid`nsponsor=$($env:ELIXAR_SPONSOR)", (New-Object Text.UTF8Encoding $false))
 
 $refs = "System.dll","System.Core.dll","System.Drawing.dll","System.Windows.Forms.dll","Microsoft.VisualBasic.dll","System.Xml.dll",
         "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll","System.Security.dll" | ForEach-Object { "/r:$_" }

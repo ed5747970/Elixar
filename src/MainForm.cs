@@ -222,7 +222,14 @@ namespace CDriveCleaner
             BuildApps();
             BuildStoreApps();
             appsTabs.TabPages.Add(pageStore);
-            appsTabs.SelectedIndexChanged += (o, e) => { if (appsTabs.SelectedTab == pageStore && !storeLoaded) RefreshStoreApps(); };
+            BuildAppUpdates();
+            if (!LinuxUi) appsTabs.TabPages.Add(pageUpdates);
+            bool updChecked = false;
+            appsTabs.SelectedIndexChanged += (o, e) =>
+            {
+                if (appsTabs.SelectedTab == pageStore && !storeLoaded) RefreshStoreApps();
+                if (appsTabs.SelectedTab == pageUpdates && !updChecked && !testMode) { updChecked = true; CheckAppUpdates(); }
+            };
             BuildAutomation();
             BuildTools();
             BuildPhone();
@@ -567,7 +574,7 @@ namespace CDriveCleaner
             dashHeader = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = "Drive C:", Margin = new Padding(0) };
             statusTail = Lang.T("Waiting for the first scan...");
             // one line that never wraps: when the window is narrow it ends with "..." (the whole text is in the tooltip)
-            dashStatus = new Label { AutoSize = false, AutoEllipsis = true, Dock = DockStyle.Fill, Height = S(24), TextAlign = Lang.Hebrew ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft,
+            dashStatus = new Label { AutoSize = false, AutoEllipsis = true, Dock = DockStyle.Fill, Height = S(24), TextAlign = Lang.Rtl ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft,
                                      ForeColor = Color.DimGray, Text = StatusText(), Margin = new Padding(S(2), S(4), S(12), 0), UseMnemonic = false };
             var statusTip = new ToolTip();
             dashStatus.TextChanged += (o, e) => statusTip.SetToolTip(dashStatus, dashStatus.Text);
@@ -696,7 +703,17 @@ namespace CDriveCleaner
                 miUninstall.Enabled = owner != null && !testMode;
                 miUninstall.Text = owner != null ? "Uninstall " + owner + "..." : "Uninstall app (this file does not belong to a removable app)";
             };
+            menu.Items.Add("Is this safe to delete?", null, (o, e) => { if (filesList.SelectedItems.Count > 0) ExplainPath((string)filesList.SelectedItems[0].Tag); });
             filesList.ContextMenuStrip = menu;
+            var dmenu = new ContextMenuStrip();
+            dmenu.Items.Add("Is this safe to delete?", null, (o, e) => { if (dashList.SelectedItems.Count > 0) ExplainPath(((DashLoc)dashList.SelectedItems[0].Tag).Path); });
+            dmenu.Items.Add("Open", null, (o, e) =>
+            {
+                if (dashList.SelectedItems.Count == 0) return;
+                var d = (DashLoc)dashList.SelectedItems[0].Tag;
+                if (Directory.Exists(d.Path)) OpenDrill(d.Path); else if (File.Exists(d.Path)) { try { Shell.Select(d.Path); } catch { } }
+            });
+            dashList.ContextMenuStrip = dmenu;
             filesList.DoubleClick += (o, e) => ShowSelectedFile();
 
             // Details: the drive bar, the four levels, every location and the largest files
@@ -741,7 +758,7 @@ namespace CDriveCleaner
 
         public DrillForm OpenDrill(string path)
         {
-            var f = new DrillForm(path, s, Icon, OwnerName, p => UninstallOwner(p));
+            var f = new DrillForm(path, s, Icon, OwnerName, p => UninstallOwner(p), p => ExplainPath(p));
             f.Shown += (o, e) => { Theme.Apply(f); Lang.Apply(f); Theme.Watch(f); };
             f.Show(this);
             return f;

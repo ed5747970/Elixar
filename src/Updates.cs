@@ -41,6 +41,19 @@ namespace CDriveCleaner
             }
         }
         public static string Repo { get { string v; return Config.TryGetValue("repo", out v) ? v : ""; } }
+
+        // the Sponsor button: GitHub Sponsors of the repository's owner, or a "sponsor=" link in the build's config (only these sites)
+        public static string SponsorUrl { get { string v; return SponsorFrom(Repo, Config.TryGetValue("sponsor", out v) ? v : null); } }
+        public static string SponsorFrom(string repo, string sponsor)
+        {
+            if (sponsor != null)
+            {
+                string v = sponsor.Trim();
+                if (System.Text.RegularExpressions.Regex.IsMatch(v, @"^https://(github\.com/sponsors|ko-fi\.com|www\.buymeacoffee\.com)/[A-Za-z0-9_-]{1,64}/?$")) return v;
+            }
+            var m = System.Text.RegularExpressions.Regex.Match(repo ?? "", @"^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))/[A-Za-z0-9._-]{1,100}$");
+            return m.Success ? "https://github.com/sponsors/" + m.Groups[1].Value : null;
+        }
         public static string ConfigValue(string key) { string v; return Config.TryGetValue(key, out v) ? v : ""; }
         public static string PublicKey { get { string v; return Config.TryGetValue("key", out v) ? v : ""; } }
         public static bool Configured { get { return Repo.Contains("/") && PublicKey.Contains("<Modulus>"); } }

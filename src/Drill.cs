@@ -92,7 +92,7 @@ namespace CDriveCleaner
         readonly Func<int, int> S;
         readonly Label crumb, status;
         readonly ListView list;
-        readonly Button btnUp, btnOpen, btnExplorer, btnUninstall;
+        readonly Button btnUp, btnOpen, btnExplorer, btnUninstall, btnExplain;
         readonly Func<string, string> ownerName;
         readonly Action<string> uninstall;
         CancellationTokenSource cts;
@@ -104,7 +104,7 @@ namespace CDriveCleaner
         static readonly Color ReviewColor = Color.FromArgb(40, 90, 200);
         static readonly Color SafeColor = Color.FromArgb(0, 125, 70);
 
-        public DrillForm(string startPath, float scale, Icon icon, Func<string, string> ownerName = null, Action<string> uninstall = null)
+        public DrillForm(string startPath, float scale, Icon icon, Func<string, string> ownerName = null, Action<string> uninstall = null, Action<string> explain = null)
         {
             this.ownerName = ownerName;
             this.uninstall = uninstall;
@@ -140,7 +140,18 @@ namespace CDriveCleaner
             btnExplorer = MkButton("Show in Explorer");
             btnUninstall = MkButton("Uninstall app...");
             btnUninstall.Enabled = false;
-            buttons.Controls.AddRange(new Control[] { btnUp, btnOpen, btnExplorer, btnUninstall,
+            btnExplain = MkButton("Is this safe to delete?");
+            btnExplain.Visible = explain != null;
+            btnExplain.Click += (o, e) =>
+            {
+                var sel = list.SelectedItems.Count > 0 ? (DrillEntry)list.SelectedItems[0].Tag : null;
+                if (explain != null) explain(sel != null && !sel.IsGroup ? sel.Path : current);
+            };
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Is this safe to delete?", null, (o, e) => btnExplain.PerformClick());
+            menu.Items.Add("Show in Explorer", null, (o, e) => btnExplorer.PerformClick());
+            if (explain != null) list.ContextMenuStrip = menu;
+            buttons.Controls.AddRange(new Control[] { btnUp, btnOpen, btnExplorer, btnExplain, btnUninstall,
                 new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(10), S(8), 0, 0), Text = "Read-only: nothing is deleted from here." } });
 
             root.Controls.Add(crumb, 0, 0);

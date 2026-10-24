@@ -370,7 +370,7 @@ namespace CDriveCleaner
             if (a == null || testMode || Policy.Blocked(this, "apps.remove")) return;
             var ok = Lang.Box(this,
                 "Uninstall " + a.Name + "?\n\nThis opens the app's own uninstaller (the same one Windows uses). Follow its steps.\n" +
-                "Size: " + Fs.Fmt(a.Size) + "\n\nWhen it has finished, click Refresh.",
+                "Size: " + Fs.Fmt(a.Size) + "\n\nWhen it has finished, Elixar looks for the folders it left behind and asks before moving them to Undo.",
                 "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
             if (ok != DialogResult.OK) return;
             try
@@ -404,8 +404,9 @@ namespace CDriveCleaner
                     Process.Start(cmd);
                 }
                 Log("Started the uninstaller for " + a.Name + (a.PerUser ? " (with your normal rights)." : "."));
+                WatchUninstall(a);
                 ChangeLog.Add("Apps", "Started the uninstaller", a.Name, "installed", "", a.Uninstall + (a.PerUser ? " (run with your normal rights)" : ""), false);
-                appsStatus.Text = "Uninstaller for " + a.Name + " started. When it has finished, click Refresh.";
+                appsStatus.Text = "Uninstaller for " + a.Name + " started. When it has finished, Elixar looks for what it left behind.";
             }
             catch (Exception ex)
             {

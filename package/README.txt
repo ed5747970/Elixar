@@ -1,7 +1,33 @@
-ELIXAR  (version 1.2.41)
+ELIXAR  (version 1.2.50)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.50
+- Tools > Space map: the whole drive as boxes as big as the space they
+  take, coloured by warning sign. Double-click to go inside; "Is this safe
+  to delete?", Open in Explorer and Move to Undo (never Critical folders).
+- "Is this safe to delete?": right-click a Dashboard location, a large file
+  or a folder in Explore for a plain answer (never / only with the right
+  tool / your decision / yes), what it is and the right way to remove it.
+  Web search sends only the folder's name, never the path.
+- Tools > Windows tweaks: switch off ads and suggested apps, tips, Bing in
+  Start's search, Copilot, extra diagnostic data and background Store
+  apps. Every value goes into Logs with its old value (undo from there);
+  Policy manager can fix each tweak on or off.
+- Apps > Updates: newer versions through Windows' winget, quietly, logged.
+- Uninstall + leftovers in one step: after an app's uninstaller finishes,
+  Elixar finds the folders it left behind and asks before moving them to
+  Undo.
+- Tools > Startup: "Slows startup by" from Windows' own measurements, and
+  how long the last startups took.
+- Dashboard: how much Elixar has freed on this PC in all.
+- Languages: Arabic, Russian and Spanish for the main screens.
+- For IT: a command line (Elixar.exe --help), an MSI (Elixar-1.2.50.msi,
+  msiexec /i ... /qn) and Policy manager > Fleet report (each PC writes a
+  small status file with --report into a shared folder).
+- Sponsor button in Settings (shows once Elixar is published on GitHub).
+- Fixed: uninstalling Elixar now also removes the policy cleaning schedule.
 
 NEW IN 1.2.41
 - Policy manager > Folders: the Dashboard's folders by their warning sign

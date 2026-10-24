@@ -85,6 +85,7 @@ namespace CDriveCleaner
         public SpaceHistory.Forecast Forecast;
         public bool DiskChecked; public HealthLevel Disk = HealthLevel.Unknown; public int DiskCount;
         public DateTime? LastClean; public long LastCleanBytes; public bool LastCleanAuto;
+        public long SavedTotal;   // everything Elixar freed on this PC (Savings)
         public bool AutoKnown, AutoClean, AutoAlert; public string AutoDay = "";
         public bool TidyOn, TidyLow; public int TidyDays;   // auto-delete (the daily tidy)
         public string MailEmail; public bool MailReports; public int MailLevel;
@@ -168,18 +169,24 @@ namespace CDriveCleaner
     // small text helpers shared by the overview
     public static class Ui
     {
-        static CultureInfo he;
+        static CultureInfo culture; static string cultureOf;
         public static CultureInfo Culture
         {
             get
             {
-                if (!Lang.Hebrew) return CultureInfo.InvariantCulture;
-                if (he == null) { try { he = new CultureInfo("he-IL"); } catch { he = CultureInfo.InvariantCulture; } }
-                return he;
+                if (!Lang.On) return CultureInfo.InvariantCulture;
+                if (cultureOf != Lang.Code)
+                {
+                    // Gregorian dates in every language (plain "ar" would use another calendar)
+                    string name = Lang.Code == "he" ? "he-IL" : Lang.Code == "ar" ? "ar-AE" : Lang.Code == "ru" ? "ru-RU" : "es-ES";
+                    try { culture = new CultureInfo(name); if (!(culture.Calendar is GregorianCalendar)) culture.DateTimeFormat.Calendar = new GregorianCalendar(); } catch { culture = CultureInfo.InvariantCulture; }
+                    cultureOf = Lang.Code;
+                }
+                return culture;
             }
         }
         public static string Month(DateTime d) { return d.ToString("MMMM yyyy", Culture); }
-        public static string ShortMonth(DateTime d) { return Lang.Hebrew ? d.ToString("MM/yyyy", CultureInfo.InvariantCulture) : d.ToString("MMM yyyy", CultureInfo.InvariantCulture); }
+        public static string ShortMonth(DateTime d) { return Lang.On ? d.ToString("MM/yyyy", CultureInfo.InvariantCulture) : d.ToString("MMM yyyy", CultureInfo.InvariantCulture); }
 
         public static string Ago(DateTime t, DateTime now)
         {
@@ -777,7 +784,7 @@ namespace CDriveCleaner
                 string cap = Lang.T(caps[i]);
                 tiles[i] = new TileCard
                 {
-                    Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Kind = !LinuxUi ? TileKinds[i] : LinuxTileKinds[i], Caption = Lang.Hebrew ? cap : cap.ToUpperInvariant(),
+                    Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Kind = !LinuxUi ? TileKinds[i] : LinuxTileKinds[i], Caption = Lang.On ? cap : cap.ToUpperInvariant(),
                     Value = "...", Accent = Theme.Accent, CapFont = capFont, ValueFont = valFont, AccessibleName = cap
                 };
                 int k = i;
@@ -950,6 +957,7 @@ namespace CDriveCleaner
                                 .Concat(runs.Select(x => Tuple.Create(x.Item1, x.Item2, true))).OrderByDescending(x => x.Item1).FirstOrDefault();
                 if (cleans != null) { sum.LastClean = cleans.Item1; sum.LastCleanBytes = cleans.Item2; sum.LastCleanAuto = cleans.Item3; }
                 sum.Recent = Activity.Recent(6, own, runs, undo, MailStatus.LastSent, MailStatus.LastWhat);
+                try { sum.SavedTotal = Savings.Read().Bytes; } catch { }
                 return sum;
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
@@ -1068,7 +1076,7 @@ namespace CDriveCleaner
             }
 
             if (!m.LastClean.HasValue) tile(2, "Not yet", "Clean once to start the record", CautionColor);
-            else tile(2, Ui.Ago(m.LastClean.Value, m.Now), "Freed " + Fs.Fmt(m.LastCleanBytes) + (m.LastCleanAuto ? " (weekly clean)" : ""),
+            else tile(2, Ui.Ago(m.LastClean.Value, m.Now), "Freed " + Fs.Fmt(m.LastCleanBytes) + (m.LastCleanAuto ? " (weekly clean)" : "") + (m.SavedTotal > m.LastCleanBytes ? " \u00B7 " + Fs.Fmt(m.SavedTotal) + " in all" : ""),
                       (m.Now - m.LastClean.Value).TotalDays > 30 ? CautionColor : SafeColor);
 
             if (LinuxUi) tile(3, m.AutoClean ? "Weekly clean on" : "Off", m.AutoClean ? "Every " + m.AutoDay : "Set it up in Automation", m.AutoClean ? SafeColor : Theme.Accent);

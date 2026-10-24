@@ -124,6 +124,78 @@ namespace CDriveCleaner
             return newest;
         }
 
+        // ---------------- right after an uninstall: what that one app left behind ----------------
+        public static string StripVersion(string name)
+        {
+            string s = Regex.Replace(name ?? "", @"\s*\((x64|x86|64-bit|32-bit|[a-z]{2}-[a-z]{2}|remove only)\)", "", RegexOptions.IgnoreCase);
+            s = Regex.Replace(s, @"\s+v?\d+(\.\d+)+.*$", "");
+            s = Regex.Replace(s, @"\s+(x64|x86|64-bit|32-bit)$", "", RegexOptions.IgnoreCase);
+            return s.Trim();
+        }
+
+        public static List<string> NamesOf(AppEntry a)
+        {
+            var l = new List<string> { N(a.Name), N(StripVersion(a.Name)) };
+            try { if (!string.IsNullOrEmpty(a.Location)) l.Add(N(Path.GetFileName(a.Location.TrimEnd('\\', '/')))); } catch { }
+            return l.Where(x => x.Length >= 4 && !Never.Contains(x)).Distinct().ToList();
+        }
+
+        public static Func<List<string[]>> ProgramRootsOverride;   // self-test
+        static List<string[]> ProgramRoots()
+        {
+            if (ProgramRootsOverride != null) return ProgramRootsOverride();
+            var r = new List<string[]>();
+            if (!Win.IsWindows) return r;
+            foreach (var f in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 })
+            {
+                string p = Environment.GetFolderPath(f);
+                if (!string.IsNullOrEmpty(p) && !r.Any(x => string.Equals(x[0], p, StringComparison.OrdinalIgnoreCase))) r.Add(new[] { p, Path.GetFileName(p) });
+            }
+            return r;
+        }
+
+        // folders named after the app (or after its publisher, then the app inside it) that nothing still installed uses
+        public static List<Leftover> ForApp(AppEntry a, List<string> stillInUse)
+        {
+            var names = NamesOf(a);
+            var found = new List<Leftover>();
+            if (names.Count == 0) return found;
+            var others = new HashSet<string>(stillInUse.Select(N).Where(x => x.Length >= 3));
+            string pub = N(a.Publisher);
+            Action<string, string> consider = (d, where) =>
+            {
+                try
+                {
+                    if (found.Any(f => string.Equals(f.Path, d, StringComparison.OrdinalIgnoreCase) || DashData.Inside(d, f.Path))) return;
+                    var di = new DirectoryInfo(d);
+                    if (!di.Exists || (di.Attributes & (FileAttributes.ReparsePoint | FileAttributes.System)) != 0 || Protect.IsProtected(d)) return;
+                    if (others.Contains(N(di.Name))) return;   // another app, service or running program still has this name
+                    found.Add(new Leftover { Path = di.FullName, Where = where, Bytes = Fs.SizeOf(di.FullName), LastChange = Directory.GetLastWriteTime(di.FullName) });
+                }
+                catch { }
+            };
+            // where the app said it was installed
+            if (!string.IsNullOrEmpty(a.Location))
+            {
+                string loc = a.Location.Trim().Trim('"').TrimEnd('\\', '/');
+                bool deepEnough = loc.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries).Length >= 3;   // never a drive or Program Files itself
+                if (deepEnough && names.Contains(N(Path.GetFileName(loc)))) consider(loc, "Install folder");
+            }
+            foreach (var root in ProgramRoots().Concat(Roots()))
+            {
+                string[] dirs;
+                try { dirs = Directory.GetDirectories(root[0]); } catch { continue; }
+                foreach (var d in dirs)
+                {
+                    string n = N(Path.GetFileName(d));
+                    if (names.Contains(n)) consider(d, root[1]);
+                    else if (pub.Length >= 3 && n == pub && !Never.Contains(n))
+                        try { foreach (var inner in Directory.GetDirectories(d)) if (names.Contains(N(Path.GetFileName(inner)))) consider(inner, root[1] + "\\" + Path.GetFileName(d)); } catch { }
+                }
+            }
+            return found.OrderByDescending(f => f.Bytes).ToList();
+        }
+
         public static Func<List<string[]>> RootsOverride;   // previews
         public static List<string[]> Roots()
         {

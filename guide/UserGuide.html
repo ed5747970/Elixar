@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.41</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.50</p></div>
 </div></header>
 <main class="wrap">
 
@@ -55,7 +55,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#it">For IT</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -164,8 +164,18 @@
 </table>
 <p>Nothing is ticked for you, a restore point is made first, and removed apps can be reinstalled from the Microsoft Store. You can also reach removal from other tabs: &ldquo;Remove apps...&rdquo; on the Dashboard and Cleaner, right-click in Largest files, and &ldquo;Uninstall &lt;app&gt;...&rdquo; in the folder drill-down.</p>
 
+<h3>Updates</h3>
+<p>Apps &gt; Updates lists apps with a newer version, using Windows&rsquo; own package manager (winget, part of &ldquo;App Installer&rdquo;). <strong>Update selected</strong> or <strong>Update all</strong> runs each app&rsquo;s own installer quietly; close the apps first. Each update is written in Logs. Policy manager can switch this off (Update apps).</p>
+<h3>Uninstall and leftovers in one step</h3>
+<p>After an app&rsquo;s own uninstaller finishes, Elixar notices Windows no longer lists it and looks for the folders it left behind: named after the app (or inside its publisher&rsquo;s folder) in Program Files, ProgramData and AppData, and not used by anything still installed. It shows the list and asks before moving them to Undo, so they can be put back.</p>
 <h2 id="tools">Tools</h2>
-<p>The Tools tab has seven inner tabs for deeper jobs.</p>
+<p>The Tools tab has inner tabs for deeper jobs.</p>
+<h3>Space map</h3>
+<p>Click <strong>Map this drive</strong>: Elixar reads the drive once and draws every folder as a box as big as the space it takes, coloured by its warning sign (red Critical, orange Caution, purple Review, green Safe, blue for folders the Dashboard doesn&rsquo;t list). Double-click a box to go inside, <strong>Back up a level</strong> to go up. Links and junctions are never followed, so nothing is counted twice. Click a box, then <strong>Is this safe to delete?</strong> for a plain answer, <strong>Open in Explorer</strong>, or <strong>Move to Undo...</strong> (never for Critical or Windows&rsquo; own folders; asks first; kept in Tools &gt; Undo). The Dashboard&rsquo;s Folder map opens it too.</p>
+<h3>Is this safe to delete?</h3>
+<p>Right-click a location on the Dashboard, a file in Largest files, or a folder in Explore (or use the Space map&rsquo;s button): a small window says <em>No - never</em>, <em>Only with the right tool</em>, <em>Your decision</em> or <em>Yes - rebuilt automatically</em>, with what it is, what happens if it goes, and the right way to remove it. The answers come from Elixar&rsquo;s own list on this PC. <strong>Search the web for it</strong> opens a search with only the folder&rsquo;s name, never the full path (paths hold your user name).</p>
+<h3>Windows tweaks</h3>
+<p>Switch off what Windows shows or sends that you didn&rsquo;t ask for: ads and suggested apps, tips and &ldquo;finish setting up&rdquo; screens, Bing results in Start&rsquo;s search, Copilot, extra diagnostic data and the advertising ID, and Store apps running in the background. Tick, then <strong>Apply</strong>. Every value is written in Logs with the value it had, so each one can be undone there; <strong>Put all back to Windows&rsquo; default</strong> writes Windows&rsquo; own values again. Policy manager can fix a tweak on or off (Windows tweaks group): it is then set when Elixar starts and can&rsquo;t be changed here. Some show after you sign out or restart.</p>
 <h3>Disk health</h3>
 <p>Reads the health, wear and error counters your drives keep about themselves (the same data Windows uses) and tells you, in plain words, before a drive fails. It only reads: nothing is written to any drive, nothing is downloaded, nothing is sent anywhere, and serial numbers are not read.</p>
 <table>
@@ -187,7 +197,7 @@
 </table>
 <p>Drivers a device uses, drivers Windows needs to start, and printer and extension drivers are never offered. Each removed driver is backed up to Undo first.</p>
 <h3>Startup</h3>
-<p>Everything that starts with Windows, checked for who signed it and where it runs from. &ldquo;Needs a look&rdquo; flags hidden scripts, programs in Temp or Downloads, and broken or missing signatures. Turn entries off or on (the same switch as Task Manager), remove leftovers whose program is gone (kept in Undo), or scan any of them with Microsoft Defender. Not signed doesn't mean harmful; many small tools aren't signed.</p>
+<p>Everything that starts with Windows, checked for who signed it and where it runs from. <strong>Slows startup by</strong> shows what Windows itself measured each time a program made startup slower than usual (its Diagnostics-Performance log, the last 90 days), and the line above the list says how long the last startups took. &ldquo;Needs a look&rdquo; flags hidden scripts, programs in Temp or Downloads, and broken or missing signatures. Turn entries off or on (the same switch as Task Manager), remove leftovers whose program is gone (kept in Undo), or scan any of them with Microsoft Defender. Not signed doesn't mean harmful; many small tools aren't signed.</p>
 <h3>System space</h3>
 <ul>
   <li>Hibernation file: hiberfil.sys is often 6-16 GB. &ldquo;Make smaller&rdquo; keeps Fast Startup but drops Hibernate; &ldquo;Turn off&rdquo; frees all of it; &ldquo;Turn back on&rdquo; restores it.</li>
@@ -266,9 +276,10 @@
 <h2 id="settings">Settings and updates</h2>
 <p>Open the <strong>Settings</strong> tab (or click Settings in the footer). Pick a language and a theme, then click <strong>Apply and restart Elixar</strong>: Elixar restarts for a moment in the new look. The small picture next to the theme choices shows what it will look like.</p>
 <ul>
-  <li><strong>Language:</strong> English or Hebrew (the window is laid out right to left). Some live status lines stay in English.</li>
+  <li><strong>Language:</strong> English, Hebrew or Arabic (laid out right to left), Russian or Spanish. Hebrew covers every screen; Arabic, Russian and Spanish cover the main screens (tabs, Dashboard, Cleaner, common buttons) and the rest stays in English. Email reports are in Hebrew or English. Some live status lines stay in English.</li>
   <li><strong>Theme:</strong> follow Windows, light or dark.</li>
   <li><strong>Install Elixar on this PC:</strong> adds it to the Start menu and to Windows&rsquo; installed apps list (with Uninstall), in C:\Program Files\Elixar.</li>
+  <li><strong>Sponsor Elixar:</strong> shows once Elixar is published on GitHub, and opens its GitHub Sponsors page.</li>
   <li><strong>Check for updates:</strong> once Elixar is published on GitHub, it checks for a new version (also quietly once a week). An update is installed only if it is signed with Elisar&rsquo;s key and every file matches its fingerprint.</li>
 </ul>
 
@@ -337,6 +348,22 @@
 <h2 id="onedrive">OneDrive</h2>
 <p>The <strong>OneDrive</strong> tab appears only when OneDrive is signed in on this PC with your account email. Elixar doesn't sign in or connect to anything: it reads OneDrive's own settings on this PC. The Dashboard also suggests it when files you haven't used for 3 months add up to 1 GB or more.</p>
 <p>It lists files of 1 MB and up that are on this PC and that you haven't opened for 1, 3, 6 or 12 months. <strong>Make selected online-only</strong> does the same as OneDrive's own &ldquo;Free up space&rdquo;: the files stay in OneDrive and in File Explorer, but take no space here until you open one (OneDrive then downloads it, which needs internet). Nothing is deleted. Files marked &ldquo;Always keep on this device&rdquo; are left alone, nothing is ticked for you, and reading the folder never downloads anything. Elixar changes only real OneDrive files inside your OneDrive folder (each must carry OneDrive's own cloud mark), so even a changed OneDrive setting can't point it at other files.</p>
+
+<h2 id="it">For IT: command line, MSI and fleet report</h2>
+<p><strong>Command line</strong> (an administrator command prompt; in cmd use <code>start /wait Elixar.exe ...</code> to wait for it). No window and no questions; the policy still applies and every change goes into Logs.</p>
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td><code>--status</code></td><td>Free space, savings, policy and tweaks</td></tr>
+  <tr><td><code>--clean</code></td><td>The weekly clean (Safe items ticked by default)</td></tr>
+  <tr><td><code>--clean-item "name"</code> / <code>--list-items</code></td><td>One cleaning item by name / every item with its level</td></tr>
+  <tr><td><code>--report &lt;folder|file.json&gt; [--with-updates]</code></td><td>Writes this PC&rsquo;s status file for the fleet report</td></tr>
+  <tr><td><code>--policy &lt;file.elixarpolicy&gt;</code></td><td>Uses that policy as Custom (refused if it was changed after export, or if a PIN protects the policy)</td></tr>
+  <tr><td><code>--tweaks on|default</code></td><td>Every Windows tweak on, or all back to Windows&rsquo; default</td></tr>
+  <tr><td><code>--update-apps</code></td><td>Updates every app winget can update</td></tr>
+</table>
+<p>Exit codes: 0 done, 1 problem, 2 blocked by the policy, 3 not administrator, 4 wrong command.</p>
+<p><strong>MSI</strong>: <code>Elixar-1.2.50.msi</code> installs Elixar for all users in Program Files with a Start menu entry (<code>msiexec /i Elixar-1.2.50.msi /qn</code>); uninstalling it also removes Elixar&rsquo;s schedules. The source (<code>package/Elixar.wxs</code>) builds with msitools&rsquo; wixl or WiX.</p>
+<p><strong>Fleet report</strong>: run <code>Elixar.exe --report \\server\share\elixar</code> on each PC (for example as a daily scheduled task). Each PC writes one small file with its name, free space, how much Elixar saved, its policy fingerprint, tweaks and app updates waiting &mdash; no user names or file names. Open that folder in Policy manager &gt; Fleet report to see every PC in one table (lowest free space first, old reports in orange), and save it as CSV.</p>
 
 <h2 id="security">Security</h2>
 <p>Elixar runs as administrator, so since 1.7 it guards against a virus with normal rights tricking it into doing admin work.</p>
@@ -437,6 +464,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-24</td><td>1.2.50</td><td>Space map (Tools: the whole drive as boxes by size and warning sign); &ldquo;Is this safe to delete?&rdquo; for any folder or file; Windows tweaks (ads, tips, Bing in Start, Copilot, extra data, background apps; each change undoable in Logs and settable in Policy manager); Apps &gt; Updates through winget; uninstall + leftovers in one step; startup impact from Windows&rsquo; own measurements; savings counter on the Dashboard; Arabic, Russian and Spanish for the main screens; for IT a command line, an MSI and the fleet report; Sponsor button (when published on GitHub)</td></tr>
   <tr><td>2026-10-24</td><td>1.2.41</td><td>Policy manager: Folders page (the Dashboard&rsquo;s folders by warning sign: Critical locked, Caution / Review / Safe with the rule of the item that cleans them; Downloads to Undo after 7-90 days; Recycle Bin only old items), Cleaning items page (Ask me / Clean it by itself at its own time / Never touch it, and only files older than 1-90 days, checked every half hour), and every schedule&rsquo;s time set in the policy (moved from Automation, existing times kept). Security review: Save boxes always write the safe way (never through a planted link), schedule XML read without outside references, damaged password databases refused; fixes for the age limit on single files and the policy cleaning schedule</td></tr>
   <tr><td>2026-10-21</td><td>1.2.40</td><td>Policy manager next to Logs: Default or Custom rules for what Elixar may change, presets, export / import, a .reg file for IT, organization rules (Group Policy / Intune). Logs tab next to Settings: every change Elixar makes, grouped by day and by section (Cleaner, Duplicates, Startup, Deleted...), in plain words with before and after, how to undo it, one-click undo for registry values, changes.txt for Notepad, and export to .csv or .txt</td></tr>
   <tr><td>2026-10-19</td><td>1.2.31</td><td>Dark mode: switched-off options are written in near white, easy to read. Optional PIN (4, 6 or 8 digits) or password for opening Elixar (Settings &rsaquo; Security and protection &rsaquo; Secure your data with a PIN or password) with a recovery code. Dark-mode group titles drawn in the right place. A one-time invitation to connect email after the first scan (Not now / Don't ask again). Gmail can connect with an app password when this copy has no Google sign-in. Windows update leftovers ($GetCurrent, $WinREAgent) are removed when it is safe (also by the weekly clean), including their protected parts; what can't be removed is reported. Dashboard &rsaquo; Watch: the folders that always grow or grow fast, with advice and how often to look at them (also in the weekly email and the report). New slogan: the cure for a cluttered PC; tidier Dashboard header. Tools &rsaquo; Sysprep &rsaquo; Golden image: finds saved passwords and keys, programs that clone their ID, Entra/Intune; Audit mode, VM checkpoint reminder, Start layout and default apps for new accounts; Image cleanup, Image passport and Capture kit</td></tr>

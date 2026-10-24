@@ -30,7 +30,7 @@ namespace CDriveCleaner
             Font = new Font("Segoe UI", 9.5f); BackColor = Theme.Back; ForeColor = Theme.Ink;
             StartPosition = FormStartPosition.CenterParent; MinimizeBox = false; ShowInTaskbar = false; Icon = Brand.Load(32);
             Size = new Size(S(780), S(640)); MinimumSize = new Size(S(600), S(420));
-            if (Lang.Hebrew) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
+            if (Lang.Rtl) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(S(16), S(12), S(16), S(8)) };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -98,8 +98,8 @@ namespace CDriveCleaner
             if (loc != null && !string.IsNullOrEmpty(loc.Action))
                 text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(tw, 0), UseMnemonic = false, ForeColor = Theme.Quiet, Margin = new Padding(0, 0, 0, S(3)), Text = Lang.T(loc.Action) });
             string when = Lang.T("Check it " + Growth.EveryText(w.EveryDays)) + "  ·  " +
-                          (w.Checked.HasValue ? Lang.T("last checked " + w.Checked.Value.ToString(Lang.Hebrew ? "d.M" : "d MMM")) + "  ·  " : "") +
-                          (w.Due ? Lang.T("due now") : Lang.T("next on " + w.NextCheck.ToString(Lang.Hebrew ? "d.M" : "d MMM")));
+                          (w.Checked.HasValue ? Lang.T("last checked " + w.Checked.Value.ToString(Lang.On ? "d.M" : "d MMM")) + "  ·  " : "") +
+                          (w.Due ? Lang.T("due now") : Lang.T("next on " + w.NextCheck.ToString(Lang.On ? "d.M" : "d MMM")));
             text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(tw, 0), UseMnemonic = false, ForeColor = Theme.Ink, Margin = new Padding(0), Text = when });
             card.Controls.Add(text, 0, 0);
 
@@ -113,7 +113,7 @@ namespace CDriveCleaner
             card.Paint += (o, e) =>
             {
                 using (var p = new Pen(Theme.Grid)) e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
-                using (var br = new SolidBrush(tone)) e.Graphics.FillRectangle(br, Lang.Hebrew ? card.Width - S(4) : 0, 0, S(4), card.Height);
+                using (var br = new SolidBrush(tone)) e.Graphics.FillRectangle(br, Lang.Rtl ? card.Width - S(4) : 0, 0, S(4), card.Height);
             };
             return card;
         }

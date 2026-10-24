@@ -139,9 +139,7 @@ namespace CDriveCleaner
 
         void OpenMap(string root)
         {
-            var mf = new TreemapForm(root, s);
-            mf.Shown += (o2, e2) => { Theme.Apply(mf); Lang.Apply(mf); };
-            mf.Show(this);
+            ShowSpaceMap(root);
         }
 
         void ShowInFolder(string path)

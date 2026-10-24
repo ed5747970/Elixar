@@ -56,8 +56,8 @@ namespace CDriveCleaner
         // ================= sections: which part of Elixar made each change =================
         public static readonly string[] Sections =
         {
-            "Cleaner", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "Drivers", "Phone", "Move folders",
-            "System space", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Other"
+            "Cleaner", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
+            "System space", "Space map", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
         };
 
         [ThreadStatic] static string scope;
@@ -80,6 +80,8 @@ namespace CDriveCleaner
         public static string Derive(Entry e)
         {
             string a = e.Action ?? "", d = e.Detail ?? "", t = e.Target ?? "", all = a + " | " + d + " | " + t, k = e.Kind ?? "";
+            if (a.StartsWith("Updated an app") || a.StartsWith("App update")) return "App updates";
+            if (Hs(d, "Windows tweak")) return "Windows tweaks";
             if (a.StartsWith("Policy cleaning") || Hs(d, "Cleaned by the policy")) return "Policy cleaning";
             if (a.StartsWith("Policy")) return "Policy";
             if (Hs(a, "restore point")) return "Restore points";
@@ -423,6 +425,7 @@ namespace CDriveCleaner
             try
             {
                 if (it == null) return;
+                if (problem == null && freed > 0) Savings.Add(freed, it.Name);
                 Add("Cleaning", "Cleaned: " + it.Name, it.Where ?? "", "", problem != null ? "Problem" : freed > 0 ? "freed " + Fs.Fmt(freed) : "",
                     (how ?? "") + (problem != null ? " - " + problem : ""), problem != null);
             }
@@ -456,13 +459,15 @@ namespace CDriveCleaner
             @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\SoftwareProtectionPlatform",
             @"SOFTWARE\Policies\Microsoft\WindowsStore",
         };
+        // ...and the values Tools > Windows tweaks changes
+        static readonly string[] TweakKeys = Tweaks.Keys.ToArray();
 
         public static bool UndoAllowed(string hive, string key)
         {
             if (hive != "HKLM" && hive != "HKCU") return false;
             key = (key ?? "").Trim('\\');
             if (key.Length == 0 || key.Contains("..")) return false;
-            return UndoKeys.Any(p => key.Equals(p.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || key.StartsWith(p.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
+            return UndoKeys.Concat(TweakKeys).Any(p => key.Equals(p.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || key.StartsWith(p.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase));
         }
 
         static bool Sensitive(string name) { return Regex.IsMatch(name ?? "", "password|secret|token|credential|key$", RegexOptions.IgnoreCase); }

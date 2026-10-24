@@ -195,7 +195,7 @@ namespace CDriveCleaner
             Text = "Elixar"; Icon = Brand.Load(32); Font = new Font("Segoe UI", 10f);
             FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false; StartPosition = FormStartPosition.CenterScreen;
             BackColor = Theme.Panel; ForeColor = Theme.Ink;
-            if (Lang.Hebrew) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
+            if (Lang.Rtl) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
             body = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(S(28), S(22), S(28), S(10)), BackColor = Theme.Panel };
             var logo = new PictureBox { Image = Brand.Load(64).ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(S(48), S(48)), Margin = new Padding(0, 0, 0, S(8)) };
             lTitle = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), Margin = new Padding(0, 0, 0, S(4)) };
@@ -329,7 +329,7 @@ namespace CDriveCleaner
             {
                 float s = 1f; using (var g = f.CreateGraphics()) s = Math.Max(1f, g.DpiX / 96f);
                 Func<int, int> S = v => (int)Math.Round(v * s);
-                if (Lang.Hebrew) { f.RightToLeft = RightToLeft.Yes; f.RightToLeftLayout = true; }
+                if (Lang.Rtl) { f.RightToLeft = RightToLeft.Yes; f.RightToLeftLayout = true; }
                 var p = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(S(28), S(22), S(28), S(10)) };
                 p.Controls.Add(new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), Text = Lang.T("Done. Keep your recovery code"), Margin = new Padding(0, 0, 0, S(6)) });
                 p.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(S(380), 0), ForeColor = Theme.Quiet, Margin = new Padding(0, 0, 0, S(12)),

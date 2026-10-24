@@ -33,7 +33,7 @@ namespace CDriveCleaner
             Font = new Font("Segoe UI", 9.5f); BackColor = Theme.Back; ForeColor = Theme.Ink;
             StartPosition = FormStartPosition.CenterParent; MinimizeBox = false; ShowInTaskbar = false; Icon = Brand.Load(32);
             Size = new Size(S(880), S(860)); MinimumSize = new Size(S(760), S(560));
-            if (Lang.Hebrew) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
+            if (Lang.Rtl) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
 
             var body = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(S(16), S(12), S(16), S(8)) };
             Func<string, Label> head = t => new Label { AutoSize = true, Text = Lang.T(t), Font = new Font("Segoe UI Semibold", 11f), Margin = new Padding(0, S(10), 0, S(4)) };

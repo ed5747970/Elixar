@@ -1,4 +1,5 @@
-// Interface language: English (built in) or Hebrew (right to left). Text not in the table stays in English.
+// Interface language: English (built in), Hebrew and Arabic (right to left), Russian and Spanish. Text not in a table stays in English.
+// Hebrew covers every screen; Arabic, Russian and Spanish cover the main screens (LangMore.cs).
 
 using System;
 using System.Collections.Generic;
@@ -10,16 +11,40 @@ namespace CDriveCleaner
 {
     public static partial class Lang
     {
-        public static bool Hebrew;
-        public static void Init(string lang) { Hebrew = lang == "he"; }
+        public static readonly string[] Codes = { "en", "he", "ar", "ru", "es" };
+        public static string Code = "en";
+        // Hebrew: the full translation (and Hebrew-only texts such as email reports); Rtl: the window runs right to left
+        public static bool Hebrew { get { return Code == "he"; } set { Code = value ? "he" : Code == "he" ? "en" : Code; } }
+        public static bool Rtl { get { return Code == "he" || Code == "ar"; } }
+        public static bool On { get { return Code != "en"; } }
+        public static void Init(string lang) { Code = Codes.Contains(lang) ? lang : "en"; }
 
-        static Dictionary<string, string> he;
-        static Dictionary<string, string> Table { get { return he ?? (he = BuildHebrew()); } }
+        static readonly Dictionary<string, Dictionary<string, string>> tables = new Dictionary<string, Dictionary<string, string>>();
+        static readonly Dictionary<string, List<Tuple<Regex, Func<Match, string>>>> patterns = new Dictionary<string, List<Tuple<Regex, Func<Match, string>>>>();
+        static List<Tuple<Regex, Func<Match, string>>> building;
+        static readonly object tableGate = new object();
+        static Dictionary<string, string> Table
+        {
+            get
+            {
+                string c = Code;
+                lock (tableGate)
+                {
+                    Dictionary<string, string> t;
+                    if (tables.TryGetValue(c, out t)) return t;
+                    building = new List<Tuple<Regex, Func<Match, string>>>();
+                    t = c == "he" ? BuildHebrew() : BuildMore(c);
+                    patterns[c] = building; tables[c] = t;
+                    return t;
+                }
+            }
+        }
+        static List<Tuple<Regex, Func<Match, string>>> Patterns { get { var t = Table; lock (tableGate) return patterns[Code]; } }
 
         // whole text, or a known start ("Remove 3 (1.2 GB)..." keeps its numbers)
         public static string T(string s)
         {
-            if (!Hebrew || string.IsNullOrEmpty(s)) return s;
+            if (!On || string.IsNullOrEmpty(s)) return s;
             string v;
             if (Table.TryGetValue(s, out v)) return v;
             string trimmed = s.Trim();
@@ -32,13 +57,15 @@ namespace CDriveCleaner
             return s;
         }
 
-        static readonly List<Tuple<Regex, Func<Match, string>>> Patterns = new List<Tuple<Regex, Func<Match, string>>>();
-        static void Pat(string re, Func<Match, string> f) { Patterns.Add(Tuple.Create(new Regex("^" + re + "$", RegexOptions.Compiled), f)); }
+        // emails are written in Hebrew or English only (the other languages cover the window's main screens)
+        public static string MailT(string s) { return Hebrew ? T(s) : s; }
+
+        static void Pat(string re, Func<Match, string> f) { building.Add(Tuple.Create(new Regex("^" + re + "$", RegexOptions.Compiled), f)); }
 
         public static void Apply(Control root)
         {
-            if (!Hebrew) return;
-            if (root is Form) { var f = (Form)root; f.RightToLeft = RightToLeft.Yes; f.RightToLeftLayout = true; f.Text = T(f.Text); }
+            if (!On) return;
+            if (root is Form) { var f = (Form)root; if (Rtl) { f.RightToLeft = RightToLeft.Yes; f.RightToLeftLayout = true; } f.Text = T(f.Text); }
             Walk(root);
         }
 
@@ -50,9 +77,9 @@ namespace CDriveCleaner
                 var lv = (ListView)c;
                 foreach (ColumnHeader h in lv.Columns) h.Text = T(h.Text);
                 foreach (ListViewGroup g in lv.Groups) g.Header = T(g.Header);
-                lv.RightToLeftLayout = true;
+                lv.RightToLeftLayout = Rtl;
             }
-            else if (c is TabControl) { var tc = (TabControl)c; tc.RightToLeftLayout = true; foreach (TabPage p in tc.TabPages) p.Text = T(p.Text); }
+            else if (c is TabControl) { var tc = (TabControl)c; tc.RightToLeftLayout = Rtl; foreach (TabPage p in tc.TabPages) p.Text = T(p.Text); }
             else if (c is ComboBox) { var cb = (ComboBox)c; for (int i = 0; i < cb.Items.Count; i++) if (cb.Items[i] is string) cb.Items[i] = T((string)cb.Items[i]); }
             if (c.ContextMenuStrip != null) foreach (ToolStripItem it in c.ContextMenuStrip.Items) it.Text = T(it.Text);
             foreach (Control k in c.Controls) Walk(k);
@@ -60,8 +87,8 @@ namespace CDriveCleaner
 
         public static void Menu(ContextMenuStrip m)
         {
-            if (!Hebrew) return;
-            m.RightToLeft = RightToLeft.Yes;
+            if (!On) return;
+            if (Rtl) m.RightToLeft = RightToLeft.Yes;
             foreach (ToolStripItem it in m.Items) it.Text = T(it.Text);
         }
 
@@ -77,7 +104,7 @@ namespace CDriveCleaner
         // Elixar's own pop-up (in the app's look and direction), with the text translated where known
         public static DialogResult Box(IWin32Window owner, string text, string caption, MessageBoxButtons b, MessageBoxIcon i)
         {
-            return NiceBox.Show(owner, Hebrew ? T(text) : text, Hebrew ? T(caption) : caption, b, i, 0);
+            return NiceBox.Show(owner, On ? T(text) : text, On ? T(caption) : caption, b, i, 0);
         }
     }
 }

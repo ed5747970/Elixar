@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Elixar for IT: a per-machine MSI for Intune, Group Policy or SCCM.
+     Build:  wixl -a x64 -D Version=1.2.50 -D Exe=path\to\Elixar.exe -o Elixar.msi Elixar.wxs   (msitools)
+             or WiX 3: candle -arch x64 -dVersion=1.2.50 -dExe=... Elixar.wxs && light Elixar.wixobj
+     Silent install:    msiexec /i Elixar.msi /qn
+     Silent uninstall:  msiexec /x Elixar.msi /qn   (also removes Elixar's schedules)
+     The UpgradeCode never changes, so a newer MSI replaces an older one. -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="Elixar" Language="1033" Version="$(var.Version)" Manufacturer="Elisar"
+           UpgradeCode="6B1C3D52-7E0A-4C89-9E1F-3A5D2B7C4E10">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Description="Elixar - the cure for a cluttered PC" Manufacturer="Elisar" Comments="Made by Elisar" />
+    <MajorUpgrade DowngradeErrorMessage="A newer Elixar is already installed." />
+    <Media Id="1" Cabinet="elixar.cab" EmbedCab="yes" />
+    <Property Id="ARPCOMMENTS" Value="The cure for a cluttered PC" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="Elixar">
+          <Component Id="ElixarExe" Guid="3F7A2C91-55D4-4B0E-8C6B-1E9D7A3F2B48" Win64="yes">
+            <File Id="ElixarExeFile" Name="Elixar.exe" Source="$(var.Exe)" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Component Id="StartMenu" Guid="A2D94E1B-6C37-4F85-B0A9-5E2C8D1F7364" Win64="yes">
+          <Shortcut Id="ElixarShortcut" Name="Elixar" Description="The cure for a cluttered PC" Target="[INSTALLDIR]Elixar.exe" WorkingDirectory="INSTALLDIR" />
+          <RegistryValue Root="HKLM" Key="Software\Elixar\Msi" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </Directory>
+
+    <Feature Id="Main" Title="Elixar" Level="1">
+      <ComponentRef Id="ElixarExe" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+
+    <!-- on uninstall: Elixar removes its own schedules first (the files themselves are removed by Windows Installer) -->
+    <CustomAction Id="RemoveSchedules" FileKey="ElixarExeFile" ExeCommand="--uninstall --quiet --msi" Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveSchedules" After="InstallInitialize">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
+    </InstallExecuteSequence>
+  </Product>
+</Wix>

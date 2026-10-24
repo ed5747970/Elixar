@@ -76,10 +76,10 @@ namespace CDriveCleaner
                 Color back = sel ? Theme.Accent : logsSections.BackColor, ink = sel ? Color.White : head ? Theme.Ink : Theme.Ink;
                 using (var b = new SolidBrush(back)) e.Graphics.FillRectangle(b, e.Bounds);
                 var rect = new Rectangle(e.Bounds.X + S(8), e.Bounds.Y, e.Bounds.Width - S(16), e.Bounds.Height);
-                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | (Lang.Hebrew ? TextFormatFlags.RightToLeft : 0);
+                var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | (Lang.Rtl ? TextFormatFlags.RightToLeft : 0);
                 using (var f = head ? new Font(logsSections.Font, FontStyle.Bold) : new Font(logsSections.Font, FontStyle.Regular))
-                    TextRenderer.DrawText(e.Graphics, Lang.T(r.Name), f, rect, ink, flags | (Lang.Hebrew ? TextFormatFlags.Right : TextFormatFlags.Left));
-                TextRenderer.DrawText(e.Graphics, r.Count.ToString(CultureInfo.CurrentCulture), logsSections.Font, rect, sel ? Color.White : Theme.Quiet, flags | (Lang.Hebrew ? TextFormatFlags.Left : TextFormatFlags.Right));
+                    TextRenderer.DrawText(e.Graphics, Lang.T(r.Name), f, rect, ink, flags | (Lang.Rtl ? TextFormatFlags.Right : TextFormatFlags.Left));
+                TextRenderer.DrawText(e.Graphics, r.Count.ToString(CultureInfo.CurrentCulture), logsSections.Font, rect, sel ? Color.White : Theme.Quiet, flags | (Lang.Rtl ? TextFormatFlags.Left : TextFormatFlags.Right));
                 if (r.Key == "#deleted")   // a line under the three summaries, before the sections
                     using (var p = new Pen(Theme.Grid)) e.Graphics.DrawLine(p, e.Bounds.X + S(6), e.Bounds.Bottom - 1, e.Bounds.Right - S(6), e.Bounds.Bottom - 1);
             };
@@ -94,7 +94,7 @@ namespace CDriveCleaner
             logsList.Columns.Add("Time", S(70)); logsList.Columns.Add("Section", S(120)); logsList.Columns.Add("What happened", S(300));
             logsList.Columns.Add("Where", S(360)); logsList.Columns.Add("Before", S(150)); logsList.Columns.Add("After", S(150)); logsList.Columns.Add("Status", S(110));
             t.Controls.Add(logsList, 1, 3);
-            logsDetail = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Font = new Font("Consolas", 9f), Margin = new Padding(0, S(6), 0, S(4)), RightToLeft = Lang.Hebrew ? RightToLeft.Yes : RightToLeft.No };
+            logsDetail = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill, Font = new Font("Consolas", 9f), Margin = new Padding(0, S(6), 0, S(4)), RightToLeft = Lang.Rtl ? RightToLeft.Yes : RightToLeft.No };
             t.Controls.Add(logsDetail, 1, 4);
 
             var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0) };
@@ -154,18 +154,18 @@ namespace CDriveCleaner
             return v.StartsWith("On  (") ? "On" : v.StartsWith("Off  (") ? "Off" : v;
         }
 
-        static string LogTime(ChangeLog.Entry e) { var w = e.When; return w == DateTime.MinValue ? e.Time : w.ToString(Lang.Hebrew ? "d.M.yyyy HH:mm" : "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); }
+        static string LogTime(ChangeLog.Entry e) { var w = e.When; return w == DateTime.MinValue ? e.Time : w.ToString(Lang.On ? "d.M.yyyy HH:mm" : "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture); }
         static string LogLongTime(ChangeLog.Entry e)
         {
             var w = e.When; if (w == DateTime.MinValue) return e.Time;
-            return Lang.Hebrew ? w.ToString("dddd, d.M.yyyy, HH:mm:ss", new CultureInfo("he-IL")) : w.ToString("dddd d MMMM yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
+            return Lang.On ? w.ToString("dddd, d.M.yyyy, HH:mm:ss", Ui.Culture) : w.ToString("dddd d MMMM yyyy, HH:mm:ss", CultureInfo.InvariantCulture);
         }
         // the day heading over the lines: Today, Yesterday, or the date
         public static string LogDay(DateTime d, DateTime today)
         {
             if (d.Date == today.Date) return Lang.T("Today");
             if (d.Date == today.Date.AddDays(-1)) return Lang.T("Yesterday");
-            return Lang.Hebrew ? d.ToString("dddd, d.M.yyyy", new CultureInfo("he-IL")) : d.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture);
+            return Lang.On ? d.ToString("dddd, d.M.yyyy", Ui.Culture) : d.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture);
         }
 
         void LogsFill()

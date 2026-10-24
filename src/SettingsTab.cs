@@ -11,11 +11,11 @@ namespace CDriveCleaner
     public partial class MainForm
     {
         TabPage pageSettings;
-        RadioButton rbEnglish, rbHebrew, rbThemeAuto, rbThemeLight, rbThemeDark;
+        RadioButton rbEnglish, rbHebrew, rbArabic, rbRussian, rbSpanish, rbThemeAuto, rbThemeLight, rbThemeDark;
         Button btnApplySettings;
         Panel themePreview;
 
-        string ChosenLanguage { get { return rbHebrew.Checked ? "he" : "en"; } }
+        string ChosenLanguage { get { return rbHebrew.Checked ? "he" : rbArabic.Checked ? "ar" : rbRussian.Checked ? "ru" : rbSpanish.Checked ? "es" : "en"; } }
         string ChosenTheme { get { return rbThemeDark.Checked ? "dark" : rbThemeLight.Checked ? "light" : "auto"; } }
 
         // for the self-test: the tab shows the saved choices
@@ -43,9 +43,12 @@ namespace CDriveCleaner
             Func<string, RadioButton> radio = text => new RadioButton { Text = text, AutoSize = true, Margin = new Padding(S(4), S(4), S(22), S(4)) };
 
             // language: each name is written in its own language, so it can be found whichever one is showing
-            var langRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+            var langRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0) };
             rbEnglish = radio("English"); rbHebrew = radio("עברית (Hebrew)");
-            langRow.Controls.Add(rbEnglish); langRow.Controls.Add(rbHebrew);
+            rbArabic = radio("العربية (Arabic)"); rbRussian = radio("Русский (Russian)"); rbSpanish = radio("Español (Spanish)");
+            var langNote = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(4), 0, 0, S(2)), Text = "Arabic, Russian and Spanish cover the main screens; the rest stays in English. Email reports are in Hebrew or English." };
+            langRow.Controls.AddRange(new Control[] { rbEnglish, rbHebrew, rbArabic, rbRussian, rbSpanish, langNote });
+            langRow.SetFlowBreak(rbSpanish, true);
 
             // theme, with a small preview of the chosen colours
             var themeRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
@@ -64,6 +67,16 @@ namespace CDriveCleaner
             var btnInstall = MakeButton(!Win.IsWindows ? "How to install Elixar" : Setup.IsRegistered() ? "Repair the installation" : "Install Elixar on this PC");
             var btnUpdate = MakeButton("Check for updates");
             pcButtons.Controls.Add(btnInstall); pcButtons.Controls.Add(btnUpdate); pcButtons.Controls.Add(TrayOption());
+            // hidden until the build knows where Elixar lives on GitHub
+            string sponsor = Updates.SponsorUrl;
+            if (sponsor != null)
+            {
+                var btnSponsor = MakeButton("Sponsor Elixar");
+                btnSponsor.ForeColor = Color.FromArgb(191, 57, 137);
+                btnSponsor.Click += (o, e) => { try { Shell.Open(sponsor); } catch { } };
+                pcButtons.Controls.Add(btnSponsor);
+                new ToolTip().SetToolTip(btnSponsor, sponsor);
+            }
             var pcInfo = Note(Win.IsWindows ? "Installing adds Elixar to the Start menu and to Windows' installed apps list (with Uninstall), in a folder only administrators can change. Start Elixar from the Start menu afterwards: Windows no longer shows its blue \"Windows protected your PC\" box for it."
                                             : "On Linux, Elixar is installed with its .deb package: it goes in /usr/lib/elixar (only root can change it), appears in your apps menu, and \"sudo apt remove elixar\" removes it.");
             pcInfo.Margin = new Padding(S(2), S(6), 0, 0);
@@ -81,11 +94,11 @@ namespace CDriveCleaner
             pageSettings.Controls.Add(t);
 
             // the saved choices
-            (Settings.Language == "he" ? rbHebrew : rbEnglish).Checked = true;
+            (Settings.Language == "he" ? rbHebrew : Settings.Language == "ar" ? rbArabic : Settings.Language == "ru" ? rbRussian : Settings.Language == "es" ? rbSpanish : rbEnglish).Checked = true;
             (Settings.ThemeMode == "dark" ? rbThemeDark : Settings.ThemeMode == "light" ? rbThemeLight : rbThemeAuto).Checked = true;
 
             EventHandler changed = (o, e) => { UpdateApplySettings(); themePreview.Invalidate(); };
-            foreach (var rb in new[] { rbEnglish, rbHebrew, rbThemeAuto, rbThemeLight, rbThemeDark }) rb.CheckedChanged += changed;
+            foreach (var rb in new[] { rbEnglish, rbHebrew, rbArabic, rbRussian, rbSpanish, rbThemeAuto, rbThemeLight, rbThemeDark }) rb.CheckedChanged += changed;
             UpdateApplySettings();
 
             btnApplySettings.Click += (o, e) => ApplySettings();
