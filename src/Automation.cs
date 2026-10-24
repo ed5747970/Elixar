@@ -170,8 +170,10 @@ namespace CDriveCleaner
         {
             var st = new TaskState();
             if (string.IsNullOrWhiteSpace(xml) || xml.IndexOf("<Task", StringComparison.Ordinal) < 0) return st;
-            var doc = new XmlDocument();
-            doc.LoadXml(xml.Substring(xml.IndexOf("<", StringComparison.Ordinal)));
+            // no DTDs and no outside references: the XML can't make Elixar read other files or reach the network
+            var doc = new XmlDocument { XmlResolver = null };
+            var xs = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 1 << 20 };
+            using (var xr = XmlReader.Create(new System.IO.StringReader(xml.Substring(xml.IndexOf("<", StringComparison.Ordinal))), xs)) doc.Load(xr);
             var ns = new XmlNamespaceManager(doc.NameTable);
             ns.AddNamespace("t", "http://schemas.microsoft.com/windows/2004/02/mit/task");
             st.Exists = true;
@@ -769,7 +771,7 @@ namespace CDriveCleaner
             {
                 if (!Policy.Moved && Policy.MoveSchedules(Automation.Query, MailPrefs.Load().Day))
                     UI(() => { Log(Lang.T("Your schedules moved to Policy manager (Custom policy), with the same times as before.")); PolicyLoadUi(); ShowScheduleText(); });
-                if (Policy.Org().Keys.Any(Policy.IsSchedule))
+                if (Policy.Org().Keys.Any(k => Policy.IsSchedule(k) || Policy.IsItemKey(k)))
                 {
                     var tidy = TidyPrefs.Load(); var mp = MailPrefs.Load();
                     var plan = Automation.Plan(Install.Exe, AlertPercent(), tidy.AnyDaily, MailAccount.Email != null && (mp.Alerts || mp.Summary) && Policy.Allowed("email"));

@@ -101,12 +101,25 @@ namespace CDriveCleaner
         }
 
         // writes text to a new file (replacing an old one), through a checked handle
-        public static void WriteText(string path, string text)
+        public static void WriteText(string path, string text) { WriteBytes(path, Encoding.UTF8.GetBytes(text)); }
+
+        public static void WriteBytes(string path, byte[] b)
         {
             if (File.Exists(path)) { if (Win.IsWindows) SafeDelete.Delete(path); else File.Delete(path); }
-            var b = Encoding.UTF8.GetBytes(text);
             using (var o = CreateNew(path)) o.Write(b, 0, b.Length);
         }
+
+        // a file you chose in a Save box. Elixar runs as administrator, so it never writes through a link another program put
+        // in that folder: when the checked write isn't possible there, it says so instead of writing the ordinary way
+        public static void Save(string path, byte[] data)
+        {
+            try { WriteBytes(path, data); }
+            catch (Exception e)
+            {
+                throw new IOException("Elixar couldn't save there safely (" + e.Message + "). Choose another folder, for example Documents or Desktop.", e);
+            }
+        }
+        public static void Save(string path, string text) { Save(path, Encoding.UTF8.GetBytes(text)); }
 
         // moves a file into a folder on the same drive, by handle: the file and the folder are both checked for where they
         // really are, and the move goes into exactly that folder even if a link is put in place of its name afterwards

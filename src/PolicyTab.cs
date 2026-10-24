@@ -262,14 +262,14 @@ namespace CDriveCleaner
             if (risky.Count > 0 && PolAsk(Lang.T("These items will be cleaned by themselves, without asking each time:") + "\n\n" + string.Join("\n", risky.Select(it => "  - " + Lang.T(it.Name) + "  (" + Lang.T(it.Tier == Tier.Review ? "Check first" : "Can't be undone") + ")")) +
                                           "\n\n" + Lang.T("They are not Safe items. Save the policy anyway?"), true) != DialogResult.Yes) return "";
             if (loosens && PolAsk(Lang.T("This makes the rules less strict. Save it?") + "\n\n" + Lang.T("Elixar writes every change to the policy in Logs."), true) != DialogResult.Yes) return "";
-            var schedBefore = Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)).ToList();
+            var schedBefore = Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)).Concat(new[] { Policy.AnyAuto().ToString() }).ToList();
             string err = Policy.Save(polCustom, polEdit);
             if (err != null) return err;
             Log(Lang.T(polCustom ? "Policy saved: Custom." : "Policy saved: Default."));
             ApplyPolicyUi();
             PolicyLoadUi();
             // new times: Task Scheduler follows right away
-            if (!schedBefore.SequenceEqual(Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)))) { ShowScheduleText(); ShowMailWhen(); PolicyApplySchedules(); }
+            if (!schedBefore.SequenceEqual(Policy.Rules.Where(r => Policy.IsSchedule(r.Key)).Select(r => Policy.Get(r.Key)).Concat(new[] { Policy.AnyAuto().ToString() }))) { ShowScheduleText(); ShowMailWhen(); PolicyApplySchedules(); }
             // a rule now asks for a PIN that isn't set
             if (!testMode && PolicyConfirmHook == null && Policy.Check().Count > 0 && !PinLock.IsSet &&
                 PolAsk(Lang.T("The policy needs a PIN or password. Set one now?"), false) == DialogResult.Yes && PinForm.SetNew(this)) { UpdatePinUi(); PolicyRefresh(); }
@@ -300,8 +300,8 @@ namespace CDriveCleaner
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
-                    if (reg) File.WriteAllText(d.FileName, Policy.RegText(rules), Encoding.Unicode);   // regedit reads UTF-16
-                    else { try { SafeFile.WriteText(d.FileName, Policy.ExportText(rules)); } catch { File.WriteAllText(d.FileName, Policy.ExportText(rules), new UTF8Encoding(false)); } }
+                    if (reg) SafeFile.Save(d.FileName, Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes(Policy.RegText(rules))).ToArray());   // regedit reads UTF-16
+                    else SafeFile.Save(d.FileName, Policy.ExportText(rules));
                 }
                 catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; }
                 using (ChangeLog.In("Policy")) ChangeLog.Add("Settings", reg ? "Policy: exported for IT (.reg)" : "Policy: exported", d.FileName, "", "", "", false);

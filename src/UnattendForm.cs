@@ -218,7 +218,7 @@ namespace CDriveCleaner
             {
                 string xml = Unattend.Build(s);
                 bool existed = File.Exists(target);
-                File.WriteAllText(target, xml, new UTF8Encoding(false));
+                SafeFile.Save(target, xml);
                 ChangeLog.Add("Files", existed ? "Saved over an answer file" : "Saved an answer file", target, "", "", "Sysprep", false);
                 path = target; loaded = Unattend.Read(xml); lPath.Text = Lang.T("File: " + path);
                 if (Log != null) Log(Lang.T("Sysprep: answer file saved: " + target));

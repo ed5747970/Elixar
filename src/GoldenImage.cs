@@ -984,7 +984,7 @@ the image: keep it next to the .wim.
                 {
                     string f = Path.Combine(folder, kv.Key);
                     if (File.Exists(f) && Links.IsLink(f)) return f + " is a link.";
-                    File.WriteAllText(f, kv.Value, new UTF8Encoding(false));
+                    SafeFile.Save(f, kv.Value);
                 }
                 ChangeLog.Add("Files", "Saved the capture kit", folder, "", string.Join(", ", CaptureKit().Keys), "", false);
                 return null;
@@ -1004,6 +1004,7 @@ the image: keep it next to the .wim.
             int ps = (data[16] << 8) | data[17]; page = ps == 1 ? 65536 : ps;
             if (page < 512 || (page & (page - 1)) != 0) throw new InvalidDataException("page size");
             usable = page - data[20];
+            if (usable < 480) throw new InvalidDataException("usable size");   // SQLite's own minimum
             enc = (data[56] << 24) | (data[57] << 16) | (data[58] << 8) | data[59];
             if (enc < 0 || enc > 3) throw new InvalidDataException("encoding");
         }
@@ -1101,8 +1102,9 @@ the image: keep it next to the .wim.
             var types = SerialTypes(rec); var vals = new List<object>(); int o = (int)hsize;
             foreach (var st in types)
             {
-                int len = (int)ValueLength(st);
-                if (o + len > rec.Length) throw new InvalidDataException("record");
+                long llen = ValueLength(st);
+                if (llen < 0 || llen > rec.Length || o + llen > rec.Length) throw new InvalidDataException("record");
+                int len = (int)llen;
                 if (st >= 13 && st % 2 == 1) vals.Add(TextOf(rec, o, len));
                 else if (st >= 1 && st <= 6) { long v = (rec[o] & 0x80) != 0 ? -1 : 0; for (int i = 0; i < len; i++) v = (v << 8) | rec[o + i]; vals.Add(v); }
                 else if (st == 8) vals.Add(0L); else if (st == 9) vals.Add(1L); else vals.Add(null);

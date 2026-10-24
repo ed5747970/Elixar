@@ -240,7 +240,7 @@ namespace CDriveCleaner
             Task.Factory.StartNew(() =>
             {
                 var data = GoldenImage.ReadPassport(checks, s => UI(() => spSummary.Text = Lang.T(s)));
-                File.WriteAllText(file, GoldenImage.Passport(data), new System.Text.UTF8Encoding(false));
+                SafeFile.Save(file, GoldenImage.Passport(data));
                 return data;
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {

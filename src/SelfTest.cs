@@ -1687,6 +1687,13 @@ namespace CDriveCleaner
                                 folders &= (Catalog.Build().First(i => i.Name == "Recycle Bin" && i.Drive == null).Info ?? "").Contains("deleted more than 30 days ago");
                                 if (!folders) pwhy += " [folders]";
                                 itemsOk &= folders;
+                                // the age limit holds for single files an item deletes (a full crash dump), and for what it measures
+                                string one = Path.Combine(pd, "MEMORY.DMP"); File.WriteAllBytes(one, new byte[64]);
+                                long seen = Fs.WithMinAge(7, () => Fs.SizeOf(one)); Fs.WithMinAge(7, () => { Fs.Delete(one); return 0L; });
+                                itemsOk &= seen == 0 && File.Exists(one);
+                                File.SetLastWriteTimeUtc(one, DateTime.UtcNow.AddDays(-9));
+                                seen = Fs.WithMinAge(7, () => Fs.SizeOf(one)); Fs.WithMinAge(7, () => { Fs.Delete(one); return 0L; });
+                                itemsOk &= seen == 64 && !File.Exists(one);
                                 if (!itemsOk) pwhy += " [items]";
                                 work &= itemsOk;
                                 // the Policy manager tab, next to Logs
@@ -1729,6 +1736,20 @@ namespace CDriveCleaner
                             check(files, "Policy: export and import take only known rules with allowed values, a changed file is noticed, and the .reg file for IT sets HKLM\\SOFTWARE\\Policies\\Elixar" + (files ? "" : pwhy));
                             check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level, every schedule runs at the time the policy sets (the times set in Automation move into the policy once, unchanged), and each cleaning item can be asked, cleaned by itself at its own time, or never touched, keeping files newer than its age limit" + (work ? "" : pwhy));
                             check(pui, "Policy: the Policy manager tab sits next to Logs, switches between Default and Custom, uses presets and imports, asks before making rules looser, and turns tabs off" + (pui ? "" : pwhy));
+                        }
+                        // hardening from the code review
+                        {
+                            bool xmlSafe = false, saveSafe = false, sqlSafe = false;
+                            try { Automation.ParseTaskXml("<?xml version=\"1.0\"?><!DOCTYPE Task [<!ENTITY e SYSTEM \"file:///etc/hostname\">]><Task xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\"><Actions><Exec><Command>&e;</Command></Exec></Actions></Task>"); }
+                            catch (System.Xml.XmlException) { xmlSafe = true; }
+                            catch { }
+                            try { SafeFile.Save(Path.Combine(root, "no-such-folder", "x.html"), "x"); } catch (IOException ex) { saveSafe = ex.Message.Contains("Choose another folder"); } catch { }
+                            var fake = new byte[4096]; System.Text.Encoding.ASCII.GetBytes("SQLite format 3\0").CopyTo(fake, 0);
+                            fake[16] = 0x02; fake[17] = 0x00; fake[20] = 100;   // 512-byte pages, 100 reserved: too little room left
+                            try { new MiniSqlite(fake); } catch (InvalidDataException) { sqlSafe = true; } catch { }
+                            sqlSafe &= GoldenImage.ChromiumLogins(fake) == -1;
+                            check(xmlSafe && saveSafe && sqlSafe, "Hardening: task XML can't pull in other files, a Save box never writes the unsafe way, and a damaged password database is refused" +
+                                  (xmlSafe && saveSafe && sqlSafe ? "" : "  (" + xmlSafe + "/" + saveSafe + "/" + sqlSafe + ")"));
                         }
                     }
                     // ---- similar photos, empty folders, compression ----

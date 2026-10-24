@@ -315,8 +315,8 @@ namespace CDriveCleaner
                 bool txt = d.FilterIndex == 2 || d.FileName.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);
                 // the mark lets Excel and Notepad read Hebrew and other letters correctly
                 string text = "\uFEFF" + (txt ? LogsText(logsAll).Replace("\n", "\r\n") : LogsCsv(logsAll));
-                try { SafeFile.WriteText(d.FileName, text); }
-                catch { try { File.WriteAllText(d.FileName, text, new UTF8Encoding(false)); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; } }
+                try { SafeFile.Save(d.FileName, text); }
+                catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; }
                 Log(Lang.T("Change log saved: ") + d.FileName);
             }
         }

@@ -21,7 +21,7 @@ namespace CDriveCleaner
 {
     public class NiceBox : Form
     {
-        public static bool Enabled = true;                    // self-test can switch back to Windows' box
+        public static new bool Enabled = true;                // self-test can switch back to Windows' box
         public static Func<NiceBox, DialogResult> TestHook;   // previews and the self-test: look at the box instead of showing it
 
         readonly string fullText;

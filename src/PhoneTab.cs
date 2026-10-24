@@ -16,15 +16,13 @@ namespace CDriveCleaner
         TabPage pagePhone, pagePhClean, pagePhApps, pagePhBig;
         TabControl phoneTabs;
         Panel phHelp, phBody;
-        Label lblPhone, lblPhNote, lblPhCleanNote, lblPhTools, lblPhApps, lblPhBig, lblPhDest;
+        Label lblPhone, lblPhNote, lblPhCleanNote, lblPhApps, lblPhBig, lblPhDest;
         DriveBar phBar; RowStyle phBarRow;
         Button btnPhFind, btnPhTools, btnPhClean, btnPhSafe, btnPhMeasure, btnPhAppRemove, btnPhAppRestore, btnPhAppSuggest, btnPhBigFind, btnPhCopy, btnPhMove, btnPhDelete, btnPhDest;
         ListView phList, phTips, phAppList, phBigList;
         CheckBox chkPhBackup;
         ComboBox cmbPhMin;
         PhoneDevice phone; IPhone.Found iphone;
-        List<PhoneItem> phItems = new List<PhoneItem>();
-        List<StorageSplit> phSplit = new List<StorageSplit>();
         string phDest;
         bool phBusy, phLoaded;
         public event Action PhoneDone;
@@ -354,7 +352,7 @@ namespace CDriveCleaner
 
         void ShowAndroid(PhoneDevice dev, List<StorageSplit> split, List<PhoneApp> apps, List<PhoneItem> items)
         {
-            phone = dev; iphone = null; phSplit = split; phItems = items;
+            phone = dev; iphone = null;
             ShowPhoneHelp(false);
             lblPhone.Text = dev.Title + (dev.Version.Length > 0 ? "   ·   Android " + dev.Version : "") +
                             (dev.Total > 0 ? "   ·   " + Fs.Fmt(dev.Total - dev.Free) + " used of " + Fs.Fmt(dev.Total) + ", " + Fs.Fmt(dev.Free) + " free" : "");

@@ -1035,7 +1035,6 @@ namespace CDriveCleaner
             hero.Primary = Lang.T(m.PrimaryText);
             hero.PrimaryOn = m.PrimaryEnabled && !testMode;
             hero.Break = new List<Tuple<string, long, Color>>();
-            long used = Math.Max(0, m.Total - m.Free);
             if (m.Tiers != null)
             {
                 hero.Break.Add(Tuple.Create(Lang.T("Safe to clean"), m.Tiers["safe"], Theme.MapFore(SafeColor)));

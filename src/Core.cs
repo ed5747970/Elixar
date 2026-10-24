@@ -43,6 +43,7 @@ namespace CDriveCleaner
     {
         public static long SizeOf(string path)
         {
+            if (MinAgeDays > 0) return OldSize(path, Cutoff);   // only what the policy lets go
             try
             {
                 if (File.Exists(path)) return new FileInfo(path).Length;
@@ -89,7 +90,7 @@ namespace CDriveCleaner
         public static long MeasureIn(string dir, string pattern = "*")
         {
             long t = 0;
-            foreach (var c in Children(dir, pattern)) t += MinAgeDays > 0 ? OldSize(c, Cutoff) : SizeOf(c);
+            foreach (var c in Children(dir, pattern)) t += SizeOf(c);
             return t;
         }
 
@@ -97,7 +98,7 @@ namespace CDriveCleaner
         // Files that are in use are skipped. With an age limit from the policy, only files older than it go.
         public static void ClearIn(string dir, string pattern = "*")
         {
-            foreach (var c in Children(dir, pattern)) { if (MinAgeDays > 0) DeleteOld(c, Cutoff); else Delete(c); }
+            foreach (var c in Children(dir, pattern)) Delete(c);
         }
 
         // ---- the policy's age limit for one item: "only files older than N days" ----
@@ -133,9 +134,9 @@ namespace CDriveCleaner
         {
             try
             {
-                if (File.Exists(path)) { if (File.GetLastWriteTimeUtc(path) < cutoffUtc) Delete(path); return; }
+                if (File.Exists(path)) { if (File.GetLastWriteTimeUtc(path) < cutoffUtc) DeleteNow(path); return; }
                 if (!Directory.Exists(path) || (new DirectoryInfo(path).Attributes & FileAttributes.ReparsePoint) != 0) return;
-                if (IsOld(path, cutoffUtc)) { Delete(path); return; }
+                if (IsOld(path, cutoffUtc)) { DeleteNow(path); return; }
                 foreach (var c in Directory.GetFileSystemEntries(path)) DeleteOld(c, cutoffUtc);
             }
             catch { }
@@ -175,6 +176,12 @@ namespace CDriveCleaner
 
         // Deletes a file or a whole folder. Junctions/symlinks are removed as links, never followed.
         public static void Delete(string path)
+        {
+            if (MinAgeDays > 0) { DeleteOld(path, Cutoff); return; }   // the policy keeps newer files for this item
+            DeleteNow(path);
+        }
+
+        static void DeleteNow(string path)
         {
             if (Win.IsWindows) { try { SafeDelete.Delete(path); } catch { } return; }
             DeleteLinux(path, new HashSet<string>(Lx.Mounts().Select(m => m.Point)));

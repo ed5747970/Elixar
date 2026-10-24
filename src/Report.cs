@@ -91,8 +91,8 @@ namespace CDriveCleaner
                                                 InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                try { SafeFile.WriteText(d.FileName, html); }
-                catch { try { File.WriteAllText(d.FileName, html, new UTF8Encoding(false)); } catch (Exception e) { Lang.Box(this, e.Message, "Elixar"); return; } }
+                try { SafeFile.Save(d.FileName, html); }
+                catch (Exception e) { Lang.Box(this, e.Message, "Elixar"); return; }
                 Log(Lang.T("Report saved: ") + d.FileName);
                 try { Shell.Open(d.FileName); } catch { }
             }

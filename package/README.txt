@@ -17,6 +17,13 @@ NEW IN 1.2.41
   by itself (low-space check, weekly clean, daily tidy, email reports and
   the weekly summary day) is set there, and Task Scheduler follows when
   you save. Your existing times move over once, unchanged.
+- Security review: files you save from a Save box (reports, logs, policy,
+  answer files, image passport, capture kit) are always written the safe
+  way, never through a link another program planted; schedule files are
+  read without outside references; a damaged browser password database is
+  refused. Fixed: "only files older than" now also keeps a new full crash
+  dump, and turning on "Clean it by itself" now always creates its
+  schedule.
 
 NEW IN 1.2.40
 - Policy manager (next to Logs): the rules for what Elixar may change on
