@@ -57,7 +57,7 @@ namespace CDriveCleaner
             });
 
             // ---------- space map ----------
-            Run(check, "Space map: a drive is read once into folders and their sizes (links are not followed), boxes fill the map without overlapping, and each box gets the Dashboard's warning sign", () =>
+            Run(check, "Space map: a drive is read once into folders and their sizes (links are not followed), each folder gets a slice of the circle as big as its share, and each gets the Dashboard's warning sign", () =>
             {
                 string m = Path.Combine(R, "map"); Directory.CreateDirectory(Path.Combine(m, "big", "inner")); Directory.CreateDirectory(Path.Combine(m, "small"));
                 File.WriteAllBytes(Path.Combine(m, "big", "inner", "a.bin"), new byte[3 << 20]); File.WriteAllBytes(Path.Combine(m, "small", "b.bin"), new byte[20000]); File.WriteAllBytes(Path.Combine(m, "c.txt"), new byte[1000]);
@@ -69,14 +69,9 @@ namespace CDriveCleaner
                 if (top.Children.Count != 3 || top.Children[0].Name != "big" || !top.Children.Any(c => c.IsFiles && c.Size == 1000)) return "children " + string.Join(",", top.Children.Select(c => c.Name + "=" + c.Size));
                 var small = top.Children.First(c => c.Name == "small");
                 if (small.Children.Count != 0 || top.Children[0].Children.Count != 1) return "prune";
-                var area = new RectangleF(0, 0, 300, 200);
-                SpaceScan.Layout(top.Children, area);
-                foreach (var a in top.Children)
-                {
-                    if (a.Box.Left < -0.01 || a.Box.Top < -0.01 || a.Box.Right > 300.01 || a.Box.Bottom > 200.01) return "outside the map";
-                    if (Math.Abs(a.Box.Width * a.Box.Height - a.Size * 60000.0 / want) > 2) return "area of " + a.Name;
-                    foreach (var b in top.Children) if (b != a) { var x = RectangleF.Intersect(a.Box, b.Box); if (x.Width * x.Height > 0.5f) return "overlap"; }
-                }
+                var sw = SpaceScan.Sweeps(top, 360f);
+                // big takes most of the circle; the 1 KB of files is a sliver (under 0.8 degrees) and is drawn with "other"
+                if (sw.Count != 2 || sw[0].Key.Name != "big" || Math.Abs(sw.Sum(x => x.Value) + 360.0 * 1000 / want - 360) > 0.01 || Math.Abs(sw[0].Value - 360.0 * (3 << 20) / want) > 0.01) return "circle " + string.Join(",", sw.Select(x => x.Key.Name + "=" + x.Value));
                 var places = new List<DashLoc> { new DashLoc { Path = Path.Combine(m, "big"), Tier = "safe" }, new DashLoc { Path = m, Tier = "review" } };
                 if (SpaceScan.TierOf(Path.Combine(m, "big", "inner"), places) != "safe" || SpaceScan.TierOf(Path.Combine(m, "small"), places) != "review" || SpaceScan.TierOf(outside, places) != "") return "tiers";
                 MainForm.MapRootOverride = m;

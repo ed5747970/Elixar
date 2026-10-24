@@ -23,7 +23,6 @@ namespace CDriveCleaner
         public List<string> Biggest = new List<string>();   // IsFiles: the biggest files (up to 3), for the name and the warning sign
         public MapNode Parent;
         public List<MapNode> Children = new List<MapNode>();
-        public RectangleF Box;               // where it is drawn now
     }
 
     public static class SpaceScan
@@ -94,50 +93,17 @@ namespace CDriveCleaner
             return top;
         }
 
-        // the squarified layout: boxes as close to squares as they can be, biggest first
-        public static void Layout(List<MapNode> items, RectangleF r)
+        // each child's share of a ring (in degrees), biggest first; slivers under 0.8 degrees are left out (drawn together as "other")
+        public static List<KeyValuePair<MapNode, float>> Sweeps(MapNode parent, float sweep)
         {
-            var list = items.Where(i => i.Size > 0).OrderByDescending(i => i.Size).ToList();
-            foreach (var i in items) i.Box = RectangleF.Empty;
-            double total = list.Sum(i => (double)i.Size);
-            if (total <= 0 || r.Width < 1 || r.Height < 1) return;
-            double scale = r.Width * (double)r.Height / total;
-            int start = 0; var rect = r;
-            while (start < list.Count)
+            var l = new List<KeyValuePair<MapNode, float>>();
+            if (parent == null || parent.Size <= 0) return l;
+            foreach (var n in parent.Children)
             {
-                float side = Math.Min(rect.Width, rect.Height);
-                var row = new List<MapNode> { list[start] }; double rowArea = list[start].Size * scale;
-                double worst = Worst(row, rowArea, side, scale);
-                int k = start + 1;
-                while (k < list.Count)
-                {
-                    var tryRow = new List<MapNode>(row) { list[k] };
-                    double a = rowArea + list[k].Size * scale, w = Worst(tryRow, a, side, scale);
-                    if (w > worst) break;
-                    row = tryRow; rowArea = a; worst = w; k++;
-                }
-                // place the row along the shorter side
-                bool alongWidth = rect.Width >= rect.Height;
-                float thick = (float)(rowArea / side);
-                float pos = alongWidth ? rect.Y : rect.X;
-                foreach (var n in row)
-                {
-                    float len = (float)(n.Size * scale / thick);
-                    n.Box = alongWidth ? new RectangleF(rect.X, pos, thick, len) : new RectangleF(pos, rect.Y, len, thick);
-                    pos += len;
-                }
-                rect = alongWidth ? new RectangleF(rect.X + thick, rect.Y, Math.Max(0, rect.Width - thick), rect.Height)
-                                  : new RectangleF(rect.X, rect.Y + thick, rect.Width, Math.Max(0, rect.Height - thick));
-                start = k;
+                float sw = (float)(sweep * n.Size / (double)parent.Size);
+                if (sw >= 0.8f) l.Add(new KeyValuePair<MapNode, float>(n, sw));
             }
-        }
-
-        static double Worst(List<MapNode> row, double area, float side, double scale)
-        {
-            if (area <= 0) return double.MaxValue;
-            double s2 = side * (double)side, a2 = area * area, w = 0;
-            foreach (var n in row) { double r = n.Size * scale; if (r <= 0) continue; w = Math.Max(w, Math.Max(s2 * r / a2, a2 / (s2 * r))); }
-            return w;
+            return l;
         }
 
         // the warning sign of a path: the nearest place on the Dashboard's map that holds it (none = "")
@@ -154,65 +120,167 @@ namespace CDriveCleaner
         }
     }
 
-    // the drawing
+    // the drawing: a circle (sunburst): the folder shown in the middle, each ring one level deeper, each slice as wide as the space it takes
     public class TreeMap : Control
     {
         public MapNode Root;
         public List<DashLoc> Places = new List<DashLoc>();
         public MapNode Hover, Picked;
         public event Action<MapNode> Opened, PickedChanged;
+        public event Action GoUp;
         public Func<string, Color> ColorFor;
+        public float Scale_ = 1f;
         readonly ToolTip tip = new ToolTip();
         string lastTip = "";
+        const int Rings = 3;
+
+        class Slice { public MapNode Node; public int Depth; public float Start, Sweep; }
+        readonly List<Slice> slices = new List<Slice>();
+        readonly List<KeyValuePair<MapNode, Rectangle>> rows = new List<KeyValuePair<MapNode, Rectangle>>();
+        PointF center; float r0, ringW;
 
         public TreeMap()
         {
             DoubleBuffered = true;
-            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
+        int S(int v) { return (int)Math.Round(v * Scale_); }
 
         public void Show(MapNode n) { Root = n; Hover = null; Picked = null; Invalidate(); if (PickedChanged != null) PickedChanged(null); }
+
+        Color Bg { get { return Theme.Panel; } }
+        Color TierCol(MapNode n) { return ColorFor != null ? ColorFor(MapTier(n)) : Color.SteelBlue; }
 
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
-            g.Clear(BackColor);
-            if (Root == null || Root.Size <= 0) return;
-            var area = new RectangleF(1, 1, Width - 3, Height - 3);
-            SpaceScan.Layout(Root.Children, area);
-            g.SmoothingMode = SmoothingMode.None;
-            foreach (var n in Root.Children)
+            g.Clear(Bg);
+            slices.Clear(); rows.Clear();
+            if (Root == null || Root.Size <= 0)
             {
-                if (n.Box.Width < 1 || n.Box.Height < 1) continue;
-                string tier = MapTier(n);
-                Color c = ColorFor != null ? ColorFor(tier) : Color.SteelBlue;
-                if (n.IsFiles) c = Blend(c, BackColor, 0.2);
-                if (n == Hover) c = Blend(c, Color.White, 0.25);
-                var r = Rectangle.Round(n.Box);
-                using (var b = new LinearGradientBrush(new Rectangle(r.X, r.Y, Math.Max(1, r.Width), Math.Max(1, r.Height)), Blend(c, Color.White, 0.18), Blend(c, Color.Black, 0.12), 45f))
-                    g.FillRectangle(b, r);
-                // the folders inside, as faint lines (a hint of what's in it)
-                if (n.IsDir && r.Width > 40 && r.Height > 40 && n.Children.Count > 1)
-                {
-                    SpaceScan.Layout(n.Children, new RectangleF(r.X + 3, r.Y + 20, r.Width - 6, r.Height - 23));
-                    using (var p = new Pen(Color.FromArgb(70, 255, 255, 255)))
-                        foreach (var cc in n.Children) if (cc.Box.Width >= 3 && cc.Box.Height >= 3) g.DrawRectangle(p, Rectangle.Round(cc.Box));
-                }
-                using (var p = new Pen(BackColor, 1)) g.DrawRectangle(p, r);
-                if (n == Picked && r.Width > 6 && r.Height > 6)
-                {
-                    using (var p = new Pen(Color.White, 3)) g.DrawRectangle(p, Rectangle.Inflate(r, -2, -2));
-                    using (var p = new Pen(Color.FromArgb(20, 20, 30), 1)) g.DrawRectangle(p, Rectangle.Inflate(r, -4, -4));
-                }
-                if (r.Width > 60 && r.Height > 18)
-                {
-                    string text = Lang.T(n.Name) + "  " + Fs.Fmt(n.Size);
-                    TextRenderer.DrawText(g, text, Font, new Rectangle(r.X + 4, r.Y + 2, r.Width - 8, 18), Color.White,
-                        TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | (Lang.Rtl ? TextFormatFlags.Right : 0));
-                }
+                TextRenderer.DrawText(g, Lang.T("Click \"Map this drive\" to see what takes the space."), Font, ClientRectangle, Theme.Quiet,
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+                return;
             }
-            // the boxes are laid out again for the mouse (the inner hint changed the children's boxes)
-            SpaceScan.Layout(Root.Children, area);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            int listW = Width >= S(760) ? Math.Min(S(380), (int)(Width * 0.36)) : 0;
+            var drawArea = new Rectangle(0, 0, Width - listW, Height);
+            PaintRings(g, drawArea);
+            if (listW > 0) PaintList(g, new Rectangle(Width - listW, 0, listW, Height));
+        }
+
+        // ---------- rings ----------
+        void PaintRings(Graphics g, Rectangle a)
+        {
+            float R = Math.Min(a.Width, a.Height) / 2f - S(14);
+            if (R < S(60)) return;
+            center = new PointF(a.X + a.Width / 2f, a.Y + a.Height / 2f);
+            r0 = R * 0.34f; ringW = (R - r0) / Rings;
+            Ring(g, Root, -90f, 360f, 1);
+            // the labels of the first ring, where there is room
+            using (var f = new Font(Font.FontFamily, Font.Size * 0.95f, FontStyle.Bold))
+                foreach (var sl in slices.Where(x => x.Depth == 1 && x.Sweep >= 16f))
+                {
+                    double mid = (sl.Start + sl.Sweep / 2) * Math.PI / 180;
+                    float rr = r0 + ringW / 2;
+                    var p = new PointF(center.X + (float)Math.Cos(mid) * rr, center.Y + (float)Math.Sin(mid) * rr);
+                    string name = Lang.T(sl.Node.Name);
+                    var sz = TextRenderer.MeasureText(name, f);
+                    float room = (float)(sl.Sweep * Math.PI / 180 * rr);
+                    if (sz.Width > Math.Max(room, ringW * 1.6f)) continue;
+                    TextRenderer.DrawText(g, name, f, new Rectangle((int)(p.X - sz.Width / 2), (int)(p.Y - sz.Height / 2), sz.Width + 2, sz.Height), Color.White, TextFormatFlags.NoPrefix);
+                }
+            // the middle: what the mouse is on, or the folder shown
+            var m = Hover ?? Picked ?? Root;
+            using (var b = new SolidBrush(Theme.Dark ? Color.FromArgb(52, 52, 62) : Color.FromArgb(244, 246, 250))) g.FillEllipse(b, center.X - r0 + S(4), center.Y - r0 + S(4), (r0 - S(4)) * 2, (r0 - S(4)) * 2);
+            int w = (int)(r0 * 1.6f);
+            using (var big = new Font(Font.FontFamily, Font.Size * 1.9f, FontStyle.Bold))
+            using (var mid = new Font(Font.FontFamily, Font.Size * 1.05f, FontStyle.Bold))
+            {
+                string pct = m != Root && Root.Size > 0 ? Math.Round(m.Size * 100.0 / Root.Size) + "%" : "";
+                TextRenderer.DrawText(g, Lang.T(m == Root ? (Root.Parent == null ? Root.Path : Root.Name) : m.Name), mid, new Rectangle((int)center.X - w / 2, (int)(center.Y - S(44)), w, S(22)), Theme.Ink,
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+                TextRenderer.DrawText(g, Fs.Fmt(m.Size), big, new Rectangle((int)center.X - w / 2, (int)(center.Y - S(20)), w, S(36)), m == Root ? Theme.Ink : TierCol(m),
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+                string sub = m == Root ? (Root.Parent != null ? Lang.T("click the middle to go back") : Lang.T("double-click a ring to go inside")) : pct + "  ·  " + Lang.T(TierShort(MapTier(m)));
+                TextRenderer.DrawText(g, sub, Font, new Rectangle((int)center.X - w / 2, (int)(center.Y + S(18)), w, S(20)), Theme.Quiet,
+                                      TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+            }
+        }
+
+        void Ring(Graphics g, MapNode parent, float start, float sweep, int depth)
+        {
+            if (depth > Rings || parent.Size <= 0) return;
+            float a = start, other = sweep;
+            foreach (var kv in SpaceScan.Sweeps(parent, sweep))
+            {
+                var n = kv.Key; float sw = kv.Value; other -= sw;
+                var sl = new Slice { Node = n, Depth = depth, Start = a, Sweep = sw };
+                slices.Add(sl);
+                Color c = TierCol(n);
+                c = Blend(c, Bg, Math.Min(0.6, (depth - 1) * 0.22 + (n.IsFiles ? 0.18 : 0)));
+                if (n == Hover || n == Picked) c = Blend(c, Color.White, 0.22);
+                Sector(g, c, depth, a, sw, n == Picked);
+                if (n.IsDir && n.Children.Count > 0) Ring(g, n, a, sw, depth + 1);
+                a += sw;
+            }
+            if (other > 0.3f) Sector(g, Blend(Theme.Grid, Bg, 0.2), depth, a, other, false);
+        }
+
+        void Sector(Graphics g, Color c, int depth, float start, float sweep, bool picked)
+        {
+            float ri = r0 + (depth - 1) * ringW, ro = ri + ringW - S(2);
+            using (var path = new GraphicsPath())
+            {
+                path.AddArc(center.X - ro, center.Y - ro, ro * 2, ro * 2, start, sweep);
+                path.AddArc(center.X - ri, center.Y - ri, ri * 2, ri * 2, start + sweep, -sweep);
+                path.CloseFigure();
+                using (var b = new SolidBrush(c)) g.FillPath(b, path);
+                using (var p = new Pen(Bg, S(2) >= 2 ? 1.6f : 1f)) g.DrawPath(p, path);
+                if (picked) using (var p = new Pen(Theme.Ink, 2.5f)) g.DrawPath(p, path);
+            }
+        }
+
+        static string TierShort(string t) { return t == "critical" ? "Critical" : t == "caution" ? "Caution" : t == "review" ? "Review" : t == "safe" ? "Safe" : "Other"; }
+
+        static GraphicsPath Round(Rectangle r, int rad)
+        {
+            var p = new GraphicsPath(); int d = Math.Max(1, rad * 2);
+            p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            p.CloseFigure(); return p;
+        }
+
+        // ---------- the list beside it: the biggest, with a bar each ----------
+        void PaintList(Graphics g, Rectangle a)
+        {
+            using (var p = new Pen(Theme.Grid)) g.DrawLine(p, a.X, a.Y + S(10), a.X, a.Bottom - S(10));
+            int x = a.X + S(18), w = a.Width - S(30), y = a.Y + S(14), rowH = S(40);
+            using (var head = new Font(Font.FontFamily, Font.Size * 1.05f, FontStyle.Bold))
+                TextRenderer.DrawText(g, Lang.T("Biggest here"), head, new Point(x, y), Theme.Ink, TextFormatFlags.NoPrefix);
+            y += S(30);
+            int max = Math.Max(1, (a.Bottom - y - S(8)) / rowH);
+            var top = Root.Children.Take(max).ToList();
+            long biggest = top.Count > 0 ? Math.Max(1, top[0].Size) : 1;
+            using (var bold = new Font(Font.FontFamily, Font.Size, FontStyle.Bold))
+                foreach (var n in top)
+                {
+                    var rr = new Rectangle(a.X + S(8), y - S(4), a.Width - S(14), rowH - S(2));
+                    rows.Add(new KeyValuePair<MapNode, Rectangle>(n, rr));
+                    if (n == Hover || n == Picked)
+                        using (var b = new SolidBrush(Theme.Dark ? Color.FromArgb(56, 56, 68) : Color.FromArgb(238, 240, 247))) using (var path = Round(rr, S(6))) g.FillPath(b, path);
+                    Color c = TierCol(n);
+                    using (var b = new SolidBrush(c)) g.FillEllipse(b, x, y + S(4), S(10), S(10));
+                    string size = Fs.Fmt(n.Size);
+                    var sw = TextRenderer.MeasureText(size, bold).Width;
+                    TextRenderer.DrawText(g, Lang.T(n.Name), Font, new Rectangle(x + S(18), y, w - S(18) - sw - S(8), S(18)), Theme.Ink, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+                    TextRenderer.DrawText(g, size, bold, new Point(x + w - sw, y), Theme.Ink, TextFormatFlags.NoPrefix);
+                    int bw = Math.Max(S(3), (int)((w - S(18)) * (double)n.Size / biggest));
+                    using (var b = new SolidBrush(Theme.Grid)) using (var path = Round(new Rectangle(x + S(18), y + S(21), w - S(18), S(6)), S(3))) g.FillPath(b, path);
+                    using (var b = new SolidBrush(c)) using (var path = Round(new Rectangle(x + S(18), y + S(21), bw, S(6)), S(3))) g.FillPath(b, path);
+                    y += rowH;
+                }
         }
 
         // a folder: its own sign; the files in a folder: the most serious sign among its biggest files
@@ -230,22 +298,37 @@ namespace CDriveCleaner
 
         static Color Blend(Color a, Color b, double t) { return Color.FromArgb((int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t)); }
 
-        MapNode At(Point p) { return Root == null ? null : Root.Children.FirstOrDefault(n => n.Box.Contains(p)); }
+        // what is under the mouse; middle = the centre of the rings
+        MapNode At(Point p, out bool middle)
+        {
+            middle = false;
+            if (Root == null) return null;
+            foreach (var kv in rows) if (kv.Value.Contains(p)) return kv.Key;
+            double dx = p.X - center.X, dy = p.Y - center.Y, d = Math.Sqrt(dx * dx + dy * dy);
+            if (d < r0) { middle = true; return null; }
+            int depth = (int)((d - r0) / Math.Max(1, ringW)) + 1;
+            if (depth > Rings) return null;
+            double ang = Math.Atan2(dy, dx) * 180 / Math.PI; if (ang < -90) ang += 360;
+            var sl = slices.FirstOrDefault(x => x.Depth == depth && ang >= x.Start && ang < x.Start + x.Sweep);
+            return sl == null ? null : sl.Node;
+        }
+        MapNode At(Point p) { bool m; return At(p, out m); }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            var h = At(e.Location);
+            bool middle; var h = At(e.Location, out middle);
             if (h != Hover) { Hover = h; Invalidate(); }
             string t = h == null ? "" : Lang.T(h.Name) + "\n" + Fs.Fmt(h.Size) + (Root.Size > 0 ? "  (" + Math.Round(h.Size * 100.0 / Root.Size) + "%)" : "") + "\n" + h.Path;
             if (t != lastTip) { lastTip = t; tip.SetToolTip(this, t); }
-            Cursor = h != null && h.IsDir && h.Children.Count > 0 ? Cursors.Hand : Cursors.Default;
+            Cursor = (h != null && h.IsDir && h.Children.Count > 0) || (middle && Root != null && Root.Parent != null) ? Cursors.Hand : Cursors.Default;
         }
         protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); Hover = null; Invalidate(); }
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
-            var h = At(e.Location);
+            bool middle; var h = At(e.Location, out middle);
+            if (middle) { if (Root != null && Root.Parent != null && GoUp != null) GoUp(); return; }
             Picked = h; Invalidate();
             if (PickedChanged != null) PickedChanged(h);
         }
@@ -296,9 +379,9 @@ namespace CDriveCleaner
             }
             t.Controls.Add(top, 0, 1);
             mapPath = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 10f), Margin = new Padding(S(2), 0, 0, S(4)), UseMnemonic = false,
-                                  Text = "Click \"Map this drive\". Big boxes take the most space; double-click a box to go inside." };
+                                  Text = "" };
             t.Controls.Add(mapPath, 0, 2);
-            map = new TreeMap { Dock = DockStyle.Fill, BackColor = Color.FromArgb(30, 32, 40), Font = new Font("Segoe UI", 9f), Margin = new Padding(0), ColorFor = MapColor };
+            map = new TreeMap { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f), Margin = new Padding(0), ColorFor = MapColor, Scale_ = s };
             t.Controls.Add(map, 0, 3);
             var bottom = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, S(6), 0, 0) };
             mapInfo = new Label { AutoSize = true, Margin = new Padding(S(2), S(7), S(12), 0), UseMnemonic = false, MaximumSize = new Size(S(700), 0) };
@@ -311,6 +394,7 @@ namespace CDriveCleaner
             btnMapScan.Click += (o, e) => MapScan();
             btnMapUp.Click += (o, e) => { if (map.Root != null && map.Root.Parent != null) MapShow(map.Root.Parent); };
             map.Opened += n => MapShow(n);
+            map.GoUp += () => btnMapUp.PerformClick();
             map.PickedChanged += n =>
             {
                 btnMapOpen.Enabled = btnMapExplain.Enabled = n != null;
@@ -326,11 +410,11 @@ namespace CDriveCleaner
         {
             switch (tier)
             {
-                case "critical": return Color.FromArgb(178, 60, 56);
-                case "caution": return Color.FromArgb(205, 128, 30);
-                case "review": return Color.FromArgb(120, 100, 190);
-                case "safe": return Color.FromArgb(46, 140, 90);
-                default: return Color.FromArgb(70, 110, 160);
+                case "critical": return Color.FromArgb(214, 76, 72);
+                case "caution": return Color.FromArgb(230, 145, 45);
+                case "review": return Color.FromArgb(132, 110, 214);
+                case "safe": return Color.FromArgb(46, 160, 105);
+                default: return Color.FromArgb(78, 128, 190);
             }
         }
         static string TierWords(string tier)
@@ -376,7 +460,7 @@ namespace CDriveCleaner
         {
             map.Show(n);
             btnMapUp.Enabled = n.Parent != null;
-            mapPath.Text = n.Path + "  \u00B7  " + Fs.Fmt(n.Size) + "  \u00B7  " + Lang.T(n.Children.Count == 1 ? "1 box" : n.Children.Count + " boxes") + "  \u00B7  " + Lang.T("double-click a box to go inside");
+            mapPath.Text = n.Path + "  \u00B7  " + Fs.Fmt(n.Size) + "  \u00B7  " + Lang.T(n.Children.Count == 1 ? "1 item" : n.Children.Count + " items") + "  \u00B7  " + Lang.T("double-click a ring to go inside");
         }
 
         // only what isn't Critical, isn't one of Windows' folders, and isn't the whole drive

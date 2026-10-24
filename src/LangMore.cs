@@ -100,6 +100,11 @@ namespace CDriveCleaner
             new[] { "Windows and apps", "Windows والتطبيقات", "Windows и приложения", "Windows y aplicaciones" },
             new[] { "All drives", "كل الأقراص", "Все диски", "Todas las unidades" },
             new[] { "Drive C:", "القرص C:", "Диск C:", "Unidad C:" },
+            new[] { "Biggest here", "الأكبر هنا", "Самое большое", "Lo más grande" },
+            new[] { "click the middle to go back", "انقر الوسط للرجوع", "щёлкните в центре, чтобы вернуться", "haga clic en el centro para volver" },
+            new[] { "double-click a ring to go inside", "انقر نقرًا مزدوجًا على حلقة للدخول", "двойной щелчок по кольцу - войти", "doble clic en un anillo para entrar" },
+            new[] { "Click \"Map this drive\" to see what takes the space.", "انقر \"ارسم خريطة هذا القرص\" لترى ما يشغل المساحة.", "Нажмите «Построить карту диска», чтобы увидеть, что занимает место.", "Haga clic en \"Mapear esta unidad\" para ver qué ocupa el espacio." },
+            new[] { "1 item", "عنصر واحد", "1 элемент", "1 elemento" },
             // levels
             new[] { "Critical - never delete", "حرج - لا تحذف أبدًا", "Критично - не удалять", "Crítico - no borrar nunca" },
             new[] { "Caution - only with the right tool", "تنبيه - فقط بالأداة المناسبة", "Осторожно - только нужным средством", "Precaución - solo con la herramienta adecuada" },
@@ -294,6 +299,7 @@ namespace CDriveCleaner
                 "يمكن تحرير " + m.Groups[1].Value + " من الذاكرة المؤقتة والملفات المؤقتة بأمان: يعيد Windows وتطبيقاتك إنشاءها تلقائيًا.",
                 m.Groups[1].Value + " кэша и временных файлов можно безопасно освободить: Windows и приложения создадут их заново.",
                 "Se pueden liberar con seguridad " + m.Groups[1].Value + " de cachés y archivos temporales: Windows y sus aplicaciones los vuelven a crear."));
+            Pat(@"(\d+) items", m => m.Groups[1].Value + w(" عناصر", " эл.", " elementos"));
             Pat(@"(\d+) PCs", m => m.Groups[1].Value + w(" أجهزة", " ПК", " equipos"));
             return d;
         }

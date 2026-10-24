@@ -1,7 +1,14 @@
-ELIXAR  (version 1.2.50)
+ELIXAR  (version 1.2.51)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.51
+- Space map has a new look: a circle. The folder you are in is in the
+  middle, the folders in it are the first ring (each slice as wide as the
+  space it takes) and the next two levels are the outer rings, in the
+  warning-sign colours. "Biggest here" beside it lists the largest with a
+  bar each. Double-click a slice to go in, click the middle to go back.
 
 NEW IN 1.2.50
 - Tools > Space map: the whole drive as boxes as big as the space they

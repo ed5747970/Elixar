@@ -1797,6 +1797,11 @@ namespace CDriveCleaner
             d["Apps > Updates: newer versions through Windows' package manager (winget)."] = "אפליקציות > עדכונים: גרסאות חדשות דרך מנהל החבילות של Windows (winget).";
             d["Sponsor Elixar"] = "תמיכה ב-Elixar";
             d["Arabic, Russian and Spanish cover the main screens; the rest stays in English. Email reports are in Hebrew or English."] = "ערבית, רוסית וספרדית מתרגמות את המסכים הראשיים; השאר נשאר באנגלית. דוחות הדואר בעברית או באנגלית.";
+            d["Biggest here"] = "הגדולים כאן";
+            d["click the middle to go back"] = "לחיצה על המרכז חוזרת אחורה";
+            d["double-click a ring to go inside"] = "לחיצה כפולה על טבעת נכנסת פנימה";
+            d["Click \"Map this drive\" to see what takes the space."] = "לחצו \"מיפוי הכונן\" כדי לראות מה תופס את המקום.";
+            d["1 item"] = "פריט אחד";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["On every internal drive, only your own Recycle Bin. What you deleted recently stays, so you can still get it back."] = "בכל כונן פנימי, רק סל המיחזור שלך. מה שמחקת לאחרונה נשאר, כך שעדיין אפשר להחזיר אותו.";
@@ -2150,6 +2155,7 @@ namespace CDriveCleaner
             Pat(@"Elixar has freed (.+) on this PC since (.+?)( \((.+) this month\))?\.", m => "Elixar פינה " + m.Groups[1].Value + " במחשב הזה מאז " + m.Groups[2].Value + (m.Groups[3].Success ? " (" + m.Groups[4].Value + " החודש)" : "") + ".");
             Pat(@"Last startup took (.+) s \(until the desktop: (.+) s\); the last (\d+) took (.+) s on average\.", m => "ההפעלה האחרונה ארכה " + m.Groups[1].Value + " שנ׳ (עד שולחן העבודה: " + m.Groups[2].Value + " שנ׳); " + m.Groups[3].Value + " ההפעלות האחרונות ארכו " + m.Groups[4].Value + " שנ׳ בממוצע.");
             Pat(@"(.+) - (Critical - never delete|Caution - only with the right tool|Review - your decision|Safe - rebuilt automatically|Not on the Dashboard\'s map)", m => m.Groups[1].Value + " - " + T(m.Groups[2].Value));
+            Pat(@"(\d+) items", m => m.Groups[1].Value + " פריטים");
             Pat(@"(\d+) s", m => m.Groups[1].Value + " שנ׳");
             Pat(@"(\d+) selected", m => m.Groups[1].Value + " נבחרו");
             Pat(@"Checking (.+)", m => "בודק " + m.Groups[1].Value);

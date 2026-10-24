@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.50</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.51</p></div>
 </div></header>
 <main class="wrap">
 
@@ -171,7 +171,7 @@
 <h2 id="tools">Tools</h2>
 <p>The Tools tab has inner tabs for deeper jobs.</p>
 <h3>Space map</h3>
-<p>Click <strong>Map this drive</strong>: Elixar reads the drive once and draws every folder as a box as big as the space it takes, coloured by its warning sign (red Critical, orange Caution, purple Review, green Safe, blue for folders the Dashboard doesn&rsquo;t list). Double-click a box to go inside, <strong>Back up a level</strong> to go up. Links and junctions are never followed, so nothing is counted twice. Click a box, then <strong>Is this safe to delete?</strong> for a plain answer, <strong>Open in Explorer</strong>, or <strong>Move to Undo...</strong> (never for Critical or Windows&rsquo; own folders; asks first; kept in Tools &gt; Undo). The Dashboard&rsquo;s Folder map opens it too.</p>
+<p>Click <strong>Map this drive</strong>: Elixar reads the drive once and draws it as a circle. The middle is the folder shown; the first ring is the folders in it, each slice as wide as the space it takes; the outer rings go one and two levels deeper. Colours are the warning signs (red Critical, orange Caution, purple Review, green Safe, blue for folders the Dashboard doesn&rsquo;t list). Point at a slice to see its name and size in the middle; <strong>Biggest here</strong> on the right lists the largest with a bar each. Double-click a slice to go inside; click the middle or <strong>Back up a level</strong> to go up. Links and junctions are never followed, so nothing is counted twice. Click a slice (or a row in the list), then <strong>Is this safe to delete?</strong> for a plain answer, <strong>Open in Explorer</strong>, or <strong>Move to Undo...</strong> (never for Critical or Windows&rsquo; own folders; asks first; kept in Tools &gt; Undo). The Dashboard&rsquo;s Folder map opens it too.</p>
 <h3>Is this safe to delete?</h3>
 <p>Right-click a location on the Dashboard, a file in Largest files, or a folder in Explore (or use the Space map&rsquo;s button): a small window says <em>No - never</em>, <em>Only with the right tool</em>, <em>Your decision</em> or <em>Yes - rebuilt automatically</em>, with what it is, what happens if it goes, and the right way to remove it. The answers come from Elixar&rsquo;s own list on this PC. <strong>Search the web for it</strong> opens a search with only the folder&rsquo;s name, never the full path (paths hold your user name).</p>
 <h3>Windows tweaks</h3>
@@ -464,6 +464,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-24</td><td>1.2.51</td><td>Space map redrawn as a circle (sunburst): the folder in the middle, three rings of folders around it, a &ldquo;Biggest here&rdquo; list beside it, and brighter warning-sign colours</td></tr>
   <tr><td>2026-10-24</td><td>1.2.50</td><td>Space map (Tools: the whole drive as boxes by size and warning sign); &ldquo;Is this safe to delete?&rdquo; for any folder or file; Windows tweaks (ads, tips, Bing in Start, Copilot, extra data, background apps; each change undoable in Logs and settable in Policy manager); Apps &gt; Updates through winget; uninstall + leftovers in one step; startup impact from Windows&rsquo; own measurements; savings counter on the Dashboard; Arabic, Russian and Spanish for the main screens; for IT a command line, an MSI and the fleet report; Sponsor button (when published on GitHub)</td></tr>
   <tr><td>2026-10-24</td><td>1.2.41</td><td>Policy manager: Folders page (the Dashboard&rsquo;s folders by warning sign: Critical locked, Caution / Review / Safe with the rule of the item that cleans them; Downloads to Undo after 7-90 days; Recycle Bin only old items), Cleaning items page (Ask me / Clean it by itself at its own time / Never touch it, and only files older than 1-90 days, checked every half hour), and every schedule&rsquo;s time set in the policy (moved from Automation, existing times kept). Security review: Save boxes always write the safe way (never through a planted link), schedule XML read without outside references, damaged password databases refused; fixes for the age limit on single files and the policy cleaning schedule</td></tr>
   <tr><td>2026-10-21</td><td>1.2.40</td><td>Policy manager next to Logs: Default or Custom rules for what Elixar may change, presets, export / import, a .reg file for IT, organization rules (Group Policy / Intune). Logs tab next to Settings: every change Elixar makes, grouped by day and by section (Cleaner, Duplicates, Startup, Deleted...), in plain words with before and after, how to undo it, one-click undo for registry values, changes.txt for Notepad, and export to .csv or .txt</td></tr>
