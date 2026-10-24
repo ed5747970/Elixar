@@ -4,8 +4,16 @@ name: Release
 on:
   push:
     tags: [ 'v*' ]
+  # or by hand: Actions > Release > Run workflow, with the version (for example 1.2.52); the tag is made from main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example 1.2.52 (must match AssemblyVersion in src/CDriveCleaner.cs)"
+        required: true
 permissions:
   contents: write
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.event.inputs.version) || github.ref_name }}
 jobs:
   release:
     runs-on: windows-latest
@@ -30,7 +38,7 @@ jobs:
         shell: powershell
         run: |
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
-          $tag = "${{ github.ref_name }}".TrimStart('v')
+          $tag = "$env:TAG".TrimStart('v')
           if (-not $v.StartsWith($tag)) { throw "Tag $tag does not match the version in the code ($v). Change AssemblyVersion in src\CDriveCleaner.cs." }
           $pkg = "pkg\Elixar"
           New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
@@ -69,4 +77,4 @@ jobs:
           $files = @("Elixar.zip", "elixar-manifest.txt")
           if (Test-Path elixar-manifest.sig) { $files += "elixar-manifest.sig" }
           if (Test-Path Elixar.msi) { $files += "Elixar.msi" }
-          gh release create "${{ github.ref_name }}" @files --title "Elixar ${{ github.ref_name }}" --generate-notes
+          gh release create "$env:TAG" @files --title "Elixar $env:TAG" --target "${{ github.sha }}" --generate-notes
