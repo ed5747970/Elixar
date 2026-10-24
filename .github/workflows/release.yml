@@ -8,12 +8,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, for example 1.2.52 (must match AssemblyVersion in src/CDriveCleaner.cs)"
+        description: "Version to release, for example 1.2.52 (with or without v) (must match AssemblyVersion in src/CDriveCleaner.cs)"
         required: true
 permissions:
   contents: write
 env:
-  TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.event.inputs.version) || github.ref_name }}
+  # typed as 1.2.52 or v1.2.52: the tag is always v1.2.52
+  TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || github.ref_name }}
 jobs:
   release:
     runs-on: windows-latest
