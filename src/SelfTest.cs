@@ -93,7 +93,7 @@ namespace CDriveCleaner
                 try { items = Catalog.Build(); } catch (Exception ex) { check(false, "Building the list of items: " + ex.Message); }
                 if (items != null)
                 {
-                    check(items.Count == 43 && items.Where(i => i.Privacy).All(i => !i.DefaultOn && i.Tier == Tier.Review), "List has 43 items; privacy items are never ticked for you");
+                    check(items.Count(i => i.Drive == null) == 43 && items.Where(i => i.Privacy).All(i => !i.DefaultOn && i.Tier == Tier.Review), "List has 43 items (plus any for other drives); privacy items are never ticked for you" + (items.Count(i => i.Drive == null) == 43 ? "" : "  (" + items.Count(i => i.Drive == null) + ")"));
                     bool allOk = true;
                     foreach (var it in items)
                     {
