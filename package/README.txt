@@ -1,16 +1,9 @@
-ELIXAR  (version 1.2.40)
+ELIXAR  (version 1.2.41)
 The cure for a cluttered PC
 Made by Elisar
 =======================
 
-NEW IN 1.2.40
-- Policy manager (next to Logs): the rules for what Elixar may change on
-  this PC. Default = Elixar's own rules (works exactly as before); Custom =
-  your copy, kept when you switch back. Presets (Careful, Deep clean,
-  Golden image, Locked down), cleaning level, restore points, Undo days,
-  which tools are allowed, required PIN. Export / import a policy file,
-  or export a .reg for IT (HKLM\SOFTWARE\Policies\Elixar via Group Policy /
-  Intune): those rules are locked as "Set by your organization".
+NEW IN 1.2.41
 - Policy manager > Folders: the Dashboard's folders by their warning sign
   (Critical, Caution, Review, Safe). Critical folders are never deleted;
   the others get the rule of the item that cleans them (same choices,
@@ -24,6 +17,15 @@ NEW IN 1.2.40
   by itself (low-space check, weekly clean, daily tidy, email reports and
   the weekly summary day) is set there, and Task Scheduler follows when
   you save. Your existing times move over once, unchanged.
+
+NEW IN 1.2.40
+- Policy manager (next to Logs): the rules for what Elixar may change on
+  this PC. Default = Elixar's own rules (works exactly as before); Custom =
+  your copy, kept when you switch back. Presets (Careful, Deep clean,
+  Golden image, Locked down), cleaning level, restore points, Undo days,
+  which tools are allowed, required PIN. Export / import a policy file,
+  or export a .reg for IT (HKLM\SOFTWARE\Policies\Elixar via Group Policy /
+  Intune): those rules are locked as "Set by your organization".
 - Logs (next to Settings): every change Elixar makes to this PC, newest
   first, grouped by day, each under its own section on the left (Cleaner,
   Duplicates, Smart scan, Startup, Phone, Sysprep... plus "Can be undone"
