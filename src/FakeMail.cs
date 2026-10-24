@@ -42,7 +42,8 @@ namespace CDriveCleaner
             {
                 TcpClient c;
                 try { c = listener.AcceptTcpClient(); } catch { return; }
-                new Thread(() => Serve(c)) { IsBackground = true }.Start();
+                // a client that hangs up mid-line is normal (Windows reports it as an error, Linux as the end): never let it take the process down
+                new Thread(() => { try { Serve(c); } catch (IOException) { } catch (SocketException) { } catch (ObjectDisposedException) { } }) { IsBackground = true }.Start();
             }
         }
 
