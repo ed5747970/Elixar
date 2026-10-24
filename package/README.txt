@@ -1,7 +1,18 @@
-ELIXAR  (version 1.2.51)
+ELIXAR  (version 1.2.52)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.52
+- First release built and fully self-tested on a real Windows PC (GitHub).
+- Fixed: while a duplicate goes to the Recycle Bin, the folders above it are
+  now really held, so none can be swapped for a link meanwhile.
+- Fixed: photos and videos copied from an iPhone keep their real names when
+  Windows hides file extensions (the default).
+- Fixed: a Sysprep answer file with a language Windows doesn't have is
+  refused (Windows 10 and later accept any well-formed name like "xx-YY").
+- Updates: releases are signed with Elisar's key; Elixar installs an update
+  only when its signature matches.
 
 NEW IN 1.2.51
 - Space map has a new look: a circle. The folder you are in is in the
