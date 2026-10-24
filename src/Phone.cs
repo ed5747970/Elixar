@@ -685,6 +685,9 @@ namespace CDriveCleaner
                     {
                         string name = Str(it, "Name");
                         if (IsFolder(it)) { stack.Push(new KeyValuePair<object, string>(SubFolder(it), cur.Value + "/" + name)); continue; }
+                        // "Name" is what Explorer shows, without the extension when extensions are hidden (Windows' default): use the real file name
+                        var real = Ext(it, "System.FileName");
+                        if (real != null && real.ToString().Length > 0) name = real.ToString();
                         long size = -1; try { size = Convert.ToInt64(Get(it, "Size")); } catch { }
                         if (size <= 0) size = Num(Ext(it, "System.Size"));
                         DateTime when = DateTime.MinValue; try { when = (DateTime)Get(it, "ModifyDate"); } catch { }

@@ -521,7 +521,9 @@ namespace CDriveCleaner
                 chain.Reverse();
                 foreach (var d in chain)
                 {
-                    var h = CreateFileW(Long(d), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING,
+                    // FILE_LIST_DIRECTORY (data access) matters: Windows ignores the share mode of a handle that can only read
+                    // attributes, so such a handle would not stop the folder being renamed or swapped for a link
+                    var h = CreateFileW(Long(d), 0x1 /* FILE_LIST_DIRECTORY */ | FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING,
                                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
                     FILE_BASIC_INFO info;
                     if (h.IsInvalid || !GetFileInformationByHandleEx(h, 0, out info, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO))) || (info.FileAttributes & ATTR_REPARSE) != 0)
