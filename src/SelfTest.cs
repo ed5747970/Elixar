@@ -1677,6 +1677,16 @@ namespace CDriveCleaner
                                            !File.Exists(Path.Combine(ad, "old.bin")) && !File.Exists(Path.Combine(ad, "sub", "old2.bin")) && File.Exists(Path.Combine(ad, "new.bin")) && File.Exists(Path.Combine(ad, "sub", "new2.bin"));
                                 var wrapped = cat.First(i => i.Name == "Error reports");
                                 itemsOk &= (wrapped.Info ?? "").Contains("older than 7 days");
+                                // folders by their warning sign: each Caution / Review / Safe folder is cleaned by a real Cleaner item, Critical ones never
+                                var names = new HashSet<string>(cat.Select(i => i.Name)) { Policy.DownloadsItem };
+                                var dlocs = DashData.Build();
+                                bool folders = Policy.FolderItems.Values.All(names.Contains) && dlocs.Where(l => l.Tier == "critical").All(l => !Policy.FolderItems.ContainsKey(l.Id)) &&
+                                               Policy.FolderFixed("system32", "critical").StartsWith("Never deleted") && Policy.FolderFixed("videos", "review").Contains("never deletes") &&
+                                               dlocs.Where(l => l.Tier == "safe").All(l => Policy.FolderItems.ContainsKey(l.Id)) && Policy.ExtraItems().All(i => i.Name == Policy.DownloadsItem && i.Tier == Tier.Review);
+                                var ci2 = new Dictionary<string, string>(Policy.Custom); ci2[Policy.ItemKey("Recycle Bin")] = "auto|daily|03:00|30"; Policy.Save(true, ci2);
+                                folders &= (Catalog.Build().First(i => i.Name == "Recycle Bin" && i.Drive == null).Info ?? "").Contains("deleted more than 30 days ago");
+                                if (!folders) pwhy += " [folders]";
+                                itemsOk &= folders;
                                 if (!itemsOk) pwhy += " [items]";
                                 work &= itemsOk;
                                 // the Policy manager tab, next to Logs
@@ -1684,6 +1694,9 @@ namespace CDriveCleaner
                                 bool itemUi = fi.PolicyItemRows > 10 && fi.CleanerRowTexts.Any(x => x.Contains("Thumbnail cache") && x.Contains("never") && !x.EndsWith("[x]")) && fi.PolicyItemWhenEnabled("Error reports") && !fi.PolicyItemWhenEnabled("Your temp files");
                                 fi.PolicySetItem("Your temp files", "auto|daily|04:30|1");
                                 itemUi &= fi.PolicyDirty && fi.PolicyItemWhenEnabled("Your temp files");
+                                // the Folders page shows every place on the Dashboard; a folder's rule and its item's rule are one rule
+                                itemUi &= fi.PolicyFolderRows == DashData.Build().Count && fi.PolicyItemValues("Your temp files").Count == 2 && fi.PolicyItemValues("Your temp files").Distinct().Count() == 1 &&
+                                          fi.PolicyItemValues("Crash dumps").Count == 3 && fi.PolicyItemValues("Crash dumps").Distinct().Count() == 1;
                                 fi.Dispose();
                                 if (!itemUi) pwhy += " [item tab]";
                                 work &= itemUi;

@@ -11,6 +11,11 @@ NEW IN 1.2.40
   which tools are allowed, required PIN. Export / import a policy file,
   or export a .reg for IT (HKLM\SOFTWARE\Policies\Elixar via Group Policy /
   Intune): those rules are locked as "Set by your organization".
+- Policy manager > Folders: the Dashboard's folders by their warning sign
+  (Critical, Caution, Review, Safe). Critical folders are never deleted;
+  the others get the rule of the item that cleans them (same choices,
+  same rule on both pages). Downloads can move files older than 7-90
+  days to Undo by itself; the Recycle Bin can empty only old items.
 - Policy manager > Cleaning items: for every item in the Cleaner, by its
   warning sign, choose Ask me, Clean it by itself (every day / week / month
   at the time you pick) or Never touch it, and keep files newer than

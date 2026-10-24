@@ -118,7 +118,11 @@ namespace CDriveCleaner
             var scroll2 = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Panel };
             var itemsGrid = BuildPolicyItems(); itemsGrid.Location = new Point(0, 0);
             scroll2.Controls.Add(itemsGrid); pItems.Controls.Add(scroll2);
-            polTabs.TabPages.Add(pRules); polTabs.TabPages.Add(pItems);
+            var pFolders = new TabPage("Folders") { BackColor = Theme.Panel };
+            var scroll3 = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Panel };
+            var foldersGrid = BuildPolicyFolders(); foldersGrid.Location = new Point(0, 0);
+            scroll3.Controls.Add(foldersGrid); pFolders.Controls.Add(scroll3);
+            polTabs.TabPages.Add(pRules); polTabs.TabPages.Add(pFolders); polTabs.TabPages.Add(pItems);
             t.Controls.Add(polTabs, 0, 4);
 
             var checkRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0, S(2), 0, S(4)) };
@@ -419,7 +423,88 @@ namespace CDriveCleaner
         }
 
         // ================= Cleaning items: what to do with each one, when, and how old its files must be =================
-        class PolItemRow { public CleanItem Item; public ComboBox Do, When, Time, Age; public Label Mark; }
+        class PolItemRow { public CleanItem Item; public ComboBox Do, When, Time, Age; public Label Mark; public string[] DoValues = ItemRule.Dos; public int[] AgeValues = ItemRule.Ages; }
+        static readonly string[] HalfHours = Enumerable.Range(0, 48).Select(i => (i / 2).ToString("00") + ":" + (i % 2 == 0 ? "00" : "30")).ToArray();
+
+        // the four choices for one item, in columns 1 to 5 of a grid row (the same item can be on both pages: they stay in step)
+        PolItemRow MakeItemRow(TableLayoutPanel g, int row, CleanItem it)
+        {
+            bool dl = it.Name == Policy.DownloadsItem;
+            var r = new PolItemRow { Item = it };
+            if (dl) { r.DoValues = new[] { "ask", "auto" }; r.AgeValues = Policy.DownloadAges; }
+            Func<int, object[], ComboBox> combo = (w, opts) => { var cb = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(w), Margin = new Padding(0, S(3), S(6), S(2)) }; cb.Items.AddRange(opts); return cb; };
+            r.Do = combo(180, dl ? new object[] { Lang.T("Leave it to me"), Lang.T("Move old files to Undo by itself") } : ItemRule.DoLabels.Select(Lang.T).Cast<object>().ToArray());
+            r.When = combo(200, ItemRule.WhenLabels.Select(Lang.T).Cast<object>().ToArray());
+            r.Time = combo(80, HalfHours.Cast<object>().ToArray());
+            r.Age = combo(160, r.AgeValues.Select(a => (object)Lang.T(ItemRule.AgeLabels[Array.IndexOf(ItemRule.Ages, a)])).ToArray());
+            r.Mark = new Label { AutoSize = true, Margin = new Padding(S(4), S(7), 0, 0), Font = new Font("Segoe UI Semibold", 9f), UseMnemonic = false };
+            g.Controls.Add(r.Do, 1, row); g.Controls.Add(r.When, 2, row); g.Controls.Add(r.Time, 3, row); g.Controls.Add(r.Age, 4, row); g.Controls.Add(r.Mark, 5, row);
+            EventHandler changed = (o, e) =>
+            {
+                if (polFilling) return;
+                var ir = new ItemRule { Do = r.DoValues[Math.Max(0, r.Do.SelectedIndex)], When = ItemRule.Whens[Math.Max(0, r.When.SelectedIndex)],
+                                        Time = HalfHours[Math.Max(0, r.Time.SelectedIndex)], Age = r.AgeValues[Math.Max(0, r.Age.SelectedIndex)] };
+                string k = Policy.ItemKey(it.Name);
+                if (ir.ToString() == ItemRule.DefaultText) polEdit.Remove(k); else polEdit[k] = ir.ToString();
+                PolicyRefresh();
+            };
+            r.Do.SelectedIndexChanged += changed; r.When.SelectedIndexChanged += changed; r.Time.SelectedIndexChanged += changed; r.Age.SelectedIndexChanged += changed;
+            polItems.Add(r);
+            return r;
+        }
+
+        // ================= Folders: the Dashboard's places, by their warning sign (Critical, Caution, Review, Safe) =================
+        Control BuildPolicyFolders()
+        {
+            var g = new TableLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 6, Padding = new Padding(S(10), S(14), S(10), S(10)), BackColor = Theme.Panel, Margin = new Padding(0) };
+            foreach (int w in new[] { 330, 190, 210, 90, 170 }) g.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(w)));
+            g.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            int row = 0;
+            Action<Control, int> add = (c, col) => g.Controls.Add(c, col, row);
+            g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var head = new Label { AutoSize = true, Text = "Folders: what to do with each one, by its warning sign", Font = new Font("Segoe UI Semibold", 11f), ForeColor = Theme.MapFore(Theme.Accent), Margin = new Padding(0, S(4), 0, S(2)) };
+            add(head, 0); g.SetColumnSpan(head, 6); row++;
+            g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var note = new Label { AutoSize = true, MaximumSize = new Size(S(1000), 0), ForeColor = Theme.Quiet, Margin = new Padding(0, 0, 0, S(6)),
+                                   Text = "The places on the Dashboard's map of C:. Critical folders are never deleted. Caution, Review and Safe folders are cleaned by the Cleaner item named under them, so a rule here is the same rule as on Cleaning items. Downloads holds your own files: old ones can only go to Undo, never straight away, and never newer than 7 days." };
+            add(note, 0); g.SetColumnSpan(note, 6); row++;
+            g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var heads = new[] { "Folder", "What to do", "When", "Time", "Only files" };
+            for (int i = 0; i < heads.Length; i++) add(new Label { AutoSize = true, Text = heads[i], Font = new Font("Segoe UI Semibold", 9f), ForeColor = Theme.Quiet, Margin = new Padding(0, S(2), 0, S(4)) }, i);
+            row++;
+            var extra = Policy.ExtraItems();
+            var locs = DashData.Build().Where(l => DashData.TierOrder.Contains(l.Tier)).OrderBy(l => Array.IndexOf(DashData.TierOrder, l.Tier)).ToList();
+            string group = null;
+            foreach (var l in locs)
+            {
+                if (l.Tier != group)
+                {
+                    group = l.Tier;
+                    g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                    string title = l.Tier == "critical" ? "\u26D4 Critical" : l.Tier == "caution" ? "\u26A0 Caution" : l.Tier == "review" ? "\u25CF Review" : "\u2714 Safe";
+                    var gh = new Label { AutoSize = true, Text = Lang.T(title.Substring(2)), Font = new Font("Segoe UI Semibold", 10f), ForeColor = Theme.MapFore(TierColor(l.Tier)), Margin = new Padding(0, S(10), 0, S(4)) };
+                    gh.Text = title.Substring(0, 2) + gh.Text;
+                    add(gh, 0); g.SetColumnSpan(gh, 6); row++;
+                }
+                g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                string itemName; Policy.FolderItems.TryGetValue(l.Id, out itemName);
+                var item = itemName == null ? null : items.Concat(extra).FirstOrDefault(i => i.Name == itemName);
+                var name = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0, S(4), S(8), S(4)), BackColor = Theme.Panel };
+                name.Controls.Add(new Label { AutoSize = true, Text = Lang.T(l.Name), MaximumSize = new Size(S(320), 0), UseMnemonic = false, Margin = new Padding(0) });
+                name.Controls.Add(new Label { AutoSize = true, Text = item == null ? l.Path : (item.Name == Policy.DownloadsItem ? l.Path : Lang.T("Cleaned by: ") + Lang.T(item.Name)), ForeColor = Theme.Quiet, MaximumSize = new Size(S(320), 0), UseMnemonic = false, Margin = new Padding(0, S(1), 0, 0) });
+                add(name, 0);
+                if (item != null) MakeItemRow(g, row, item);
+                else
+                {
+                    var fixedL = new Label { AutoSize = true, Text = "\uD83D\uDD12 " + Lang.T(Policy.FolderFixed(l.Id, l.Tier)), ForeColor = Theme.Quiet, Margin = new Padding(0, S(7), 0, 0), UseMnemonic = false };
+                    add(fixedL, 1); g.SetColumnSpan(fixedL, 4);
+                }
+                polFolderRows++;
+                row++;
+            }
+            return g;
+        }
+        int polFolderRows;
         readonly List<PolItemRow> polItems = new List<PolItemRow>();
 
         static string ItemOf(Dictionary<string, string> d, string key) { string v; return d.TryGetValue(key, out v) ? v : ItemRule.DefaultText; }
@@ -442,7 +527,6 @@ namespace CDriveCleaner
             foreach (var h in new[] { "Item", "What to do", "When", "Time", "Only files" })
                 add(new Label { AutoSize = true, Text = h, Font = new Font("Segoe UI Semibold", 9f), ForeColor = Theme.Quiet, Margin = new Padding(0, S(2), 0, S(4)) }, Array.IndexOf(new[] { "Item", "What to do", "When", "Time", "Only files" }, h));
             row++;
-            string[] times = Enumerable.Range(0, 48).Select(i => (i / 2).ToString("00") + ":" + (i % 2 == 0 ? "00" : "30")).ToArray();
             Func<CleanItem, int> order = it => it.Drive != null ? 4 : it.Privacy ? 3 : (int)it.Tier;
             string group = null;
             foreach (var it in items.OrderBy(order).ThenBy(i => Lang.T(i.Name)))
@@ -458,27 +542,8 @@ namespace CDriveCleaner
                     add(gh, 0); g.SetColumnSpan(gh, 6); row++;
                 }
                 g.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-                var r = new PolItemRow { Item = it };
                 add(new Label { AutoSize = true, Text = Lang.T(it.Name), MaximumSize = new Size(S(320), 0), UseMnemonic = false, Margin = new Padding(0, S(6), S(8), S(4)) }, 0);
-                Func<int, object[], ComboBox> combo = (w, opts) => { var cb = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(w), Margin = new Padding(0, S(3), S(6), S(2)) }; cb.Items.AddRange(opts); return cb; };
-                r.Do = combo(180, ItemRule.DoLabels.Cast<object>().ToArray());
-                r.When = combo(200, ItemRule.WhenLabels.Cast<object>().ToArray());
-                r.Time = combo(80, times.Cast<object>().ToArray());
-                r.Age = combo(160, ItemRule.AgeLabels.Cast<object>().ToArray());
-                r.Mark = new Label { AutoSize = true, Margin = new Padding(S(4), S(7), 0, 0), Font = new Font("Segoe UI Semibold", 9f), UseMnemonic = false };
-                add(r.Do, 1); add(r.When, 2); add(r.Time, 3); add(r.Age, 4); add(r.Mark, 5);
-                var row_ = r;
-                EventHandler changed = (o, e) =>
-                {
-                    if (polFilling) return;
-                    var ir = new ItemRule { Do = ItemRule.Dos[Math.Max(0, row_.Do.SelectedIndex)], When = ItemRule.Whens[Math.Max(0, row_.When.SelectedIndex)],
-                                            Time = times[Math.Max(0, row_.Time.SelectedIndex)], Age = ItemRule.Ages[Math.Max(0, row_.Age.SelectedIndex)] };
-                    string k = Policy.ItemKey(row_.Item.Name);
-                    if (ir.ToString() == ItemRule.DefaultText) polEdit.Remove(k); else polEdit[k] = ir.ToString();
-                    PolicyRefresh();
-                };
-                r.Do.SelectedIndexChanged += changed; r.When.SelectedIndexChanged += changed; r.Time.SelectedIndexChanged += changed; r.Age.SelectedIndexChanged += changed;
-                polItems.Add(r);
+                MakeItemRow(g, row, it);
                 row++;
             }
             return g;
@@ -495,12 +560,12 @@ namespace CDriveCleaner
                 string k = Policy.ItemKey(r.Item.Name);
                 bool byOrg = org.ContainsKey(k);
                 var ir = ItemRule.Parse(byOrg ? org[k] : polCustom ? ItemOf(polEdit, k) : ItemRule.DefaultText);
-                r.Do.SelectedIndex = Array.IndexOf(ItemRule.Dos, ir.Do);
+                r.Do.SelectedIndex = Math.Max(0, Array.IndexOf(r.DoValues, ir.Do));
                 r.When.SelectedIndex = Array.IndexOf(ItemRule.Whens, ir.When);
                 r.Time.SelectedIndex = Math.Max(0, Array.IndexOf(times, ir.Time));
-                r.Age.SelectedIndex = Math.Max(0, Array.IndexOf(ItemRule.Ages, ir.Age));
+                r.Age.SelectedIndex = Math.Max(0, Array.IndexOf(r.AgeValues, ir.Age));
                 bool edit = polCustom && !byOrg;
-                r.Do.Enabled = r.Age.Enabled = edit && ir.Do != "never";
+                r.Age.Enabled = edit && ir.Do != "never";
                 r.Do.Enabled = edit;
                 r.When.Enabled = r.Time.Enabled = edit && ir.Do == "auto";
                 if (byOrg) { r.Mark.Text = "\uD83D\uDD12 " + Lang.T("Set by your organization"); r.Mark.ForeColor = Theme.MapFore(Color.FromArgb(150, 90, 0)); }
@@ -512,12 +577,19 @@ namespace CDriveCleaner
 
         // for the self-test and previews
         public void PolicySetItem(string name, string rule) { var r = polItems.First(x => x.Item.Name == name); var ir = ItemRule.Parse(rule);
-            r.Do.SelectedIndex = Array.IndexOf(ItemRule.Dos, ir.Do); r.When.SelectedIndex = Array.IndexOf(ItemRule.Whens, ir.When);
-            r.Time.SelectedIndex = ir.Time == "00:00" ? 0 : Array.IndexOf(Enumerable.Range(0, 48).Select(i => (i / 2).ToString("00") + ":" + (i % 2 == 0 ? "00" : "30")).ToArray(), ir.Time);
-            r.Age.SelectedIndex = Array.IndexOf(ItemRule.Ages, ir.Age); }
+            r.Do.SelectedIndex = Array.IndexOf(r.DoValues, ir.Do); r.When.SelectedIndex = Array.IndexOf(ItemRule.Whens, ir.When);
+            r.Time.SelectedIndex = Array.IndexOf(HalfHours, ir.Time); r.Age.SelectedIndex = Array.IndexOf(r.AgeValues, ir.Age); }
+        public int PolicyFolderRows { get { return polFolderRows; } }
+        public List<string> PolicyItemValues(string name) { return polItems.Where(x => x.Item.Name == name).Select(x => x.Do.SelectedIndex + "/" + x.When.SelectedIndex + "/" + x.Time.SelectedIndex + "/" + x.Age.SelectedIndex).ToList(); }
+        public void PolicyShowFolders() { polTabs.SelectedIndex = 1; }
+        public void PolicyScrollFolders(string itemName)
+        {
+            var r = polItems.FirstOrDefault(x => x.Item.Name == itemName && x.Do.Parent != null && x.Do.Parent.Parent != null && x.Do.Parent.Parent.Parent == polTabs.TabPages[1]);
+            if (r != null) ((ScrollableControl)r.Do.Parent.Parent).ScrollControlIntoView(r.Do);
+        }
         public int PolicyItemRows { get { return polItems.Count; } }
         public bool PolicyItemWhenEnabled(string name) { return polItems.First(x => x.Item.Name == name).When.Enabled; }
-        public void PolicyShowItems() { polTabs.SelectedIndex = 1; }
+        public void PolicyShowItems() { polTabs.SelectedIndex = 2; }
         public List<string> CleanerRowTexts { get { return list.Items.Cast<ListViewItem>().Select(i => i.Text + (i.Checked ? " [x]" : "")).ToList(); } }
     }
 }

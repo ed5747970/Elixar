@@ -89,6 +89,14 @@ namespace CDriveCleaner
                 if (r.Age <= 0) continue;
                 int age = r.Age;
                 var measure = it.Measure; var clean = it.Clean;
+                if (it.Name == "Recycle Bin" && it.Drive == null)
+                {
+                    // the Recycle Bin knows when each item was deleted: only what has been in it longer than the limit goes
+                    it.Measure = () => { long total, old; RecycleAging.Stats(age, out total, out old); return old; };
+                    it.Clean = log => { int n; RecycleAging.EmptyOld(age, log, out n); };
+                    it.Info = (it.Info ?? "") + " Policy: only items deleted more than " + age + (age == 1 ? " day ago." : " days ago.");
+                    continue;
+                }
                 if (measure != null) it.Measure = () => Fs.WithMinAge(age, measure);
                 if (clean != null) it.Clean = log => Fs.WithMinAge(age, () => { clean(log); return 0L; });
                 it.Info = (it.Info ?? "") + " Policy: only files older than " + age + (age == 1 ? " day." : " days.");
@@ -97,6 +105,50 @@ namespace CDriveCleaner
         }
 
         public static bool Never(CleanItem it) { try { return GetItem(it.Name).Do == "never"; } catch { return false; } }
+
+        // ---------------- the Dashboard's folders, by their warning sign ----------------
+        // which Cleaner item cleans each folder; null = Elixar never deletes it (Windows needs it, or they are your own files)
+        public static readonly Dictionary<string, string> FolderItems = new Dictionary<string, string>
+        {
+            { "winold", "Previous Windows installation (Windows.old)" }, { "winbt", "Previous Windows installation (Windows.old)" },
+            { "getcurrent", "Windows upgrade media ($GetCurrent)" }, { "winreagent", "Recovery update leftovers ($WinREAgent)" },
+            { "adobearm", "Adobe Reader old updates" }, { "winsxs", "Windows component cleanup (DISM)" }, { "logs", "Old Windows servicing logs" },
+            { "downloads", DownloadsItem }, { "recycle", "Recycle Bin" },
+            { "nvdx", "NVIDIA shader cache" }, { "stremio", "Stremio cache" }, { "usertemp", "Your temp files" }, { "wintemp", "Windows temp files" },
+            { "wudl", "Windows Update downloads" }, { "dosvc", "Delivery Optimization cache" }, { "wer", "Error reports" }, { "minidump", "Crash dumps" },
+            { "memdump", "Crash dumps" }, { "thumbs", "Thumbnail cache" }, { "d3d", "DirectX shader cache" }, { "chrome", "Chrome cache" }, { "edge", "Edge cache" },
+        };
+
+        // why a folder has no rule
+        public static string FolderFixed(string id, string tier)
+        {
+            if (tier == "critical") return "Never deleted: Windows and your apps need it";
+            if (id == "hiberfil") return "Not a schedule: shrink or turn it off in Tools > System space";
+            if (id == "videos" || id == "desktop") return "Your own files: Elixar never deletes them";
+            return "Elixar doesn't clean this folder";
+        }
+
+        // Downloads: your own files, so only "move what is older than N days to Undo" (never deleted straight away, never newer files)
+        public const string DownloadsItem = "Downloads folder (files older than the limit, to Undo)";
+        public static readonly int[] DownloadAges = { 7, 14, 30, 90 };
+
+        public static List<CleanItem> ExtraItems()
+        {
+            var l = new List<CleanItem>();
+            string dl = null;
+            try { dl = Path.Combine(UserDirs.Home, "Downloads"); } catch { }
+            if (dl == null) return l;
+            var r = GetItem(DownloadsItem);
+            int age = Math.Max(7, r.Age);
+            l.Add(new CleanItem
+            {
+                Name = DownloadsItem, Tier = Tier.Review, Where = dl,
+                Info = "Moves what has been in Downloads longer than the limit to Undo. Newer files stay.",
+                Measure = () => Fs.WithMinAge(age, () => Fs.MeasureIn(dl)),
+                Clean = log => Fs.WithMinAge(age, () => { var keep = TidyPrefs.Load().UndoDays; Quarantine.MoveToUndo("Downloads older than " + age + " days", Fs.Children(dl, "*"), log, keep); return 0L; })
+            });
+            return l;
+        }
 
         // ---------------- items that clean by themselves ----------------
         public static string RunsFile { get { return Paths.FileIn("policy-cleaning.txt"); } }
@@ -154,7 +206,7 @@ namespace CDriveCleaner
             var now = DateTime.Now;
             var runs = ReadRuns();
             bool first;
-            var due = Due(Catalog.Build(), now, runs, out first);
+            var due = Due(Catalog.Build().Concat(ExtraItems()).ToList(), now, runs, out first);
             long total = 0; int done = 0;
             using (ChangeLog.In("Policy cleaning"))
                 foreach (var it in due)
