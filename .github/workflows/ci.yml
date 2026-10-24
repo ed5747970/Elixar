@@ -12,7 +12,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and run the self-test
         shell: powershell
-        run: .\build.ps1 -SelfTest
+        # what went wrong is also written as annotations (shown on the run's page, readable without signing in)
+        run: |
+          $failed = $false
+          try { .\build.ps1 -SelfTest *>&1 | Tee-Object -FilePath build-log.txt } catch { $_ | Out-String | Out-File -Append build-log.txt; $failed = $true }
+          if ($failed -or -not $?) {
+            $lines = Get-Content build-log.txt | Where-Object { $_ -match 'error|FAIL|Exception|failed|throw' } | Select-Object -First 40
+            if (-not $lines) { $lines = Get-Content build-log.txt | Select-Object -Last 20 }
+            foreach ($l in $lines) { Write-Host ("::error::" + ($l -replace '%','%25' -replace "`r",'' -replace "`n",' ')) }
+            exit 1
+          }
         env:
           ELIXAR_GOOGLE_ID: ${{ secrets.ELIXAR_GOOGLE_ID }}
           ELIXAR_GOOGLE_SECRET: ${{ secrets.ELIXAR_GOOGLE_SECRET }}
