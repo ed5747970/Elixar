@@ -26,6 +26,15 @@ jobs:
             # the lines just after each FAIL often say why
             $why = @(); for ($i = 0; $i -lt $log.Count; $i++) { if ($log[$i] -match '^FAIL') { $why += $log[$i]; $why += ($log[($i+1)..([Math]::Min($i+4, $log.Count-1))] | Where-Object { $_ -match '^\s' }) } }
             if ($why) { Write-Host ("::error title=Details::" + ((($why | Select-Object -First 150) -join "`n") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A')) }
+            # the whole self-test report, in two parts (an annotation holds at most 64 KB)
+            $rep = 'out\selftest-report.txt'
+            if (Test-Path $rep) {
+              $all = (Get-Content $rep) -join "`n"
+              for ($k = 0; $k -lt [Math]::Min($all.Length, 120000); $k += 55000) {
+                $part = $all.Substring($k, [Math]::Min(55000, $all.Length - $k))
+                Write-Host ("::notice title=Self-test report part " + ($k / 55000 + 1) + "::" + ($part -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'))
+              }
+            }
             # a crash: Windows keeps the .NET error with its stack in the Application log (one annotation, newlines as %0A)
             Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = '.NET Runtime' } -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object {
               $m = $_.Message; if ($m.Length -gt 6000) { $m = $m.Substring(0, 6000) }
