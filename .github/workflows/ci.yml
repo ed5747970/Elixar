@@ -17,9 +17,15 @@ jobs:
           $failed = $false
           try { .\build.ps1 -SelfTest *>&1 | Tee-Object -FilePath build-log.txt } catch { $_ | Out-String | Out-File -Append build-log.txt; $failed = $true }
           if ($failed -or -not $?) {
-            $lines = Get-Content build-log.txt | Where-Object { $_ -match 'error|FAIL|Exception|failed|throw' } | Select-Object -First 40
-            if (-not $lines) { $lines = Get-Content build-log.txt | Select-Object -Last 20 }
-            foreach ($l in $lines) { Write-Host ("::error::" + ($l -replace '%','%25' -replace "`r",'' -replace "`n",' ')) }
+            # every failed check (and compile errors) in one annotation: GitHub shows at most 10 per step
+            $log = Get-Content build-log.txt
+            $fails = $log | Where-Object { $_ -match '^FAIL|error CS|Exception|RESULT' }
+            if (-not $fails) { $fails = $log | Select-Object -Last 25 }
+            $text = ($fails | Select-Object -First 80) -join "`n"
+            Write-Host ("::error title=Failed checks::" + ($text -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'))
+            # the lines just after each FAIL often say why
+            $why = @(); for ($i = 0; $i -lt $log.Count; $i++) { if ($log[$i] -match '^FAIL') { $why += $log[$i]; $why += ($log[($i+1)..([Math]::Min($i+4, $log.Count-1))] | Where-Object { $_ -match '^\s' }) } }
+            if ($why) { Write-Host ("::error title=Details::" + ((($why | Select-Object -First 150) -join "`n") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A')) }
             # a crash: Windows keeps the .NET error with its stack in the Application log (one annotation, newlines as %0A)
             Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = '.NET Runtime' } -MaxEvents 2 -ErrorAction SilentlyContinue | ForEach-Object {
               $m = $_.Message; if ($m.Length -gt 6000) { $m = $m.Substring(0, 6000) }
