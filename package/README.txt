@@ -16,6 +16,9 @@ NEW IN 1.2.56
   IT sees all PCs in the Cure Console web page. Reports only: nothing can be
   started on a PC from the console. Set-up steps: User Guide > Cure.
 - Build: the GitHub job's token is no longer kept in the checked-out code.
+- Fixed: on some PCs the "Elixar" event log (1.2.55) could stay readable by
+  every signed-in user. Elixar now sets its access reliably, checks it exactly,
+  and writes nothing there until it's right (an existing log is corrected).
 
 NEW IN 1.2.55  (for companies)
 - Company PCs: Email is now off too (with Phone and Sysprep); IT can allow it
