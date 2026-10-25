@@ -175,6 +175,17 @@ namespace CDriveCleaner
                 ? (cleaning ? "Emails go to you only, list categories and sizes (never your file names), and never contain a link. With Email cleaning on, Elixar can also see your emails' senders, dates and sizes and move emails to the trash, only from the Email tab and only after you confirm. Your sign-in is encrypted on this PC in a folder only administrators can open."
                             : "With Google or Microsoft, Elixar can only send email to you, never read your inbox, until you turn on Email cleaning. Emails list categories and sizes (never your file names) and never contain a link: to delete anything, open Elixar. Your sign-in is encrypted on this PC in a folder only administrators can open.")
                 : "Emails go to you only, list categories and sizes (never your file names), and never contain a link. Your app password is encrypted on this PC in a folder only administrators can open, and Elixar looks at your mailbox only when Email cleaning is on."));
+            // email turned off (policy or company PC): nothing can be connected or sent; an account connected before can still be disconnected
+            if (!Policy.Allowed("email"))
+            {
+                mailStatus.ForeColor = Theme.MapFore(CautionColor);
+                mailStatus.Text = (Policy.ByCompany("email") ? string.Format(Lang.T("Email is turned off on company PCs (this PC is joined to {0}). Ask your IT department."), Policy.Company())
+                                                             : Lang.T("Email is turned off by the policy (Policy manager).")) +
+                                  (signed ? "\n" + Lang.T("No emails are sent. You can disconnect the account that is still connected.") : "");
+                foreach (Control c in new Control[] { pnlChoose, pnlGoogle, pnlMicrosoft, pnlOther, pnlReports, btnMailTest, btnMailSave, btnMailCleanOn }) c.Enabled = false;
+                btnMailOut.Enabled = signed && !busy && !testMode;
+            }
+            else foreach (Control c in new Control[] { pnlChoose, pnlGoogle, pnlMicrosoft, pnlOther, pnlReports }) c.Enabled = true;
             UpdateEmailUi();
         }
 
@@ -182,6 +193,7 @@ namespace CDriveCleaner
         void SignInMail(string kind, bool cleaning)
         {
             if (mailCts != null) { mailCts.Cancel(); return; }
+            if (Policy.Blocked(this, "email")) return;
             if (!cleaning && MailAccount.Email != null && MailAccount.Kind != kind) MailAccount.Disconnect();
             mailCts = new CancellationTokenSource();
             var token = mailCts.Token;
@@ -205,6 +217,7 @@ namespace CDriveCleaner
         // any other provider: check the settings by signing in to IMAP, then send a test email through SMTP
         void ConnectOther()
         {
+            if (Policy.Blocked(this, "email")) return;
             var st = new OtherMail.Settings_ { Email = txtOtherEmail.Text.Trim(), Password = txtOtherPass.Text.Trim(), Imap = txtOtherImap.Text.Trim(), Smtp = txtOtherSmtp.Text.Trim() };
             // Google shows app passwords in groups of four ("abcd efgh ijkl mnop"); the spaces aren't part of it
             if (OtherMail.PresetFor(st.Email).Name == "Gmail") st.Password = st.Password.Replace(" ", "");
@@ -237,6 +250,7 @@ namespace CDriveCleaner
         // Elixar asks in its own words first; only then does Google or Microsoft ask for the permission
         public void ToggleCleaning(bool on)
         {
+            if (on && Policy.Blocked(this, "email")) return;
             string kind = MailAccount.Kind;
             if (MailAccount.Email == null) return;
             if (!on)
@@ -294,6 +308,7 @@ namespace CDriveCleaner
 
         void RunMail(string doing, Func<string> work, string done)
         {
+            if (Policy.Blocked(this, "email")) return;
             mailStatus.Text = Lang.T(doing);
             btnMailTest.Enabled = false;
             Task.Factory.StartNew(work).ContinueWith(t => UI(() =>
@@ -315,7 +330,7 @@ namespace CDriveCleaner
         // saves the choices; the daily email schedule runs at the policy's time (it starts the protected copy in Program Files, as administrator)
         void SaveMail()
         {
-            if (testMode || MailAccount.Email == null) return;
+            if (testMode || MailAccount.Email == null || Policy.Blocked(this, "email")) return;
             var p = MailPrefs.Load();
             p.CleanReport = chkMailClean.Checked; p.Alerts = chkMailAlerts.Checked; p.Summary = chkMailSummary.Checked;
             p.Save();

@@ -320,7 +320,7 @@ namespace CDriveCleaner
                 return null;
             });
 
-            Run(check, "Company PC: on a PC joined to a domain or Entra ID the Phone and Sysprep tools are off and locked; IT can allow them; a home PC is not affected", () =>
+            Run(check, "Company PC: on a PC joined to a domain or Entra ID the Phone, Sysprep and Email tools are off and locked; IT can allow them; a home PC is not affected", () =>
             {
                 var keepC = Policy.CompanyOverride; var keepO = Policy.OrgOverride; var org = new Dictionary<string, string>(); Policy.OrgOverride = () => org;
                 try
@@ -329,7 +329,8 @@ namespace CDriveCleaner
                     if (!Policy.Allowed("phone") || !Policy.Allowed("sysprep") || Policy.ByCompany("phone")) return "home PC";
                     Policy.CompanyOverride = () => "CONTOSO";
                     if (Policy.Allowed("phone") || Policy.Allowed("sysprep") || !Policy.ByCompany("phone") || !Policy.ByCompany("sysprep") || Policy.Source("sysprep") != "organization") return "company PC";
-                    if (!Policy.Allowed("email") || !Policy.Allowed("apps.remove") || Policy.ByCompany("email")) return "other rules changed";
+                    if (Policy.Allowed("email") || !Policy.ByCompany("email")) return "email on a company PC";
+                    if (!Policy.Allowed("apps.remove") || !Policy.Allowed("startup.change") || Policy.ByCompany("apps.remove")) return "other rules changed";
                     var c = Policy.Defaults(); c["phone"] = "allow";
                     bool keepU = Policy.UseCustom; var keepCu = Policy.Custom; Policy.UseCustom = true; Policy.Custom = c;
                     bool still = !Policy.Allowed("phone"); Policy.UseCustom = keepU; Policy.Custom = keepCu;
@@ -342,6 +343,83 @@ namespace CDriveCleaner
                     return null;
                 }
                 finally { Policy.CompanyOverride = keepC; Policy.OrgOverride = keepO; }
+            });
+
+            Run(check, "Group Policy template: Elixar.admx and its en-US / he-IL texts are valid XML, every rule is in it with its values, and every text it names exists", () =>
+            {
+                string dir = Path.Combine(R, "admx"); string langBefore = Lang.Code;
+                var keepOut = Cli.Out; var said = new List<string>(); Cli.Out = said.Add;
+                int code; try { code = Cli.Run(new[] { "--admx", dir }); } finally { Cli.Out = keepOut; }
+                if (code != 0 || said.Count(x => x.StartsWith("Saved ")) != 3) return "command line: " + code + " " + string.Join(" | ", said);
+                const string ns = "http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions";
+                var admx = new System.Xml.XmlDocument(); admx.Load(Path.Combine(dir, "Elixar.admx"));
+                var m = new System.Xml.XmlNamespaceManager(admx.NameTable); m.AddNamespace("p", ns);
+                var pols = admx.SelectNodes("//p:policy", m);
+                if (pols.Count != Policy.Rules.Length) return "policies " + pols.Count;
+                foreach (var r in Policy.Rules)
+                {
+                    var e = admx.SelectSingleNode("//p:policy[@name='" + Policy.AdmxId(r.Key) + "']/p:elements/p:enum", m);
+                    if (e == null || e.Attributes["valueName"].Value != r.Key) return "rule " + r.Key;
+                    var vals = e.SelectNodes("p:item/p:value/p:string", m).Cast<System.Xml.XmlNode>().Select(x => x.InnerText).ToArray();
+                    if (!vals.SequenceEqual(r.Values) || vals.Any(v => r.Canon(v) != v)) return "values of " + r.Key;
+                    if (admx.SelectSingleNode("//p:policy[@name='" + Policy.AdmxId(r.Key) + "']", m).Attributes["key"].Value != @"SOFTWARE\Policies\Elixar") return "key";
+                }
+                var names = new HashSet<string>(); foreach (System.Xml.XmlNode n in pols) if (!names.Add(n.Attributes["name"].Value)) return "same name twice";
+                string text = File.ReadAllText(Path.Combine(dir, "Elixar.admx"));
+                var strs = System.Text.RegularExpressions.Regex.Matches(text, @"\$\(string\.([^)]+)\)").Cast<System.Text.RegularExpressions.Match>().Select(x => x.Groups[1].Value).Distinct().ToList();
+                var pres = System.Text.RegularExpressions.Regex.Matches(text, @"\$\(presentation\.([^)]+)\)").Cast<System.Text.RegularExpressions.Match>().Select(x => x.Groups[1].Value).Distinct().ToList();
+                foreach (var loc in new[] { "en-US", "he-IL" })
+                {
+                    var adml = new System.Xml.XmlDocument(); adml.Load(Path.Combine(dir, loc, "Elixar.adml"));
+                    var ids = new HashSet<string>(adml.SelectNodes("//p:string", m).Cast<System.Xml.XmlNode>().Select(x => x.Attributes["id"].Value));
+                    var pids = new HashSet<string>(adml.SelectNodes("//p:presentation", m).Cast<System.Xml.XmlNode>().Select(x => x.Attributes["id"].Value));
+                    var miss = strs.Where(x => !ids.Contains(x)).Concat(pres.Where(x => !pids.Contains(x))).ToList();
+                    if (miss.Count > 0) return loc + " is missing " + string.Join(", ", miss.Take(3));
+                    foreach (System.Xml.XmlNode d in adml.SelectNodes("//p:dropdownList", m))
+                        if (admx.SelectSingleNode("//p:enum[@id='" + d.Attributes["refId"].Value + "']", m) == null) return "dropdown " + d.Attributes["refId"].Value;
+                    string phone = adml.SelectSingleNode("//p:string[@id='phone']", m).InnerText;
+                    if ((loc == "he-IL") != phone.Any(c => c >= 0x5D0 && c <= 0x5EA)) return loc + " language";
+                }
+                if (Lang.Code != langBefore) return "the language was left changed";
+                return null;
+            });
+
+            Run(check, "Windows Event Log: each change in Logs also goes to an 'Elixar' event log that only administrators and Event Log Readers can read; the policy can turn it off", () =>
+            {
+                var got = new List<Tuple<int, System.Diagnostics.EventLogEntryType, string>>();
+                var keepW = WinEvents.WriteOverride; WinEvents.WriteOverride = (i, t, m) => got.Add(Tuple.Create(i, t, m));
+                var keepO = Policy.OrgOverride; var org = new Dictionary<string, string>(); Policy.OrgOverride = () => org;
+                try
+                {
+                    ChangeLog.Add("Registry", "Turned off ads in Start", @"HKLM\SOFTWARE\Test", "1", "0", "self-test", false);
+                    if (got.Count != 1 || got[0].Item1 != 1002 || got[0].Item2 != System.Diagnostics.EventLogEntryType.Information || !got[0].Item3.Contains("Turned off ads in Start") || !got[0].Item3.Contains("Change id: ")) return "event: " + got.Count;
+                    ChangeLog.Add("Apps", "Removed an app", "Test app", "", "", "", true);
+                    if (got.Count != 2 || got[1].Item1 != 1003 || got[1].Item2 != System.Diagnostics.EventLogEntryType.Warning) return "a failed change";
+                    using (ChangeLog.Quiet()) ChangeLog.Add("Files", "quiet", "x", "", "", "", false);
+                    if (got.Count != 2) return "quiet";
+                    org["eventlog"] = "off"; ChangeLog.Add("Files", "off", "x", "", "", "", false);
+                    if (got.Count != 2) return "the policy turned it off";
+                }
+                finally { WinEvents.WriteOverride = keepW; Policy.OrgOverride = keepO; }
+                WinEvents.Write(new ChangeLog.Entry { Kind = "Files", Action = "test log only" });   // the self-test's own log: never to the real Event Log
+                var a = WinEvents.Access;
+                if (!a.Contains("(A;;0x1;;;S-1-5-32-573)") || a.Contains(";;;BU)") || a.Contains(";;;AU)") || a.Contains(";;;IU)") || a.Contains(";;;WD)")) return "access";
+                // on GitHub's Windows test PC: really make the log, write, read back, check who can read it, then remove it
+                if (Win.IsWindows && Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
+                {
+                    bool had = WinEvents.Exists();
+                    string mark = "selftest-" + Guid.NewGuid().ToString("N");
+                    if (!WinEvents.WriteNow(new ChangeLog.Entry { Kind = "Settings", Action = "Event Log self-test", Id = mark })) return "could not write";
+                    bool found = false;
+                    using (var log = new System.Diagnostics.EventLog(WinEvents.LogName))
+                        foreach (System.Diagnostics.EventLogEntry x in log.Entries) if (x.Message.Contains(mark) && x.InstanceId == 1002) found = true;
+                    string ca = Sys.Run("wevtutil.exe", "gl " + WinEvents.LogName, 30000);
+                    if (!had) WinEvents.Remove();
+                    if (!found) return "the event wasn't in the log";
+                    if (!ca.Contains("S-1-5-32-573") || ca.Contains(";;;IU)") || ca.Contains(";;;AU)")) return "log access: " + ca.Replace("\r", " ").Replace("\n", " ");
+                    if (!had && WinEvents.Exists()) return "not removed";
+                }
+                return null;
             });
 
             // ---------- sponsor ----------

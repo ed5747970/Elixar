@@ -118,7 +118,7 @@ namespace CDriveCleaner
         void ScanMailbox()
         {
             if (emCts != null) { emCts.Cancel(); return; }
-            if (!MailAccount.Cleaning) return;
+            if (!MailAccount.Cleaning || !Policy.Allowed("email")) return;
             emCts = new CancellationTokenSource();
             var token = emCts.Token;
             var cats = MailAccount.Categories();

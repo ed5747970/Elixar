@@ -124,6 +124,7 @@ namespace CDriveCleaner
             try { if (Directory.Exists(Paths.Data)) SafeDelete.Delete(Paths.Data); } catch { }
             try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Elixar", false); } catch { }
             try { using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) hklm.DeleteSubKeyTree(@"Software\Elixar", false); } catch { }
+            WinEvents.Remove();   // the Elixar log in Event Viewer
         }
 }
 }

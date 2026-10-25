@@ -12,7 +12,7 @@ namespace CDriveCleaner
 {
     public static class Cli
     {
-        public static readonly string[] Commands = { "--help", "/?", "--status", "--clean", "--clean-item", "--report", "--policy", "--tweaks", "--update-apps", "--list-items" };
+        public static readonly string[] Commands = { "--help", "/?", "--status", "--clean", "--clean-item", "--report", "--policy", "--tweaks", "--update-apps", "--list-items", "--admx" };
 
         public static bool IsCli(string[] args) { return args.Length > 0 && Commands.Contains(args[0], StringComparer.OrdinalIgnoreCase); }
 
@@ -32,6 +32,7 @@ namespace CDriveCleaner
             "  Elixar.exe --policy <file.elixarpolicy> use this policy as the Custom policy\n" +
             "  Elixar.exe --tweaks on|default         every Windows tweak on, or all back to Windows' default\n" +
             "  Elixar.exe --update-apps               update every app winget can update (Microsoft's winget and Store sources only)\n" +
+            "  Elixar.exe --admx <folder>             Group Policy template: Elixar.admx with en-US and he-IL texts (no admin needed)\n" +
             "  Elixar.exe --uninstall --quiet [--purge]  remove Elixar; --purge also deletes its Undo backups, logs and settings\n\n" +
             "Exit codes: 0 done, 1 problem, 2 blocked by the policy, 3 not administrator, 4 wrong command.\n" +
             "In cmd, start it with  start /wait Elixar.exe ...  so the prompt waits for it (then %errorlevel% is the exit code).\n" +
@@ -44,6 +45,15 @@ namespace CDriveCleaner
             if (Win.IsWindows && Out == (Action<string>)Console.WriteLine) try { AttachConsole(-1); Out(""); } catch { }
             string cmd = args[0].ToLowerInvariant();
             if (cmd == "--help" || cmd == "/?") { Out(Help); return 0; }
+            if (cmd == "--admx")
+            {
+                string dir = Arg(args, 1);
+                if (string.IsNullOrWhiteSpace(dir)) { Out("Elixar: say which folder, e.g. Elixar.exe --admx C:\\Temp\\PolicyDefinitions"); return 4; }
+                try { foreach (var f in Policy.SaveAdmx(Path.GetFullPath(dir))) Out("Saved " + f); }
+                catch (Exception ex) { Out("Elixar: " + ex.Message); return 1; }
+                Out("Copy them to C:\\Windows\\PolicyDefinitions (or the domain's Central Store), or import them in Intune.");
+                return 0;
+            }
             if (Win.IsWindows && !AssumeAdmin && !Sys.IsAdmin()) { Out("Elixar: run this from an administrator command prompt."); return 3; }
             try
             {

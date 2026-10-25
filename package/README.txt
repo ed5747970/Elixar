@@ -1,7 +1,20 @@
-ELIXAR  (version 1.2.54)
+ELIXAR  (version 1.2.55)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.55  (for companies)
+- Company PCs: Email is now off too (with Phone and Sysprep); IT can allow it
+  with email = allow. An account connected before sends nothing and can still
+  be disconnected.
+- Group Policy / Intune template: Policy manager > Export for IT > "Group
+  Policy and Intune template (*.admx)", or Elixar.exe --admx <folder>. The zip
+  has it ready in PolicyDefinitions (English and Hebrew).
+- Every change also goes to Event Viewer > Applications and Services Logs >
+  Elixar (administrators and Event Log Readers only), so security tools can
+  collect it. Policy manager can turn it off.
+- License: free for personal and noncommercial use (PolyForm Noncommercial
+  1.0.0, see LICENSE); business use or selling needs a license from Elisar.
 
 NEW IN 1.2.54  (company PCs)
 - On a PC joined to a company (Active Directory domain or Microsoft Entra ID)

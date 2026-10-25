@@ -1738,11 +1738,14 @@ namespace CDriveCleaner
                                 // a company PC: Phone and Sysprep greyed out and locked; IT can allow Sysprep
                                 Policy.CompanyOverride = () => "CONTOSO";
                                 var f3 = new MainForm(true); f3.ShowPolicy(); f3.PolicySetMode(true);
-                                bool co = f3.NavGreyed.Contains("Phone") && !f3.PolicyComboEnabled("phone") && !f3.PolicyComboEnabled("sysprep") && f3.PolicyComboEnabled("email") &&
-                                          (f3.SysprepOffText ?? "").Contains("CONTOSO") && (f3.PolicyOrgText ?? "").Contains("CONTOSO");
+                                bool co = f3.NavGreyed.Contains("Phone") && !f3.PolicyComboEnabled("phone") && !f3.PolicyComboEnabled("sysprep") && !f3.PolicyComboEnabled("email") && f3.PolicyComboEnabled("apps.remove") && f3.NavGreyed.Contains("Email") &&
+                                          (f3.SysprepOffText ?? "").Contains("CONTOSO") && (f3.PolicyOrgText ?? "").Contains("CONTOSO") &&
+                                          !f3.MailConnectEnabled && (f3.MailStatusText ?? "").Contains("CONTOSO");
                                 f3.Dispose();
                                 org["sysprep"] = "allow"; var f4 = new MainForm(true);
-                                co &= f4.SysprepOffText == null && f4.NavGreyed.Contains("Phone");
+                                co &= f4.SysprepOffText == null && f4.NavGreyed.Contains("Phone") && f4.MailConnectEnabled == false;
+                                f4.Dispose(); org["email"] = "allow"; f4 = new MainForm(true);
+                                co &= f4.MailConnectEnabled && !f4.NavGreyed.Contains("Email");
                                 f4.Dispose(); org.Clear(); Policy.CompanyOverride = null;
                                 if (!co) pwhy += " [company PC]";
                                 pui &= co;

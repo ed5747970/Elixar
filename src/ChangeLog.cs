@@ -169,6 +169,7 @@ namespace CDriveCleaner
                 }
                 finally { if (m != null) { if (owned) try { m.ReleaseMutex(); } catch { } m.Dispose(); } }
             }
+            WinEvents.Write(e);   // and in Windows' Event Log, for the company's security tools
             return e;
         }
 

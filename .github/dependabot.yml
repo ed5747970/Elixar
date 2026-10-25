@@ -1,0 +1,9 @@
+# Keeps the GitHub Actions in the build up to date. They stay pinned to exact commits;
+# Dependabot opens a pull request with the new commit when a new version comes out, so nothing changes without review.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

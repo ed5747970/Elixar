@@ -2,7 +2,7 @@
 name: Build and self-test
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'preview/**' ]
   pull_request:
   workflow_dispatch:
 # this build only reads the code: it can't change the repository or publish anything

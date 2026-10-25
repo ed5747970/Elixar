@@ -2,8 +2,8 @@
 // Default = Elixar's own rules (exactly how Elixar works without a policy). Custom = your copy; switching back keeps it.
 // An organization can set rules for every PC through Group Policy / Intune (HKLM\SOFTWARE\Policies\Elixar): those win and are locked.
 // The policy file is kept in Elixar's data folder, which only administrators can change.
-// On a company PC (joined to an Active Directory domain or to Microsoft Entra ID) the Phone tab and the Sysprep tools are off
-// and locked, as if the organization had set them; IT can allow them in HKLM\SOFTWARE\Policies\Elixar (phone / sysprep = allow).
+// On a company PC (joined to an Active Directory domain or to Microsoft Entra ID) the Phone tab, the Sysprep tools and email are off
+// and locked, as if the organization had set them; IT can allow them in HKLM\SOFTWARE\Policies\Elixar (phone / sysprep / email = allow).
 
 using System;
 using System.Collections.Generic;
@@ -72,6 +72,8 @@ namespace CDriveCleaner
             R("sysprep", "What Elixar may change", "Sysprep and golden image tools", "Tools > Sysprep: fixes, answer files, image cleanup.", "allow", Allow),
             R("email", "What Elixar may change", "Email", "Connect an email account, reports and Gmail cleaning.", "allow", Allow),
             R("updates.check", "What Elixar may change", "Check for Elixar updates", "Once a week and when you ask, from GitHub (api.github.com). Not allowed: Elixar never connects for updates; IT updates it.", "allow", Allow),
+            R("eventlog", "Access", "Write changes to the Windows Event Log", "Event Viewer > Applications and Services Logs > Elixar, readable by administrators and Event Log Readers, so security tools can collect it.", "on",
+              "on", "On", "off", "Off"),
             R("pin.open", "Access", "PIN or password to open Elixar", "Required: Elixar asks for one to be set and it can't be turned off.", "choice",
               "choice", "Your choice (Settings)", "required", "Required"),
             R("pin.policy", "Access", "PIN or password to change this policy", "Needed: changing the policy asks for the PIN or password first.", "off",
@@ -167,7 +169,7 @@ namespace CDriveCleaner
         }
 
         // ---- company PCs ----
-        public static readonly string[] CompanyBlocks = { "phone", "sysprep" };
+        public static readonly string[] CompanyBlocks = { "phone", "sysprep", "email" };
         public static Func<string> CompanyOverride;   // self-test and previews: the company this PC is joined to (null = none)
         static string companyCache; static bool companyRead;
         // the domain or Entra ID organization this PC is joined to; null on a home PC

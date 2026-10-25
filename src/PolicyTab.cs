@@ -36,6 +36,8 @@ namespace CDriveCleaner
         public void PolicyUsePreset(string name) { polPreset.SelectedIndex = Array.IndexOf(Policy.PresetNames, name); PolicyPreset(); }
         public string PolicySave() { return PolicySaveNow(); }
         public bool PolicyComboEnabled(string key) { return polCombos[key].Enabled; }
+        public bool MailConnectEnabled { get { return pnlChoose != null && pnlChoose.Enabled; } }
+        public string MailStatusText { get { return mailStatus == null ? null : mailStatus.Text; } }
         public string PolicyOrgText { get { return polOrg == null ? null : polOrg.Text; } }
         // the Sysprep tools' "turned off" note, or null when they can be used
         public string SysprepOffText { get { return pageSysprep != null && sysprepBlocked != null && pageSysprep.Controls.Cast<Control>().Any(c => c != sysprepBlocked && !c.Enabled) ? sysprepBlocked.Text : null; } }
@@ -139,7 +141,7 @@ namespace CDriveCleaner
             btnPolDiscard = MakeButton("Discard changes");
             btnPolExport = MakeButton("Export...");
             btnPolImport = MakeButton("Import...");
-            btnPolReg = MakeButton("Export for IT (.reg)...");
+            btnPolReg = MakeButton("Export for IT (.reg or Group Policy)...");
             buttons.Controls.AddRange(new Control[] { btnPolSave, btnPolDiscard, btnPolExport, btnPolImport, btnPolReg });
             t.Controls.Add(buttons, 0, 6);
             pagePolicy.Controls.Add(t);
@@ -233,7 +235,7 @@ namespace CDriveCleaner
             polStatus.Text = Lang.T(polCustom ? "Custom policy" : "Default policy") + "  ·  " +
                              Lang.T(!polCustom ? "Elixar's own rules" : diff == 0 ? "same as Default" : diff == 1 ? "1 rule differs from Default" : diff + " rules differ from Default");
             int byCo = Policy.CompanyBlocks.Count(Policy.ByCompany), bySet = org.Count - byCo;
-            polOrg.Text = (byCo == 0 ? "" : string.Format(Lang.T("This PC is joined to {0}: the Phone tools and Sysprep tools are off."), Policy.Company()) + (bySet > 0 ? "  " : "")) +
+            polOrg.Text = (byCo == 0 ? "" : string.Format(Lang.T("This PC is joined to {0}: Phone, Sysprep and Email are off."), Policy.Company()) + (bySet > 0 ? "  " : "")) +
                           (bySet == 0 ? "" : Lang.T(bySet == 1 ? "1 rule is set by your organization and can't be changed here." : bySet + " rules are set by your organization and can't be changed here."));
             polPreset.Enabled = btnPolPreset.Enabled = polCustom;
             PolicyRefreshItems();
@@ -302,11 +304,23 @@ namespace CDriveCleaner
         {
             if (testMode) return;
             var rules = Policy.Rules.ToDictionary(r => r.Key, r => Policy.Get(r.Key));
-            using (var d = new SaveFileDialog { Filter = reg ? "Registry file (*.reg)|*.reg" : "Elixar policy (*.elixarpolicy)|*.elixarpolicy",
+            using (var d = new SaveFileDialog { Filter = reg ? Lang.T("Registry file with this policy (*.reg)") + "|*.reg|" + Lang.T("Group Policy and Intune template (*.admx)") + "|*.admx" : "Elixar policy (*.elixarpolicy)|*.elixarpolicy",
                                                 FileName = "Elixar policy " + DateTime.Today.ToString("yyyy-MM-dd") + (reg ? ".reg" : ".elixarpolicy"),
                                                 InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), OverwritePrompt = true })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
+                if (reg && (d.FilterIndex == 2 || d.FileName.EndsWith(".admx", StringComparison.OrdinalIgnoreCase)))
+                {
+                    List<string> files;
+                    try { files = Policy.SaveAdmx(Path.GetDirectoryName(d.FileName)); }
+                    catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); return; }
+                    using (ChangeLog.In("Policy")) ChangeLog.Add("Settings", "Policy: Group Policy template saved", files[0], "", "", "", false);
+                    Log(Lang.T("Policy exported: ") + files[0]);
+                    Lang.Box(this, Lang.T("Saved Elixar.admx with its texts (en-US, he-IL) in this folder:") + "\n" + Path.GetDirectoryName(files[0]) + "\n\n" +
+                                   Lang.T("Copy them to C:\\Windows\\PolicyDefinitions (or your domain's Central Store), or import Elixar.admx in Intune. The rules then show in the Group Policy editor under Computer Configuration > Administrative Templates > Elixar. The per-item cleaning rules are only in the .reg file."),
+                             "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
                 try
                 {
                     if (reg) SafeFile.Save(d.FileName, Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes(Policy.RegText(rules))).ToArray());   // regedit reads UTF-16
@@ -367,6 +381,7 @@ namespace CDriveCleaner
             };
             navOn(pagePhone, "phone");
             navOn(pageEmail, "email");
+            UpdateMailUi();
             nav.Invalidate();
             if (tabs.SelectedTab != null && nav.Items.Any(i => i.Page == tabs.SelectedTab && !i.Enabled)) tabs.SelectedTab = pageDash;
             // restore point before a clean

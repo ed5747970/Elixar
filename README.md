@@ -55,3 +55,14 @@ delegated Mail.Send and Mail.ReadWrite) and add the repository secret `ELIXAR_MS
 
 With a code-signing certificate (.pfx), add the secrets `CODESIGN_PFX` (base64 of the file) and `CODESIGN_PASSWORD`.
 Releases are then signed and Windows stops showing "Windows protected your PC".
+
+## License
+
+Free for personal and other noncommercial use under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+Using Elixar in or for a business, or selling it or anything made from it, needs a commercial license from Elisar:
+ask through [Issues](https://github.com/ed5747970/Elixar/issues).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) to report a problem privately, and the
+[backdoor and compromise assessment](audit-reports/BACKDOOR_AND_COMPROMISE_ASSESSMENT.md).
