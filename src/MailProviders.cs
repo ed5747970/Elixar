@@ -777,8 +777,11 @@ namespace CDriveCleaner
         }
         public static string TrashName { get { string k = Kind; return k == "microsoft" ? "Deleted Items" : k == "other" ? "Trash" : "Gmail's Trash"; } }
 
+        // every email Elixar sends and every look into the mailbox goes through here: email turned off (policy or company PC) stops it all
+        public const string OffText = "Email is turned off by the policy.";
         public static string Send(string subject, string text, string html, List<Mailer.Inline> images)
         {
+            if (!Policy.Allowed("email")) return OffText;
             string k = Kind;
             if (k == "microsoft") return MicrosoftAuth.Send(subject, text, html, images);
             if (k == "other") return OtherMail.Send(subject, text, html, images);
@@ -789,6 +792,7 @@ namespace CDriveCleaner
         public static string CheckSignIn(out bool signedOut)
         {
             signedOut = false;
+            if (!Policy.Allowed("email")) return OffText;
             string k = Kind, err = null;
             if (k == "google") { if (GoogleAuth.AccessToken(out err) == null) signedOut = err == GoogleAuth.SignedOutText; }
             else if (k == "microsoft") { if (MicrosoftAuth.AccessToken(out err) == null) signedOut = err == MicrosoftAuth.SignedOutText; }
@@ -808,11 +812,13 @@ namespace CDriveCleaner
         }
         public static void Scan(MailCategory c, CancellationToken t)
         {
+            if (!Policy.Allowed("email")) throw new InvalidOperationException(OffText);
             string k = Kind;
             if (k == "microsoft") Outlook.Scan(c, t); else if (k == "other") OtherMail.Scan(c, t); else Gmail.Scan(c, t);
         }
         public static int Trash(List<MailCategory> cats, Action<int> progress, CancellationToken t)
         {
+            if (!Policy.Allowed("email")) throw new InvalidOperationException(OffText);
             string k = Kind;
             if (k == "other") return OtherMail.Trash(cats, progress, t);
             var ids = cats.SelectMany(c => c.Ids).Distinct().ToList();

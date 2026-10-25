@@ -136,6 +136,7 @@ namespace CDriveCleaner
 
         public static void ShowFor(IWin32Window owner, bool testMode, Action<string> log)
         {
+            if (Policy.Blocked(owner, "sysprep")) return;   // turned off (policy or company PC)
             using (var f = new UnattendForm(testMode) { Log = log })
             {
                 if (TestHook != null) { TestHook(f); return; }

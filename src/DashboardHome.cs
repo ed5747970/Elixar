@@ -1086,11 +1086,12 @@ namespace CDriveCleaner
             else tile(3, "Off", "Switch on to empty old trash by itself", Theme.Accent);
             if (tiles[3].HasSwitch && !tiles[3].SwitchBusy) tiles[3].SwitchOn = m.TidyOn;
 
-            if (m.MailEmail == null) tile(4, "Not connected", "Connect your email in Settings", Theme.Accent);
+            if (!Policy.Allowed("email")) tile(4, "Off", Policy.ByCompany("email") ? "Turned off on company PCs" : "Turned off by the policy", Color.Gray);
+            else if (m.MailEmail == null) tile(4, "Not connected", "Connect your email in Settings", Theme.Accent);
             else if (m.MailLevel == 2) tile(4, "Signed out", "Connect again in Settings", CriticalColor);
             else if (m.MailLevel == 1) tile(4, "Last email failed", m.MailEmail, CautionColor);
             else tile(4, m.MailReports ? "On" : "Connected", m.MailEmail, SafeColor);
-            if (m.MailEmail != null) tiles[4].Sub = m.MailLevel == 2 ? Lang.T("Connect again in Settings") : m.MailEmail;   // the address is never translated
+            if (m.MailEmail != null && Policy.Allowed("email")) tiles[4].Sub = m.MailLevel == 2 ? Lang.T("Connect again in Settings") : m.MailEmail;   // the address is never translated
 
             if (LinuxUi) tile(5, m.AptBytes <= 0 ? "Clean" : Fs.Fmt(m.AptBytes), m.AptBytes <= 0 ? "No downloaded update packages" : "Downloaded update packages, safe to clean", m.AptBytes > (256L << 20) ? CautionColor : SafeColor);
             else if (m.UndoCount == 0) tile(5, "Empty", "Removed items wait here before they are deleted for good", Theme.Accent);

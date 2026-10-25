@@ -425,7 +425,7 @@ namespace CDriveCleaner
             try { File.AppendAllText(HistoryFile, DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "\t" + freed + Environment.NewLine); } catch { }
             try
             {
-                if (MailAccount.Email != null && MailPrefs.Load().CleanReport)
+                if (MailAccount.Email != null && MailPrefs.Load().CleanReport && Policy.Allowed("email"))
                 {
                     string e = MailReports.CleanReport(results, freed, Sys.Free(), Sys.Total(), MailReports.Measure()).Send();
                     Log("Email: weekly clean report " + (e == null ? "sent." : "not sent: " + e));

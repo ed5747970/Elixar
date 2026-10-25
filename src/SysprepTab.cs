@@ -47,12 +47,12 @@ namespace CDriveCleaner
             t.Controls.Add(row2, 0, 4);
             t.Controls.Add(spList, 0, 5);
             pageSysprep.Controls.Add(t);
-            spCheck.Click += (o, e) => SysprepRefresh();
+            spCheck.Click += (o, e) => { if (!Policy.Blocked(this, "sysprep")) SysprepRefresh(); };
             spAnswer.Click += (o, e) => { UnattendForm.ShowFor(this, testMode, Log); if (spLoaded) SysprepRefresh(); };
-            spOpen.Click += (o, e) => SysprepOpen();
+            spOpen.Click += (o, e) => { if (!Policy.Blocked(this, "sysprep")) SysprepOpen(); };
             spClean.Click += (o, e) => { ImageCleanForm.ShowFor(this, testMode, Log); if (spLoaded) SysprepRefresh(); };
-            spPassport.Click += (o, e) => SysprepPassport();
-            spKit.Click += (o, e) => SysprepKit();
+            spPassport.Click += (o, e) => { if (!Policy.Blocked(this, "sysprep")) SysprepPassport(); };
+            spKit.Click += (o, e) => { if (!Policy.Blocked(this, "sysprep")) SysprepKit(); };
             spLog.Click += (o, e) =>
             {
                 string err = Path.Combine(Sysprep.Panther, "setuperr.log"), act = Path.Combine(Sysprep.Panther, "setupact.log");

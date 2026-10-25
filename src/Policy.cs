@@ -130,7 +130,7 @@ namespace CDriveCleaner
 
         public static void Load()
         {
-            UseCustom = false; Custom = Defaults(); orgCache = null; SchedulesMoved = false;
+            UseCustom = false; Custom = Defaults(); orgCache = null; orgMerged = null; SchedulesMoved = false;
             try
             {
                 string f = File_;
@@ -152,12 +152,18 @@ namespace CDriveCleaner
 
         // what an organization set (Group Policy / Intune): only known rules with allowed values count
         static Dictionary<string, string> orgCache;
+        static Dictionary<string, string> orgMerged;   // what IT set plus the company PC rules (read once, like the registry)
         public static Dictionary<string, string> Org()
         {
+            bool cache = OrgOverride == null && CompanyOverride == null;
+            if (cache && orgMerged != null) return orgMerged;
             var d = OrgSet();
-            if (Company() == null || CompanyBlocks.All(d.ContainsKey)) return d;
-            d = new Dictionary<string, string>(d);
-            foreach (var k in CompanyBlocks) if (!d.ContainsKey(k)) d[k] = "block";
+            if (Company() != null && !CompanyBlocks.All(d.ContainsKey))
+            {
+                d = new Dictionary<string, string>(d);
+                foreach (var k in CompanyBlocks) if (!d.ContainsKey(k)) d[k] = "block";
+            }
+            if (cache) orgMerged = d;
             return d;
         }
         // only what IT wrote in the registry

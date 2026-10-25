@@ -9,7 +9,7 @@ Use GitHub's private report instead: **Security** tab > **Report a vulnerability
 (https://github.com/ed5747970/Elixar/security/advisories/new).
 
 Include what you found, the Elixar version (Settings shows it), the steps to reproduce it,
-and what an attacker could do with it. You'll get an answer within 7 days.
+and what an attacker could do with it. You'll get an answer as soon as possible.
 
 ## Supported versions
 

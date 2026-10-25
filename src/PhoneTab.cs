@@ -288,7 +288,7 @@ namespace CDriveCleaner
 
         void GetAndroidTools()
         {
-            if (phBusy) return;
+            if (phBusy || Policy.Blocked(this, "phone")) return;
             SetPhBusy(true); lblPhNote.Text = "Downloading Google's Android tools...";
             Task.Factory.StartNew(() => Adb.Download(Log)).ContinueWith(t => UI(() =>
             {

@@ -7,6 +7,9 @@ NEW IN 1.2.55  (for companies)
 - Company PCs: Email is now off too (with Phone and Sysprep); IT can allow it
   with email = allow. An account connected before sends nothing and can still
   be disconnected.
+- Fixed: the weekly clean's email report was still sent when the policy had
+  turned email off. Now every email, mailbox check and sign-in check stops
+  when email is off.
 - Group Policy / Intune template: Policy manager > Export for IT > "Group
   Policy and Intune template (*.admx)", or Elixar.exe --admx <folder>. The zip
   has it ready in PolicyDefinitions (English and Hebrew).

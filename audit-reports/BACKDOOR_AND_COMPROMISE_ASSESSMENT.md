@@ -138,7 +138,8 @@ Elixar has **no code that reaches other machines** except: SMB share for fleet r
 | `adb` server | Phone tab | Elixar's token | Stopped on exit (1.2.53) |
 | Google OAuth grant | Email setup | — | Revoked at Google on disconnect/uninstall |
 | Microsoft OAuth grant | Email setup | — | Deleted locally; **consent stays at Microsoft** until removed (B-8) |
-| `HKLM\SOFTWARE\Policies\Elixar` | IT (GPO/Intune/.reg) | — | No — IT's own setting |
+| `HKLM\SOFTWARE\Policies\Elixar` | IT (GPO/Intune/.reg/ADMX) | — | No — IT's own setting |
+| Event log "Elixar" + event source (1.2.55) | First change written | — | **Only with `--purge`** (it is a record, like the logs) |
 
 No service, driver, browser extension, WMI subscription, Run-key entry for itself, or hidden account is created.
 
@@ -178,7 +179,7 @@ No service, driver, browser extension, WMI subscription, Run-key entry for itsel
 Elixar is an endpoint tool: "isolation" means **limiting what each PC's copy may do and reach**, not network segmentation of a server.
 
 1. **Distribution**: deploy the **MSI** from a build you verified (hash matches the signed release, or built yourself from the tagged source). Don't let users run copies from Downloads.
-2. **Organization policy** (`HKLM\SOFTWARE\Policies\Elixar` via GPO/Intune; export from Policy manager > "Export for IT (.reg)"):
+2. **Organization policy** (`HKLM\SOFTWARE\Policies\Elixar` via GPO/Intune; export from Policy manager > "Export for IT" as a .reg file or the Group Policy / Intune template `Elixar.admx`):
    - `updates.check = block` (IT pushes updates)
    - `email = block` (or allow only with an admin-consented Entra app + Conditional Access)
    - `sysprep = block` except on imaging PCs — **automatic from 1.2.54** on PCs joined to an AD domain or Microsoft Entra ID (together with `phone = block`); IT re-allows with `sysprep = allow` / `phone = allow`
@@ -187,10 +188,11 @@ Elixar is an endpoint tool: "isolation" means **limiting what each PC's copy may
    - `pin.policy = on` on shared PCs
 3. **Outbound allowlist** (if your proxy/firewall filters per process): `Elixar.exe` needs nothing when the rules above are set. If email is allowed: Microsoft Graph/login or Google APIs only.
 4. **Identity**: Entra ID → disallow user consent to unverified multi-tenant apps; review "Enterprise applications" for an Elixar entry.
-5. **EDR**: keep alerts on for shadow-copy deletion and event-log clearing — with `sysprep = block` Elixar never does these. Optionally allowlist Elixar's signed hash after you verify it.
-6. **Fleet reports**: dedicated share; computers *create/write* only; IT *read*; no execute.
-7. **Owner (GitHub) controls**: 2FA on the account; branch protection on `main`; Settings > Environments > `release` > **Required reviewers = you**; move `ELIXAR_SIGNING_KEY` into that environment's secrets; keep the offline key backup safe; add an Authenticode certificate when possible.
-8. **Removal**: `Elixar.exe --uninstall --quiet --purge`, then `msiexec /x` for MSI installs; remove the Entra consent if email was used.
+5. **Logging (1.2.55)**: collect Event Viewer > Applications and Services Logs > *Elixar* with Windows Event Forwarding or your SIEM agent (readable only by SYSTEM, Administrators and Event Log Readers). Event ids: 1000 cleaning, 1001 Undo, 1002 settings/registry, 1003 apps/startup, 1004 security, 1005 email, 1006 Windows commands; failures are warnings.
+6. **EDR**: keep alerts on for shadow-copy deletion and event-log clearing — with `sysprep = block` Elixar never does these. Optionally allowlist Elixar's signed hash after you verify it.
+7. **Fleet reports**: dedicated share; computers *create/write* only; IT *read*; no execute.
+8. **Owner (GitHub) controls**: 2FA on the account; branch protection on `main`; Settings > Environments > `release` > **Required reviewers = you**; move `ELIXAR_SIGNING_KEY` into that environment's secrets; keep the offline key backup safe; add an Authenticode certificate when possible.
+9. **Removal**: `Elixar.exe --uninstall --quiet --purge`, then `msiexec /x` for MSI installs; remove the Entra consent if email was used.
 
 ---
 
@@ -240,7 +242,7 @@ Blocking items before company-wide use (not code bugs; they can't be closed by s
 - **An attacker already admin on a PC** gains little extra from Elixar: at most a mail token (block email by policy) and write access to the fleet share (restrict by ACL).
 - **An outside network attacker** has no entry point: Elixar exposes no listener beyond a short-lived, loopback-only sign-in callback.
 
-**Required measures:** section I, items 1–8, and the five release-gate items above.
+**Required measures:** section I, items 1–9, and the five release-gate items above.
 
 ---
 
@@ -256,4 +258,6 @@ Blocking items before company-wide use (not code bugs; they can't be closed by s
 | Microsoft disconnect explains how to remove the consent at Microsoft | `EmailTab.cs` |
 | CI: Actions pinned to SHAs, read-only test token, `release` environment | `.github/workflows/ci.yml`, `release.yml` |
 | Self-test for the fixes (249 checks pass on Linux; Windows run on GitHub) | `SelfTest1250.cs` |
+| **1.2.55 review fixes:** (1) the weekly clean's email report ignored `email = block` — every send, mailbox scan/trash and sign-in check now re-checks the policy in one place; (2) every Sysprep/golden-image button and window and the Android tools download re-check the policy (not only the greyed tab); (3) Event Log: the "Elixar" source must belong to its own admin-only log (never Application), the log keeps 20 MB and overwrites the oldest instead of dropping new events, `%%` in names can't be read as message numbers, and a write on one thread no longer drops another thread's event | `MailProviders.cs`, `Automation.cs`, `SysprepTab.cs`, `ImageCleanForm.cs`, `UnattendForm.cs`, `PhoneTab.cs`, `WinEvents.cs` |
+| **1.2.55:** email also off on company PCs (Settings and Email tab locked, every email action re-checks the policy); Group Policy / Intune template (`Elixar.admx`, en-US + he-IL) made from the same rules; every change also written to an admin-only "Elixar" event log; LICENSE (PolyForm Noncommercial 1.0.0), SECURITY.md (private reporting), Dependabot for the pinned Actions | `Policy.cs`, `EmailTab.cs`, `EmailCleanTab.cs`, `PolicyAdmx.cs`, `Cli.cs`, `WinEvents.cs`, `ChangeLog.cs`, `Setup.cs`, `.github/` |
 | **1.2.54:** on a PC joined to an AD domain or Microsoft Entra ID, Phone and Sysprep tools are off and locked (no phone or image checks run); IT can allow them by policy | `Policy.cs` (`DomainJoin`, `Company`, `ByCompany`), `PolicyTab.cs`, `PhoneTab.cs`, `SysprepTab.cs` |

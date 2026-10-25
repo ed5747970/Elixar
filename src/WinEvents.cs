@@ -15,7 +15,10 @@ namespace CDriveCleaner
         // read: SYSTEM, Administrators, Event Log Readers (S-1-5-32-573); write and clear: SYSTEM and Administrators
         public const string Access = "O:BAG:SYD:(A;;0xf0007;;;SY)(A;;0x7;;;BA)(A;;0x1;;;S-1-5-32-573)";
         public static Action<int, EventLogEntryType, string> WriteOverride;   // self-test
-        static bool ready, broken, busy;
+        static bool ready, broken;
+        [ThreadStatic] static bool busy;   // this thread is already writing (making the log writes a change of its own)
+        // 20 MB, the oldest events make room for new ones (Windows' default for a new log keeps only 512 KB)
+        public const string Size = "/ms:20971520 /rt:false /ab:false";
         static readonly object gate = new object();
 
         // the event id says what kind of change it was
@@ -43,7 +46,7 @@ namespace CDriveCleaner
             line("Kind", e.Kind); line("Part of Elixar", e.Section); line("Detail", e.Detail);
             line("Windows user", Environment.UserDomainName + "\\" + Environment.UserName);
             line("Elixar", Updates.Current.ToString()); line("Change id", e.Id);
-            string s = sb.ToString();
+            string s = sb.ToString().Replace("%%", "% %");   // Event Viewer would read %%n as a message number
             return s.Length > 30000 ? s.Substring(0, 30000) : s;   // an event holds up to 32K characters
         }
 
@@ -75,8 +78,12 @@ namespace CDriveCleaner
             if (ready) return;
             using (ChangeLog.Quiet())
             {
+                // the source must write to Elixar's own log, never to a log everyone can read (Application)
+                if (EventLog.SourceExists(Source) && !string.Equals(EventLog.LogNameFromSourceName(Source, "."), LogName, StringComparison.OrdinalIgnoreCase))
+                    EventLog.DeleteEventSource(Source);
                 if (!EventLog.SourceExists(Source)) EventLog.CreateEventSource(new EventSourceCreationData(Source, LogName));
-                Sys.Run("wevtutil.exe", "sl " + LogName + " /ca:" + Access, 30000);
+                Sys.Run("wevtutil.exe", "sl " + LogName + " /ca:" + Access + " " + Size, 30000);
+                if (!Sys.Run("wevtutil.exe", "gl " + LogName, 30000).Contains("S-1-5-32-573")) throw new InvalidOperationException("the Elixar log's access could not be set");
             }
             ready = true;
         }

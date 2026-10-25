@@ -330,6 +330,9 @@ namespace CDriveCleaner
                     Policy.CompanyOverride = () => "CONTOSO";
                     if (Policy.Allowed("phone") || Policy.Allowed("sysprep") || !Policy.ByCompany("phone") || !Policy.ByCompany("sysprep") || Policy.Source("sysprep") != "organization") return "company PC";
                     if (Policy.Allowed("email") || !Policy.ByCompany("email")) return "email on a company PC";
+                    if (MailAccount.Send("x", "x", null, null) != MailAccount.OffText) return "an email could still be sent";
+                    try { MailAccount.Scan(new MailCategory(), System.Threading.CancellationToken.None); return "the mailbox could still be read"; } catch (InvalidOperationException) { }
+                    bool so; if (MailAccount.CheckSignIn(out so) != MailAccount.OffText) return "the sign-in was still checked";
                     if (!Policy.Allowed("apps.remove") || !Policy.Allowed("startup.change") || Policy.ByCompany("apps.remove")) return "other rules changed";
                     var c = Policy.Defaults(); c["phone"] = "allow";
                     bool keepU = Policy.UseCustom; var keepCu = Policy.Custom; Policy.UseCustom = true; Policy.Custom = c;
@@ -371,7 +374,9 @@ namespace CDriveCleaner
                 foreach (var loc in new[] { "en-US", "he-IL" })
                 {
                     var adml = new System.Xml.XmlDocument(); adml.Load(Path.Combine(dir, loc, "Elixar.adml"));
-                    var ids = new HashSet<string>(adml.SelectNodes("//p:string", m).Cast<System.Xml.XmlNode>().Select(x => x.Attributes["id"].Value));
+                    var idList = adml.SelectNodes("//p:string", m).Cast<System.Xml.XmlNode>().Select(x => x.Attributes["id"].Value).ToList();
+                    var ids = new HashSet<string>(idList);
+                    if (ids.Count != idList.Count) return loc + ": a text id is used twice";
                     var pids = new HashSet<string>(adml.SelectNodes("//p:presentation", m).Cast<System.Xml.XmlNode>().Select(x => x.Attributes["id"].Value));
                     var miss = strs.Where(x => !ids.Contains(x)).Concat(pres.Where(x => !pids.Contains(x))).ToList();
                     if (miss.Count > 0) return loc + " is missing " + string.Join(", ", miss.Take(3));
@@ -399,6 +404,8 @@ namespace CDriveCleaner
                     if (got.Count != 2) return "quiet";
                     org["eventlog"] = "off"; ChangeLog.Add("Files", "off", "x", "", "", "", false);
                     if (got.Count != 2) return "the policy turned it off";
+                    org.Clear(); ChangeLog.Add("Files", "Odd name %%1234", "x", "", "", "", false);
+                    if (got.Count != 3 || got[2].Item3.Contains("%%")) return "%% in a message";
                 }
                 finally { WinEvents.WriteOverride = keepW; Policy.OrgOverride = keepO; }
                 WinEvents.Write(new ChangeLog.Entry { Kind = "Files", Action = "test log only" });   // the self-test's own log: never to the real Event Log
@@ -416,7 +423,7 @@ namespace CDriveCleaner
                     string ca = Sys.Run("wevtutil.exe", "gl " + WinEvents.LogName, 30000);
                     if (!had) WinEvents.Remove();
                     if (!found) return "the event wasn't in the log";
-                    if (!ca.Contains("S-1-5-32-573") || ca.Contains(";;;IU)") || ca.Contains(";;;AU)")) return "log access: " + ca.Replace("\r", " ").Replace("\n", " ");
+                    if (!ca.Contains("S-1-5-32-573") || ca.Contains(";;;IU)") || ca.Contains(";;;AU)") || !ca.Contains("20971520") || !System.Text.RegularExpressions.Regex.IsMatch(ca, @"retention:\s*false")) return "log access: " + ca.Replace("\r", " ").Replace("\n", " ");
                     if (!had && WinEvents.Exists()) return "not removed";
                 }
                 return null;

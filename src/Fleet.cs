@@ -48,7 +48,7 @@ namespace CDriveCleaner
             try
             {
                 Policy.Get("clean.level");
-                s.PolicyMode = Policy.Org().Count > 0 ? "organization" : Policy.UseCustom ? "custom" : "default";
+                s.PolicyMode = Policy.Org().Keys.Any(k => !Policy.ByCompany(k)) ? "organization" : Policy.UseCustom ? "custom" : "default";
                 s.PolicyFingerprint = Policy.Fingerprint(Policy.Rules.ToDictionary(r => r.Key, r => Policy.Get(r.Key)));
             }
             catch { }

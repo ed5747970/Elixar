@@ -1565,6 +1565,8 @@ HE = {
 "Copy them to C:\\Windows\\PolicyDefinitions (or your domain's Central Store), or import Elixar.admx in Intune. The rules then show in the Group Policy editor under Computer Configuration > Administrative Templates > Elixar. The per-item cleaning rules are only in the .reg file.":"העתיקו אותם ל-C:\\Windows\\PolicyDefinitions (או ל-Central Store של הדומיין), או ייבאו את Elixar.admx ב-Intune. הכללים יופיעו בעורך Group Policy תחת Computer Configuration > Administrative Templates > Elixar. הכללים לכל פריט ניקוי נמצאים רק בקובץ ה-.reg.",
 "Write changes to the Windows Event Log":"כתיבת השינויים ביומן האירועים של Windows",
 "Event Viewer > Applications and Services Logs > Elixar, readable by administrators and Event Log Readers, so security tools can collect it.":"מציג האירועים > Applications and Services Logs > Elixar, קריא למנהלים ול-Event Log Readers, כדי שכלי אבטחה יוכלו לאסוף אותו.",
+"Turned off on company PCs":"כבוי במחשבי חברה",
+"Turned off by the policy":"כובה על ידי המדיניות",
 "Recycle Bin and Undo":"סל המיחזור וביטול",
 "Every day, empty what has been in the Recycle Bin for more than":"בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-",
 "7 days":"7 ימים",

@@ -1828,6 +1828,8 @@ namespace CDriveCleaner
             d["Copy them to C:\\Windows\\PolicyDefinitions (or your domain's Central Store), or import Elixar.admx in Intune. The rules then show in the Group Policy editor under Computer Configuration > Administrative Templates > Elixar. The per-item cleaning rules are only in the .reg file."] = "העתיקו אותם ל-C:\\Windows\\PolicyDefinitions (או ל-Central Store של הדומיין), או ייבאו את Elixar.admx ב-Intune. הכללים יופיעו בעורך Group Policy תחת Computer Configuration > Administrative Templates > Elixar. הכללים לכל פריט ניקוי נמצאים רק בקובץ ה-.reg.";
             d["Write changes to the Windows Event Log"] = "כתיבת השינויים ביומן האירועים של Windows";
             d["Event Viewer > Applications and Services Logs > Elixar, readable by administrators and Event Log Readers, so security tools can collect it."] = "מציג האירועים > Applications and Services Logs > Elixar, קריא למנהלים ול-Event Log Readers, כדי שכלי אבטחה יוכלו לאסוף אותו.";
+            d["Turned off on company PCs"] = "כבוי במחשבי חברה";
+            d["Turned off by the policy"] = "כובה על ידי המדיניות";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["On every internal drive, only your own Recycle Bin. What you deleted recently stays, so you can still get it back."] = "בכל כונן פנימי, רק סל המיחזור שלך. מה שמחקת לאחרונה נשאר, כך שעדיין אפשר להחזיר אותו.";
