@@ -28,11 +28,11 @@ namespace CDriveCleaner
             "  Elixar.exe --clean                     the weekly clean: Safe items ticked by default\n" +
             "  Elixar.exe --clean-item \"<name>\"       one cleaning item by its name (see --list-items)\n" +
             "  Elixar.exe --list-items                every cleaning item with its level\n" +
-            "  Elixar.exe --report <folder|file.json> [--with-updates]   status file for Policy manager > Fleet report\n" +
-            "  Elixar.exe --policy <file.elixarpolicy> use this policy as the Custom policy\n" +
+            "  Elixar.exe --report <folder|file.json> [--with-updates]   status file for Policy manager > Fleet report (Business)\n" +
+            "  Elixar.exe --policy <file.elixarpolicy> use this policy as the Custom policy (Business)\n" +
             "  Elixar.exe --tweaks on|default         every Windows tweak on, or all back to Windows' default\n" +
             "  Elixar.exe --update-apps               update every app winget can update (Microsoft's winget and Store sources only)\n" +
-            "  Elixar.exe --admx <folder>             Group Policy template: Elixar.admx with en-US and he-IL texts (no admin needed)\n" +
+            "  Elixar.exe --admx <folder>             Group Policy template: Elixar.admx with en-US and he-IL texts (Business; no admin needed)\n" +
             "  Elixar.exe --uninstall --quiet [--purge]  remove Elixar; --purge also deletes its Undo backups, logs and settings\n\n" +
             "Exit codes: 0 done, 1 problem, 2 blocked by the policy, 3 not administrator, 4 wrong command.\n" +
             "In cmd, start it with  start /wait Elixar.exe ...  so the prompt waits for it (then %errorlevel% is the exit code).\n" +
@@ -45,6 +45,7 @@ namespace CDriveCleaner
             if (Win.IsWindows && Out == (Action<string>)Console.WriteLine) try { AttachConsole(-1); Out(""); } catch { }
             string cmd = args[0].ToLowerInvariant();
             if (cmd == "--help" || cmd == "/?") { Out(Help); return 0; }
+            if (!Edition.Business && (cmd == "--admx" || cmd == "--report" || cmd == "--policy")) { Out("Elixar: " + Edition.BusinessOnly); return 2; }
             if (cmd == "--admx")
             {
                 string dir = Arg(args, 1);

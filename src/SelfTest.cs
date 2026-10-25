@@ -692,9 +692,14 @@ namespace CDriveCleaner
                     var rel = Updates.ParseRelease("{\"tag_name\":\"v1.9.2\",\"html_url\":\"https://github.com/elisar/elixar/releases/tag/v1.9.2\",\"body\":\"Notes\",\"assets\":[" +
                         "{\"name\":\"Elixar.zip\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/Elixar.zip\"}," +
                         "{\"name\":\"elixar-manifest.txt\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-manifest.txt\"}," +
-                        "{\"name\":\"elixar-manifest.sig\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-manifest.sig\"}]}");
+                        "{\"name\":\"elixar-manifest.sig\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-manifest.sig\"}," +
+                        "{\"name\":\"Elixar-Business.zip\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/Elixar-Business.zip\"}," +
+                        "{\"name\":\"elixar-business-manifest.txt\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-business-manifest.txt\"}," +
+                        "{\"name\":\"elixar-business-manifest.sig\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-business-manifest.sig\"}]}");
                     var man = Updates.ParseManifest("version=1.9.2.0\nzip-sha256=aa11\nexe-sha256=BB22\n");
-                    check(rel.Version == new Version(1, 9, 2) && rel.ZipUrl.EndsWith("Elixar.zip") && rel.SigUrl.EndsWith(".sig") && man.Version == new Version(1, 9, 2, 0) && man.ZipSha256 == "AA11" &&
+                    var manB = Updates.ParseManifest("version=1.9.2.0\nzip-sha256=aa11\nexe-sha256=BB22\nedition=business\n");
+                    check(rel.Version == new Version(1, 9, 2) && rel.ZipUrl.EndsWith("/" + Edition.ZipAsset) && rel.ManifestUrl.EndsWith("/" + Edition.ManifestAsset + ".txt") && rel.SigUrl.EndsWith("/" + Edition.ManifestAsset + ".sig") &&
+                          man.Edition == "private" && manB.Edition == "business" && man.Version == new Version(1, 9, 2, 0) && man.ZipSha256 == "AA11" &&
                           Updates.ParseTag("v2.0") == new Version(2, 0) && Updates.ParseTag("nightly") == null, "Updates: reads GitHub's release and the signed manifest");
                     using (var key = new System.Security.Cryptography.RSACryptoServiceProvider(2048, new System.Security.Cryptography.CspParameters(24)))
                     {
@@ -1529,7 +1534,7 @@ namespace CDriveCleaner
                                 ChangeLog.Command("vssadmin.exe", "delete shadows /for=C: /all /quiet", "", 0);
                                 var lf = new MainForm(true);
                                 lf.LogsLoad();
-                                bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && lf.LogsRowCount == 3;
+                                bool page = lf.NavRightItems.SequenceEqual(Edition.Business ? new[] { "Settings", "Logs", "Policy manager" } : new[] { "Settings", "Logs" }) && lf.LogsRowCount == 3;
                                 lf.LogsSetFilter(1, 2, ""); page &= lf.LogsRowCount == 2;          // Registry only
                                 lf.LogsSetFilter(0, 2, "vssadmin"); page &= lf.LogsRowCount == 1;   // search
                                 lf.LogsSetFilter(0, 2, ""); page &= lf.LogsSections.Contains("*:3") && lf.LogsSections.Contains("Restore points:1") && lf.LogsSections.Contains("#undo:2") && lf.LogsSections.Contains("#deleted:1");
@@ -1564,6 +1569,7 @@ namespace CDriveCleaner
                             check(ui, "Logs: the Logs page sits next to Settings, filters and searches, shows before and after, and \"Undo this change\" puts the old value back");
                         }
                         // Policy manager: Default and Custom rules, an organization's rules win, export / import, and the rules at work
+                        if (Edition.Business)
                         {
                             string pd = Path.Combine(root, "policy"); Directory.CreateDirectory(pd);
                             string keepPf = Policy.OverrideFile, keepCl = ChangeLog.OverrideFile, keepTp = TidyPrefs.OverrideFile; var keepOg = Policy.OrgOverride;
@@ -1762,6 +1768,7 @@ namespace CDriveCleaner
                             check(work, "Policy: the weekly clean and the Cleaner keep to the cleaning level, every schedule runs at the time the policy sets (the times set in Automation move into the policy once, unchanged), and each cleaning item can be asked, cleaned by itself at its own time, or never touched, keeping files newer than its age limit" + (work ? "" : pwhy));
                             check(pui, "Policy: the Policy manager tab sits next to Logs, switches between Default and Custom, uses presets and imports, asks before making rules looser, and turns tabs off" + (pui ? "" : pwhy));
                         }
+                        else SelfTest1250.PrivatePolicy(root, check);   // Elixar for Private: no Policy manager; times, an organization's rules and company locks still work
                         // hardening from the code review
                         {
                             bool xmlSafe = false, saveSafe = false, sqlSafe = false;

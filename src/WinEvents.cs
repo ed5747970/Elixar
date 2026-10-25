@@ -52,7 +52,7 @@ namespace CDriveCleaner
 
         public static void Write(ChangeLog.Entry e)
         {
-            if (e == null || busy) return;
+            if (e == null || busy || !Edition.Business) return;   // Elixar for Business
             if (WriteOverride == null && (ChangeLog.OverrideFile != null || !Win.IsWindows || broken)) return;   // a test log is never sent to the real Event Log
             if (Policy.Get("eventlog") == "off") return;
             var type = e.Failed ? EventLogEntryType.Warning : EventLogEntryType.Information;

@@ -87,8 +87,8 @@ namespace CDriveCleaner
             // the day and time are set in Policy manager
             cmbMailDay.Visible = timeMail.Visible = false;
             lblMailWhen = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(6), S(6), 0, 0), UseMnemonic = false };
-            var btnMailTimes = new LinkLabel { AutoSize = true, Text = "Change in Policy manager", Margin = new Padding(S(8), S(6), 0, 0) };
-            btnMailTimes.LinkClicked += (o, e2) => ShowPolicy();
+            var btnMailTimes = new LinkLabel { AutoSize = true, Text = Edition.Business ? "Change in Policy manager" : "Change the times", Margin = new Padding(S(8), S(6), 0, 0) };
+            btnMailTimes.LinkClicked += (o, e2) => ChangeTimes();
             sumRow.Controls.AddRange(new Control[] { chkMailSummary, cmbMailDay, timeMail, lblMailWhen, btnMailTimes });
             ShowMailWhen();
             var row2 = Row();
@@ -180,6 +180,7 @@ namespace CDriveCleaner
             {
                 mailStatus.ForeColor = Theme.MapFore(CautionColor);
                 mailStatus.Text = (Policy.ByCompany("email") ? string.Format(Lang.T("Email is turned off on company PCs (this PC is joined to {0}). Ask your IT department."), Policy.Company())
+                                                             : Policy.Source("email") == "organization" ? Lang.T("Email is turned off by your organization's policy. Ask your IT department.")
                                                              : Lang.T("Email is turned off by the policy (Policy manager).")) +
                                   (signed ? "\n" + Lang.T("No emails are sent. You can disconnect the account that is still connected.") : "");
                 foreach (Control c in new Control[] { pnlChoose, pnlGoogle, pnlMicrosoft, pnlOther, pnlReports, btnMailTest, btnMailSave, btnMailCleanOn }) c.Enabled = false;

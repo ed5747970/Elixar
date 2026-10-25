@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.55</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.56</p></div>
 </div></header>
 <main class="wrap">
 
@@ -55,7 +55,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#it">For IT</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#editions">Private and Business</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#cure">Cure Agent and Console</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#it">For IT</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -295,7 +295,19 @@
 </ul>
 <p>Passwords, PINs, tokens and recovery codes are never written to the log, only that they were set or removed, and email addresses are shortened. The log is in C:\ProgramData\Elixar, which only administrators can change; at 4 MB it moves to changes-old.jsonl and a new one starts, and both are shown.</p>
 
-<h2 id="policy">Policy manager</h2>
+<h2 id="editions">Elixar for Private and Elixar for Business</h2>
+<p>Elixar comes in two editions. The header shows which one you have.</p>
+<table>
+<tr><th></th><th>Elixar for Private</th><th>Elixar for Business</th></tr>
+<tr><td>For</td><td>Home PCs. Free for personal and other noncommercial use.</td><td>Companies, IT departments and anyone using Elixar at work (business license).</td></tr>
+<tr><td>Cleaning, apps, tools, phone, email, automation, PIN, Logs</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Policy manager, Sysprep and golden image tools, fleet report, Group Policy template, Event Log</td><td>&mdash;</td><td>Yes</td></tr>
+<tr><td>Cure Agent and Cure Console (all PCs in one place)</td><td>&mdash;</td><td>Yes</td></tr>
+<tr><td>An organization's Group Policy rules, and the company-PC locks</td><td>Always obeyed</td><td>Always obeyed</td></tr>
+</table>
+<p>In Elixar for Private, <strong>Automation &gt; Change the times</strong> sets when each automatic action runs (Business sets the times in Policy manager). Each edition updates itself only to the same edition. To switch, install the other edition&rsquo;s MSI or copy: it replaces the one you have and keeps your settings.</p>
+
+<h2 id="policy">Policy manager (Business)</h2>
 <p>The <strong>Policy manager</strong> tab, next to Logs, holds the rules for what Elixar may change on this PC and how. Choose <strong>Default</strong> or <strong>Custom</strong> at the top:</p>
 <ul>
   <li><strong>Default</strong> is Elixar&rsquo;s own rules: exactly how Elixar works without a policy (every clean asks first, everything is allowed, your choices in Automation and Settings count).</li>
@@ -348,6 +360,16 @@
 <h2 id="onedrive">OneDrive</h2>
 <p>The <strong>OneDrive</strong> tab appears only when OneDrive is signed in on this PC with your account email. Elixar doesn't sign in or connect to anything: it reads OneDrive's own settings on this PC. The Dashboard also suggests it when files you haven't used for 3 months add up to 1 GB or more.</p>
 <p>It lists files of 1 MB and up that are on this PC and that you haven't opened for 1, 3, 6 or 12 months. <strong>Make selected online-only</strong> does the same as OneDrive's own &ldquo;Free up space&rdquo;: the files stay in OneDrive and in File Explorer, but take no space here until you open one (OneDrive then downloads it, which needs internet). Nothing is deleted. Files marked &ldquo;Always keep on this device&rdquo; are left alone, nothing is ticked for you, and reading the folder never downloads anything. Elixar changes only real OneDrive files inside your OneDrive folder (each must carry OneDrive's own cloud mark), so even a changed OneDrive setting can't point it at other files.</p>
+
+<h2 id="cure">Cure Agent and Cure Console (Business)</h2>
+<p>Cure shows every company PC in one web page: free space, what can be cleaned, disk health, the last clean, app updates and problems. <strong>Stage 1 is reports only</strong>: the PCs send their status to your own server, and nothing can be started on a PC from the console.</p>
+<ol>
+<li><strong>Server</strong> (a Windows server in your domain): install <code>Elixar-Business.msi</code>, then from an administrator prompt run <code>"C:\Program Files\Elixar\CureServer.exe" --install --group "CONTOSO\Cure Console Users"</code>. It makes a certificate (or use yours with <code>--cert &lt;thumbprint&gt;</code>), opens port 8443 on the domain network only, runs as its own low-rights account (NT SERVICE\CureServer) and prints the console address, the certificate thumbprint and the <em>enrollment token</em> (shown once). The settings for the PCs are saved as <code>Cure Agent settings.reg</code> in C:\ProgramData\Elixar\CureServer.</li>
+<li><strong>PCs</strong>: put the settings in Group Policy (Computer &gt; Preferences &gt; Registry, or import the .reg in Intune): <code>HKLM\SOFTWARE\Policies\Elixar\Cure</code> with <code>Server</code>, <code>EnrollToken</code>, <code>Thumbprint</code> and optionally <code>Interval</code> (minutes, 5&ndash;1440, default 15). Then deploy <code>msiexec /i Elixar-Business.msi /qn CUREAGENT=1</code>. Or without Group Policy: <code>msiexec /i Elixar-Business.msi /qn CURESERVER=https://cure.contoso.local:8443/ CURETOKEN=... CURETHUMBPRINT=...</code>.</li>
+<li><strong>Console</strong>: open the address in a browser on the company network. You sign in with your Windows account; members of the group you gave (and the server&rsquo;s administrators) can see it.</li>
+</ol>
+<p><strong>How it stays safe</strong>: HTTPS only, and with a thumbprint the PCs accept only your server&rsquo;s certificate. A PC joins once with the enrollment token and then signs every report with its own key (kept with Windows&rsquo; machine encryption in a folder only administrators can open); the server refuses a wrong signature, an old or repeated report and more than one report a minute. The token is a join code, not a password: anyone on a company PC can read Group Policy settings, so it only lets a new PC join (you see every PC in the console). If it leaks, run <code>CureServer.exe --new-token</code> (joined PCs keep reporting); remove a PC with <code>CureServer.exe --remove-pc &lt;name&gt;</code>. Reports never contain file names, emails, what&rsquo;s in your files, who is signed in, passwords or keys; <code>CureAgent.exe --show</code> prints exactly what a report contains. The console only reads, can&rsquo;t be shown inside another site, and never shows a PC&rsquo;s text as code.</p>
+<p><strong>Commands</strong>: <code>CureAgent.exe --status</code> | <code>--send</code> | <code>--show</code> | <code>--uninstall</code>; <code>CureServer.exe --new-token</code> | <code>--remove-pc &lt;name&gt;</code> | <code>--uninstall [--purge]</code>. Uninstalling the MSI removes both services; the server&rsquo;s reports stay unless you use <code>--purge</code>.</p>
 
 <h2 id="it">For IT: command line, MSI and fleet report</h2>
 <p><strong>Command line</strong> (an administrator command prompt; in cmd use <code>start /wait Elixar.exe ...</code> to wait for it). No window and no questions; the policy still applies and every change goes into Logs.</p>
@@ -468,6 +490,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-26</td><td>1.2.56</td><td>Two editions: Elixar for Private (home) and Elixar for Business (Policy manager, Sysprep, fleet, Group Policy template, Event Log); Cure Agent and Cure Console: every company PC in one web page, reports only</td></tr>
   <tr><td>2026-10-25</td><td>1.2.55</td><td>Email is also off on company PCs; Group Policy / Intune template (ADMX) from Policy manager or <code>--admx</code>; every change also goes to an admin-only &ldquo;Elixar&rdquo; log in Event Viewer; PolyForm Noncommercial license</td></tr>
   <tr><td>2026-10-25</td><td>1.2.54</td><td>Company PCs: on a PC joined to an Active Directory domain or Microsoft Entra ID, the Phone tab and the Sysprep tools are greyed out and locked; IT can allow them by policy</td></tr>
   <tr><td>2026-10-25</td><td>1.2.53</td><td>Security audit (backdoor and compromise review, no backdoor found): logs readable by administrators only; update checks can be turned off in Policy manager; app updates only from Microsoft&rsquo;s sources; the Android tools&rsquo; server stops with Elixar; uninstall can remove Undo backups and logs (<code>--purge</code>); pinned build actions</td></tr>

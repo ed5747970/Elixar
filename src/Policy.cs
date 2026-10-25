@@ -213,12 +213,14 @@ namespace CDriveCleaner
             if (IsItemKey(key))
             {
                 if (Org().TryGetValue(key, out v)) return v;
-                if (UseCustom && Custom.TryGetValue(key, out v)) return v;
+                if (UseCustom && Edition.Business && Custom.TryGetValue(key, out v)) return v;   // per-item rules: Policy manager (Business)
                 return ItemRule.DefaultText;
             }
             var r = Rule(key); if (r == null) return null;
             if (Org().TryGetValue(key, out v)) return v;
-            if (UseCustom && Custom.TryGetValue(key, out v) && r.Valid(v)) return v;
+            // Elixar for Private has no Policy manager: of your own rules only the times (Automation > Change the times) count;
+            // an organization's rules above always do
+            if (UseCustom && (Edition.Business || IsSchedule(key)) && Custom.TryGetValue(key, out v) && r.Valid(v)) return v;
             return r.Default;
         }
 

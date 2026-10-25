@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Elixar for IT: a per-machine MSI for Intune, Group Policy or SCCM.
+<!-- Elixar for Private: a per-machine MSI for Intune, Group Policy or SCCM.
      Build:  wixl -a x64 -D Version=1.2.50 -D Exe=path\to\Elixar.exe -o Elixar.msi Elixar.wxs   (msitools)
              or WiX 3: candle -arch x64 -dVersion=1.2.50 -dExe=... Elixar.wxs && light Elixar.wixobj
      Silent install:    msiexec /i Elixar.msi /qn
      Silent uninstall:  msiexec /x Elixar.msi /qn   (also removes Elixar's schedules)
      The UpgradeCode never changes, so a newer MSI replaces an older one. -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="Elixar" Language="1033" Version="$(var.Version)" Manufacturer="Elisar"
+  <Product Id="*" Name="Elixar for Private" Language="1033" Version="$(var.Version)" Manufacturer="Elisar"
            UpgradeCode="6B1C3D52-7E0A-4C89-9E1F-3A5D2B7C4E10">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
              Description="Elixar - the cure for a cluttered PC" Manufacturer="Elisar" Comments="Made by Elisar" />
-    <MajorUpgrade DowngradeErrorMessage="A newer Elixar is already installed." />
+    <!-- the same UpgradeCode as Elixar for Business: installing one edition replaces the other -->
+    <MajorUpgrade DowngradeErrorMessage="A newer Elixar is already installed." AllowSameVersionUpgrades="yes" />
     <Media Id="1" Cabinet="elixar.cab" EmbedCab="yes" />
     <Property Id="ARPCOMMENTS" Value="The cure for a cluttered PC" />
     <Property Id="ARPNOMODIFY" Value="1" />

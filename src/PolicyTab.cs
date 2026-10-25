@@ -377,7 +377,8 @@ namespace CDriveCleaner
                 var was = (Tuple<bool, string>)it.Tag;
                 bool ok = Policy.Allowed(key);
                 it.Enabled = was.Item1 && ok;
-                it.Tip = ok ? was.Item2 : Policy.ByCompany(key) ? Lang.T("Turned off on company PCs. Ask your IT department.") : Lang.T("Turned off by the policy (Policy manager).");
+                it.Tip = ok ? was.Item2 : Policy.ByCompany(key) ? Lang.T("Turned off on company PCs. Ask your IT department.") :
+                         Policy.Source(key) == "organization" ? Lang.T("Turned off by your organization's policy. Ask your IT department.") : Lang.T("Turned off by the policy (Policy manager).");
             };
             navOn(pagePhone, "phone");
             navOn(pageEmail, "email");

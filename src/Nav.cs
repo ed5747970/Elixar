@@ -173,7 +173,7 @@ namespace CDriveCleaner
             nav.Items.Add(item("Linux", pageLinux, lx, "Only on Linux: this PC runs " + OsInfo.Current.Name + "."));
             nav.Items.Add(new NavBar.Item { Text = "Settings", Page = pageSettings, Right = true, Glyph = "gear" });
             nav.Items.Add(new NavBar.Item { Text = "Logs", Page = pageLogs, Right = true, Glyph = "list" });
-            nav.Items.Add(new NavBar.Item { Text = "Policy manager", Page = pagePolicy, Right = true, Glyph = "shield" });
+            if (Edition.Business) nav.Items.Add(new NavBar.Item { Text = "Policy manager", Page = pagePolicy, Right = true, Glyph = "shield" });
             nav.Selected = nav.Items[0];
             nav.Picked += it => tabs.SelectedTab = it.Page;
             tabs.SelectedIndexChanged += (o, e) => nav.Select(tabs.SelectedTab);

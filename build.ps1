@@ -1,5 +1,5 @@
 # Builds Elixar.exe with the C# compiler that comes with Windows (.NET Framework 4). No extra tools needed.
-# .\build.ps1                -> out\Elixar.exe
+# .\build.ps1                -> out\Elixar.exe (Elixar for Private) and out\business\ (Elixar for Business, CureAgent.exe, CureServer.exe)
 # .\build.ps1 -SelfTest      -> also runs the safe self-test and fails if any check fails
 param([string]$Out = "out", [switch]$SelfTest)
 $ErrorActionPreference = "Stop"
@@ -26,17 +26,38 @@ if ($msid -and -not ($msid -as [guid])) { throw "ELIXAR_MS_ID must be the Applic
 $refs = "System.dll","System.Core.dll","System.Drawing.dll","System.Windows.Forms.dll","Microsoft.VisualBasic.dll","System.Xml.dll",
         "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll","System.Security.dll" | ForEach-Object { "/r:$_" }
 $src = Get-ChildItem (Join-Path $root "src\*.cs") | ForEach-Object { $_.FullName }
+$common = @("/nologo", "/optimize+", "/win32icon:$root\app.ico", "/win32manifest:$root\app.manifest",
+            "/resource:$root\app.ico,Elixar.app.ico", "/resource:$root\brand.png,Elixar.brand.png",
+            "/resource:$root\guide\UserGuide.html,Elixar.guide.html", "/resource:$cfg,Elixar.update-config.txt") + $refs
+
+# Elixar for Private -> out\Elixar.exe
 $exe = Join-Path $outDir "Elixar.exe"
-& $csc /nologo /target:winexe /optimize+ "/out:$exe" "/win32icon:$root\app.ico" "/win32manifest:$root\app.manifest" `
-    "/resource:$root\app.ico,Elixar.app.ico" "/resource:$root\brand.png,Elixar.brand.png" `
-    "/resource:$root\guide\UserGuide.html,Elixar.guide.html" "/resource:$cfg,Elixar.update-config.txt" $refs $src
-if ($LASTEXITCODE -ne 0) { throw "Build failed" }
-Write-Host "Built $exe"
+& $csc /target:winexe "/out:$exe" $common $src
+if ($LASTEXITCODE -ne 0) { throw "Build failed (Private)" }
+Write-Host "Built $exe (Elixar for Private)"
+
+# Elixar for Business -> out\business\Elixar.exe, CureAgent.exe, CureServer.exe
+$bizDir = Join-Path $outDir "business"
+New-Item -ItemType Directory -Force $bizDir | Out-Null
+$biz = Join-Path $bizDir "Elixar.exe"
+& $csc /target:winexe "/out:$biz" /define:BUSINESS $common `
+    "/resource:$root\cure\console.html,Elixar.cure.console.html" "/resource:$root\cure\console.js,Elixar.cure.console.js" "/resource:$root\cure\console.css,Elixar.cure.console.css" $src
+if ($LASTEXITCODE -ne 0) { throw "Build failed (Business)" }
+foreach ($t in "Agent", "Server") {
+    & $csc /nologo /optimize+ /target:exe "/out:$bizDir\Cure$t.exe" "/win32icon:$root\app.ico" "/win32manifest:$root\app.manifest" "/r:$biz" $refs "$root\cure\${t}Main.cs"
+    if ($LASTEXITCODE -ne 0) { throw "Build failed (Cure $t)" }
+}
+Write-Host "Built $biz, CureAgent.exe and CureServer.exe (Elixar for Business)"
 
 if ($SelfTest) {
-    $p = Start-Process -FilePath $exe -ArgumentList "--selftest", "--quiet" -Wait -PassThru
-    $report = Join-Path $outDir "selftest-report.txt"
-    if (Test-Path $report) { Get-Content $report }
-    if ($p.ExitCode -ne 0) { throw "Self-test: $($p.ExitCode) check(s) failed" }
-    Write-Host "Self-test passed"
+    $failed = 0
+    foreach ($e in @($exe, $biz)) {
+        $p = Start-Process -FilePath $e -ArgumentList "--selftest", "--quiet" -Wait -PassThru
+        $report = Join-Path (Split-Path $e) "selftest-report.txt"
+        Write-Host "===== Self-test: $e"
+        if (Test-Path $report) { Get-Content $report }
+        if ($p.ExitCode -ne 0) { $failed += $p.ExitCode }
+    }
+    if ($failed -ne 0) { throw "Self-test: $failed check(s) failed" }
+    Write-Host "Self-test passed (Private and Business)"
 }

@@ -772,8 +772,11 @@ namespace CDriveCleaner
                     string newVer = ""; try { newVer = System.Diagnostics.FileVersionInfo.GetVersionInfo(Exe).FileVersion; } catch { }
                     ChangeLog.Add("Apps", had ? "Updated Elixar's protected copy" : "Installed Elixar's protected copy", Exe, had ? oldVer : "", newVer, "In a folder only administrators can change; the schedules use this copy", false);
                 }
+#if BUSINESS
+                CureSetup.UpdateFiles(Current);   // Cure Agent / Cure Server next to it, from a checked update only
+#endif
                 // older copies that were in use during an update ("Elixar.exe.old-...") are removed once they are free
-                try { foreach (var o in Directory.GetFiles(Dir, "Elixar.exe.old-*")) try { File.Delete(o); } catch { } } catch { }
+                try { foreach (var o in Directory.GetFiles(Dir, "*.exe.old-*")) try { File.Delete(o); } catch { } } catch { }
                 SafeFile.RemoveDownloadMark(Exe);
                 string lerr = WriteLauncher();
                 if (lerr != null) return lerr;

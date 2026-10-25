@@ -74,7 +74,7 @@ namespace CDriveCleaner
         public static bool IsNewer(Version a, Version than) { return Compare(a, than) > 0; }
 
         public class Release { public Version Version; public string Tag = "", ZipUrl = "", ManifestUrl = "", SigUrl = "", Page = "", Notes = ""; }
-        public class Manifest { public Version Version; public string ZipSha256 = "", ExeSha256 = ""; }
+        public class Manifest { public Version Version; public string ZipSha256 = "", ExeSha256 = "", Edition = "private"; }   // no edition line: Elixar for Private
 
         public static Version ParseTag(string tag)
         {
@@ -94,9 +94,10 @@ namespace CDriveCleaner
                 foreach (Dictionary<string, object> a in assets)
                 {
                     string name = a["name"] as string ?? "", url = a["browser_download_url"] as string ?? "";
-                    if (name.Equals("Elixar.zip", StringComparison.OrdinalIgnoreCase)) r.ZipUrl = url;
-                    else if (name.Equals("elixar-manifest.txt", StringComparison.OrdinalIgnoreCase)) r.ManifestUrl = url;
-                    else if (name.Equals("elixar-manifest.sig", StringComparison.OrdinalIgnoreCase)) r.SigUrl = url;
+                    // only this edition's files (Elixar for Private and Elixar for Business are published side by side)
+                    if (name.Equals(Edition.ZipAsset, StringComparison.OrdinalIgnoreCase)) r.ZipUrl = url;
+                    else if (name.Equals(Edition.ManifestAsset + ".txt", StringComparison.OrdinalIgnoreCase)) r.ManifestUrl = url;
+                    else if (name.Equals(Edition.ManifestAsset + ".sig", StringComparison.OrdinalIgnoreCase)) r.SigUrl = url;
                 }
             return r;
         }
@@ -111,6 +112,7 @@ namespace CDriveCleaner
                 if (p[0] == "version") Version.TryParse(p[1], out m.Version);
                 else if (p[0] == "zip-sha256") m.ZipSha256 = p[1].ToUpperInvariant();
                 else if (p[0] == "exe-sha256") m.ExeSha256 = p[1].ToUpperInvariant();
+                else if (p[0] == "edition") m.Edition = p[1].Trim().ToLowerInvariant();
             }
             return m;
         }
@@ -207,6 +209,7 @@ namespace CDriveCleaner
                 if (!VerifySignature(manifest, sigBytes, PublicKey)) { error = "The update is not signed by Elisar's key, so Elixar did not install it."; return null; }
                 var m = ParseManifest(Encoding.UTF8.GetString(manifest));
                 if (m.Version == null || !IsNewer(m.Version, Current)) { error = "No newer version."; return null; }
+                if (m.Edition != Edition.Id) { error = "The update is for another Elixar edition, so Elixar did not install it."; return null; }
                 if (log != null) log("Downloading Elixar " + m.Version + "...");
                 string zip = Path.Combine(dir, "Elixar.zip");
                 using (var fs = new FileStream(zip, FileMode.CreateNew, FileAccess.Write)) Download(r.ZipUrl, fs, MaxZip);

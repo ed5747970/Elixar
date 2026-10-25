@@ -8,6 +8,17 @@ Every change it makes (registry values with before and after, files, commands, a
 the Logs tab, where a registry change can be undone with one click.
 The full user guide is in `guide/UserGuide.html` (also built into the app: press F1).
 
+## Two editions
+
+| | Elixar for Private | Elixar for Business |
+|---|---|---|
+| Download | `Elixar.zip` / `Elixar.msi` | `Elixar-Business.zip` / `Elixar-Business.msi` |
+| For | Home PCs (free, noncommercial) | Companies (business license) |
+| Policy manager, Sysprep tools, fleet report, Group Policy template, Event Log | — | ✓ |
+| **Cure Agent + Cure Console**: every company PC in one web page (reports only) | — | ✓ |
+
+Both are built from the same code (`/define:BUSINESS` for Business) and both always obey an organization's Group Policy and the company-PC locks. Set-up of Cure: User Guide > Cure Agent and Cure Console.
+
 ## Build
 
 On any Windows 10/11 PC: `powershell -ExecutionPolicy Bypass -File build.ps1 -SelfTest`

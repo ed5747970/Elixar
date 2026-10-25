@@ -481,8 +481,8 @@ namespace CDriveCleaner
             timeCheck = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(12), Visible = false };
             chkLogon = new CheckBox { AutoSize = true, Checked = true, Text = "and a few minutes after I sign in", Margin = new Padding(S(10), S(4), 0, 0), Visible = false };
             lblSchedCheck = new Label { AutoSize = true, Margin = new Padding(S(2), S(6), S(10), 0), UseMnemonic = false, Font = new Font("Segoe UI Semibold", 9f) };
-            var btnTimes1 = MakeButton("Change the times in Policy manager...");
-            btnTimes1.Click += (o, e) => ShowPolicy();
+            var btnTimes1 = MakeButton(Edition.Business ? "Change the times in Policy manager..." : "Change the times...");
+            btnTimes1.Click += (o, e) => ChangeTimes();
             r2.Controls.AddRange(new Control[] { lblSchedCheck, timeCheck, chkLogon, btnTimes1 });
             lblAlertState = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(22), S(6), 0, 0), Text = "Checking..." };
             fa.Controls.AddRange(new Control[] { r1, r2, lblAlertState });
@@ -499,8 +499,8 @@ namespace CDriveCleaner
             timeClean = new TimeBox { Width = S(80), Value = DateTime.Today.AddHours(20) };
             chkClean.Visible = cmbDay.Visible = timeClean.Visible = false;
             lblSchedClean = new Label { AutoSize = true, Margin = new Padding(S(2), S(6), S(10), 0), UseMnemonic = false, Font = new Font("Segoe UI Semibold", 9f) };
-            var btnTimes2 = MakeButton("Change in Policy manager...");
-            btnTimes2.Click += (o, e) => ShowPolicy();
+            var btnTimes2 = MakeButton(Edition.Business ? "Change in Policy manager..." : "Change the times...");
+            btnTimes2.Click += (o, e) => ChangeTimes();
             r3.Controls.AddRange(new Control[] { chkClean, cmbDay, timeClean, lblSchedClean, btnTimes2 });
             lblAutoItems = new Label
             {
@@ -748,9 +748,10 @@ namespace CDriveCleaner
             if (lblSchedCheck == null) return;
             string chk = Policy.Get("sched.check"), day = Policy.Get("sched.clean.day");
             bool logon = Policy.Get("sched.logon") == "on";
-            lblSchedCheck.Text = Lang.T(chk == "off" && !logon ? "When: off (set in Policy manager)" :
-                                        "When: " + (chk != "off" ? "every day at " + chk : "") + (chk != "off" && logon ? " and " : "") + (logon ? "a few minutes after you sign in" : "") + " (set in Policy manager)");
-            lblSchedClean.Text = Lang.T(day == "off" ? "Weekly clean: off (set in Policy manager)" : "Weekly clean: every " + day + " at " + Policy.Get("sched.clean.time") + " (set in Policy manager)");
+            string sfx = Edition.Business ? " (set in Policy manager)" : "";   // Elixar for Private: the button next to it changes the times
+            lblSchedCheck.Text = Lang.T(chk == "off" && !logon ? "When: off" + sfx :
+                                        "When: " + (chk != "off" ? "every day at " + chk : "") + (chk != "off" && logon ? " and " : "") + (logon ? "a few minutes after you sign in" : "") + sfx);
+            lblSchedClean.Text = Lang.T(day == "off" ? "Weekly clean: off" + sfx : "Weekly clean: every " + day + " at " + Policy.Get("sched.clean.time") + sfx);
         }
 
         // how low is too low (the % in Automation), from the schedule when it isn't on screen yet

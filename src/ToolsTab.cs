@@ -52,7 +52,7 @@ namespace CDriveCleaner
             pageSysprep = new TabPage("Sysprep") { BackColor = pageTools.BackColor };
             BuildSpaceMap(); BuildTweaks();
             if (LinuxUi) toolsTabs.TabPages.AddRange(new[] { pageMap, pageDups });   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageSysprep, pageUndo });
+            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageSysprep, pageUndo }.Where(p => p != pageSysprep || Edition.Business).ToArray());   // Sysprep: Elixar for Business
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();

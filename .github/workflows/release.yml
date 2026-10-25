@@ -22,7 +22,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
-      - name: Build and run the self-test
+        with:
+          persist-credentials: false   # the job's token isn't left in .git/config for later steps
+      - name: Build and run the self-test (both editions)
         shell: powershell
         run: .\build.ps1 -SelfTest
         env:
@@ -30,43 +32,53 @@ jobs:
           ELIXAR_GOOGLE_SECRET: ${{ secrets.ELIXAR_GOOGLE_SECRET }}
           ELIXAR_MS_ID: ${{ secrets.ELIXAR_MS_ID }}
           ELIXAR_SPONSOR: ${{ vars.ELIXAR_SPONSOR }}
-      - name: Code-sign Elixar.exe (only when a certificate is set up)
+      - name: Code-sign the programs (only when a certificate is set up)
         if: env.CODESIGN_PFX != ''
         env:
           CODESIGN_PFX: ${{ secrets.CODESIGN_PFX }}
           CODESIGN_PASSWORD: ${{ secrets.CODESIGN_PASSWORD }}
         shell: powershell
-        run: .\tools\sign-exe.ps1 -Exe out\Elixar.exe
-      - name: Package
+        run: |
+          foreach ($e in "out\Elixar.exe", "out\business\Elixar.exe", "out\business\CureAgent.exe", "out\business\CureServer.exe") { .\tools\sign-exe.ps1 -Exe $e }
+      - name: Package (Elixar for Private and Elixar for Business)
         shell: powershell
         run: |
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
           $tag = "$env:TAG".TrimStart('v')
           if (-not $v.StartsWith($tag)) { throw "Tag $tag does not match the version in the code ($v). Change AssemblyVersion in src\CDriveCleaner.cs." }
-          $pkg = "pkg\Elixar"
-          New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
-          Copy-Item out\Elixar.exe, package\README.txt, "package\Run self-test (safe).bat", guide\UserGuide.html $pkg
-          Copy-Item -Recurse src, guide, tools, package, audit-reports, app.ico, app.manifest, brand.png, build.ps1, README.md, LICENSE, SECURITY.md, update-key.pub.xml "$pkg\source"
-          Copy-Item LICENSE $pkg
-          # the Group Policy / Intune template, made by this build of Elixar
-          $p = Start-Process out\Elixar.exe -ArgumentList '--admx', "`"$((Resolve-Path $pkg).Path)\PolicyDefinitions`"" -Wait -PassThru
-          if ($p.ExitCode -ne 0 -or -not (Test-Path "$pkg\PolicyDefinitions\en-US\Elixar.adml")) { throw "Could not make the Group Policy template" }
-          $exeHash = (Get-FileHash out\Elixar.exe -Algorithm SHA256).Hash
-          [IO.File]::WriteAllText("$pkg\SHA256.txt", "Elixar $v - made by Elisar`r`nSHA-256 of Elixar.exe:`r`n$exeHash`r`n")
-          Compress-Archive -Path $pkg -DestinationPath Elixar.zip -Force
-          $zipHash = (Get-FileHash Elixar.zip -Algorithm SHA256).Hash
-          [IO.File]::WriteAllText("elixar-manifest.txt", "version=$v`nzip-sha256=$zipHash`nexe-sha256=$exeHash`n", (New-Object Text.UTF8Encoding $false))
-      - name: Build the MSI for IT (Intune, Group Policy, SCCM)
+          function Pack($name, $edition, $files, $zip, $manifest) {
+            $pkg = "pkg\$name"
+            New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
+            Copy-Item $files $pkg
+            Copy-Item package\README.txt, "package\Run self-test (safe).bat", guide\UserGuide.html, LICENSE $pkg
+            Copy-Item -Recurse src, guide, tools, package, cure, audit-reports, app.ico, app.manifest, brand.png, build.ps1, README.md, LICENSE, SECURITY.md, update-key.pub.xml "$pkg\source"
+            $exe = Join-Path $pkg "Elixar.exe"
+            if ($edition -eq "business") {
+              # the Group Policy / Intune template, made by this build of Elixar for Business
+              $p = Start-Process $exe -ArgumentList '--admx', "`"$((Resolve-Path $pkg).Path)\PolicyDefinitions`"" -Wait -PassThru
+              if ($p.ExitCode -ne 0 -or -not (Test-Path "$pkg\PolicyDefinitions\en-US\Elixar.adml")) { throw "Could not make the Group Policy template" }
+            }
+            $exeHash = (Get-FileHash $exe -Algorithm SHA256).Hash
+            $sums = Get-ChildItem $pkg -Filter *.exe | ForEach-Object { "$($_.Name)  $((Get-FileHash $_.FullName -Algorithm SHA256).Hash)" }
+            [IO.File]::WriteAllText("$pkg\SHA256.txt", "Elixar for $(if ($edition -eq 'business') {'Business'} else {'Private'}) $v - made by Elisar`r`nSHA-256:`r`n" + ($sums -join "`r`n") + "`r`n")
+            Compress-Archive -Path $pkg -DestinationPath $zip -Force
+            $zipHash = (Get-FileHash $zip -Algorithm SHA256).Hash
+            [IO.File]::WriteAllText($manifest, "version=$v`nzip-sha256=$zipHash`nexe-sha256=$exeHash`nedition=$edition`n", (New-Object Text.UTF8Encoding $false))
+          }
+          Pack "Elixar" "private" @("out\Elixar.exe") "Elixar.zip" "elixar-manifest.txt"
+          Pack "Elixar-Business" "business" @("out\business\Elixar.exe", "out\business\CureAgent.exe", "out\business\CureServer.exe") "Elixar-Business.zip" "elixar-business-manifest.txt"
+      - name: Build the MSIs for IT (Intune, Group Policy, SCCM)
         continue-on-error: true
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 4.0.5
-          Copy-Item package\Elixar.wxs Elixar4.wxs
-          wix convert Elixar4.wxs; $global:LASTEXITCODE = 0
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
           $v3 = ($v.Split('.')[0..2]) -join '.'
+          Copy-Item package\Elixar.wxs Elixar4.wxs; Copy-Item package\Elixar-Business.wxs ElixarBiz4.wxs
+          wix convert Elixar4.wxs; wix convert ElixarBiz4.wxs; $global:LASTEXITCODE = 0
           wix build -arch x64 -d Version=$v3 -d Exe=out\Elixar.exe -o Elixar.msi Elixar4.wxs
-      - name: Sign the update manifest
+          wix build -arch x64 -d Version=$v3 -d Exe=out\business\Elixar.exe -d Agent=out\business\CureAgent.exe -d Server=out\business\CureServer.exe -o Elixar-Business.msi ElixarBiz4.wxs
+      - name: Sign the update manifests
         env:
           ELIXAR_SIGNING_KEY: ${{ secrets.ELIXAR_SIGNING_KEY }}
         shell: pwsh
@@ -74,14 +86,15 @@ jobs:
           if (-not $env:ELIXAR_SIGNING_KEY) { Write-Warning "No ELIXAR_SIGNING_KEY secret: this release can't be installed by Elixar's updater (people download it by hand)."; exit 0 }
           $rsa = [System.Security.Cryptography.RSA]::Create()
           $rsa.FromXmlString($env:ELIXAR_SIGNING_KEY)
-          $sig = $rsa.SignData([IO.File]::ReadAllBytes("elixar-manifest.txt"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
-          [IO.File]::WriteAllText("elixar-manifest.sig", [Convert]::ToBase64String($sig))
+          foreach ($m in "elixar-manifest", "elixar-business-manifest") {
+            $sig = $rsa.SignData([IO.File]::ReadAllBytes("$m.txt"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            [IO.File]::WriteAllText("$m.sig", [Convert]::ToBase64String($sig))
+          }
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $files = @("Elixar.zip", "elixar-manifest.txt")
-          if (Test-Path elixar-manifest.sig) { $files += "elixar-manifest.sig" }
-          if (Test-Path Elixar.msi) { $files += "Elixar.msi" }
+          $files = @("Elixar.zip", "elixar-manifest.txt", "Elixar-Business.zip", "elixar-business-manifest.txt")
+          foreach ($f in "elixar-manifest.sig", "elixar-business-manifest.sig", "Elixar.msi", "Elixar-Business.msi") { if (Test-Path $f) { $files += $f } }
           gh release create "$env:TAG" @files --title "Elixar $env:TAG" --target "${{ github.sha }}" --generate-notes
