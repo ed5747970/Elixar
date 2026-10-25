@@ -3,10 +3,11 @@
 | | |
 |---|---|
 | Application | Elixar (Windows disk-space and maintenance tool, WinForms / .NET Framework 4.x, C# 5) |
-| Version reviewed | 1.2.52 (commit `a958c9f`) — fixes applied in **1.2.53** (commit `564bf83`) |
+| Version reviewed | **1.2.55** (commit `1b22b5a`, re-audit). First review: 1.2.52 (`a958c9f`), fixes in 1.2.53 (`564bf83`), 1.2.54 and 1.2.55 |
 | Repository | `github.com/ed5747970/Elixar` (56 commits reviewed for structure; current tree reviewed in full by search, sensitive areas read line by line) |
-| Scope | All 93 C# source files (~33,000 lines), `build.ps1`, `.github/workflows/*.yml`, `package/Elixar.wxs`, `tools/` (Linux helper and signing scripts) |
-| Method | Static review: inventory of every network call, listener, process launch, credential store, scheduled task, registry write and update path; plus the full self-test (249 checks) on Linux and on a real Windows Server 2025 runner (GitHub Actions) |
+| Scope | All 94 C# source files (~34,000 lines), `build.ps1`, `.github/workflows/*.yml`, `package/Elixar.wxs`, `tools/` (Linux helper and signing scripts) |
+| Method | Static review: inventory of every network call, listener, process launch, credential store, scheduled task, registry write and update path; plus the full self-test (252 checks) on Linux and on a real Windows Server 2025 runner (GitHub Actions) |
+| Re-audit (1.2.55) | New since the first review: company-PC detection (`Policy.cs` `DomainJoin`), email/phone/Sysprep locks, Group Policy template (`PolicyAdmx.cs`, `Cli.cs --admx`), Windows Event Log writer (`WinEvents.cs`), LICENSE, SECURITY.md, Dependabot. No application code was changed during this re-audit |
 | Not done | No dynamic network capture on a production-like Windows PC, no fuzzing, no third-party pen test, no review of the GitHub account's own security settings (2FA, branch protection) |
 | Date | 2026-10-25 |
 
@@ -28,7 +29,9 @@ Integrations that **exist**:
 | Google (Gmail) | Optional | Only if a user connects Gmail (`gmail.send`; `gmail.modify` only for Email cleaning) |
 | Other IMAP/SMTP mail servers | Optional | User-entered server and app password |
 | SMB file shares | Optional (IT) | Only `--report <\\server\share>` / Fleet report writes and reads small JSON files |
-| Active Directory, SQL, network devices, telephony, internal web apps, cloud consoles | **No** | No code paths found. Elixar never authenticates to AD, never queries LDAP, never opens SQL/SSH/RDP/SNMP connections |
+| Active Directory / Entra ID | **Read-only, local** (1.2.54+) | Elixar asks Windows only *whether* the PC is joined (`NetGetJoinInformation`, `NetGetAadJoinInformation` — local calls, `Policy.cs` `DomainJoin`) to lock Phone, Sysprep and Email. It never contacts a domain controller or Entra, never authenticates, never queries LDAP |
+| SQL, network devices, telephony, internal web apps, cloud consoles | **No** | No code paths found. Elixar never opens SQL/SSH/RDP/SNMP/LDAP connections |
+| Windows Event Log | Yes (1.2.55) | Writes its own changes to a local "Elixar" log (admins and Event Log Readers only) for SIEM/WEF collection; nothing is sent anywhere by Elixar |
 | Android phones (USB) | Optional | Via Google's `adb` (downloaded on request, signature-checked) |
 | winget (app updates) | Optional | Runs Windows' own package manager |
 
@@ -37,6 +40,8 @@ Nothing in the code suggests planned integrations beyond these.
 ---
 
 ## A. Intentional backdoor findings
+
+*Re-audit 1.2.55:* the new code (company detection, ADMX generator, Event Log writer, email/phone/Sysprep locks) adds no listener, no network destination, no account, no remote command path and no code loading. `--admx` only writes three XML files to the folder it is given and needs no administrator rights.
 
 **None found.** Each item from the requested checklist was searched for explicitly:
 
@@ -72,6 +77,9 @@ Severity is for a **corporate deployment** where Elixar runs as administrator on
 | B-9 | **Uninstall left Undo backups (copies of deleted files) and logs forever**, and the uninstall text wrongly said they would expire. | Medium (data remnant) | **Fixed**: uninstall asks; IT uses `--uninstall --quiet --purge` (`Setup.cs:120`). |
 | B-10 | **Fleet report files are not authenticated.** Any PC (or user) with write access to the share can write or overwrite any `<name>.json`. Parsing is bounded and safe (64 KB cap, clipped strings, CSV formula guard — `Fleet.cs:72-140`), so the risk is false data, not code execution. | Low | Documented. **Company action:** share ACL "create files / write data" for computers, read only for IT; treat reports as advisory. |
 | B-11 | **Uninstall strings of installed apps are executed** (`Apps.cs:88`) — inherent to an uninstaller. Mitigations present: per-user (HKCU) uninstallers run **without** admin rights (`Apps.cs:383`), unsigned uninstallers outside Program Files trigger a warning (`Apps.cs:117`), `cmd /d` blocks AutoRun, working folder is System32. | Low | Existing controls adequate. |
+| B-13 | **GitHub Actions keep the job token in the checked-out repository.** `actions/checkout` is used without `persist-credentials: false` (`.github/workflows/ci.yml`, `release.yml`), so later steps — the build, the self-test and, in the release job, the freshly built `Elixar.exe --admx` — can read the token from `.git/config`. In the release job that token has `contents: write` (it could push or publish). Exploitable only if malicious code is already in the build. | **Medium** (supply chain) | **Open** (not changed in this audit). Fix: add `with: persist-credentials: false` to both checkout steps (the publish step uses `GH_TOKEN` explicitly and doesn't need it) |
+| B-14 | **Company-PC lock fails open.** If Windows' join check fails (an API error), Elixar treats the PC as a home PC and Phone/Sysprep/Email stay on. | Low | By design (no lock-out of home users). **Company action:** set `phone`, `sysprep`, `email` explicitly in `HKLM\SOFTWARE\Policies\Elixar` (or the ADMX) instead of relying on detection |
+| B-15 | **Event Log shows file paths and settings to the Event Log Readers group** (and to whoever receives the forwarded events). | Low | By design for SIEM; the log is not readable by ordinary users. Policy rule `eventlog = off` turns it off |
 | B-12 | **Golden image scanner reads credential *locations* across all profiles** (SSH keys, `.aws`, `.azure`, Docker/npm auth markers, Credential Manager target names, Chromium login counts). It never decrypts or transmits secrets (`GoldenImage.cs:270-480`), but the access pattern looks like credential harvesting to EDR. | Low (operational) | Documented; covered by the `sysprep` rule. |
 
 Hardening already present (verified): DLL search order locked to System32 (`Security.cs:891`); planted `.config/.local/.manifest` next to the exe refused (`EnvGuard.cs:36`); risky .NET/PATH environment variables dropped when elevated (`EnvGuard.cs:101`); PowerShell module path forced to `$PSHOME` (`Core.cs:317`); all deletes are link-safe and refuse Windows/user root folders (`SafeDelete`, `Protect.IsProtected`); files from Save dialogs written without following links (`SafeFile.cs`); task XML parsed without DTDs (no XXE); IMAP replies size-limited; update downloads size-limited (`Updates.cs:141`).
@@ -92,6 +100,8 @@ Hardening already present (verified): DLL search order locked to System32 (`Secu
 | 8 | `Fleet.cs:104` | SMB share given by IT | Only with `--report` or "Add this PC" | Computer name, Windows version, disk numbers, savings, policy fingerprint, tweak ids | Windows (share ACL) | Optional | By not configuring it |
 | 9 | Browser (`Explain.cs:142`, `SettingsTab.cs:76`, `EmailTab.cs:354,399`) | `bing.com`, `github.com/sponsors`, `console.cloud.google.com`, `entra.microsoft.com` | Only when the user clicks those buttons; opened unelevated in the default browser | Web search sends only the folder name (never the path or user name) | — | Optional | Not separately (user-initiated) |
 | 10 | `StartupTab.cs` → Microsoft Defender (`MpCmdRun`) | Defender cloud, per Windows' own Defender settings | Only on "Scan with Microsoft Defender" | Whatever Defender's cloud protection is configured to send | — | Optional | Defender policy |
+
+**Re-audit 1.2.55:** no new destination (all URLs in the source were re-listed). On company PCs rows 3–6 are blocked by default (Phone, Email); the Event Log is local.
 
 **Not found:** analytics, error tracking, crash upload, WebSockets, webhooks, DNS-based callbacks, cloud storage uploads, hard-coded IPs. `Dns.GetHostName` (`DiskNumber.cs:35`) is a local call.
 
@@ -156,6 +166,8 @@ No service, driver, browser extension, WMI subscription, Run-key entry for itsel
 | Runtime downloads | Elixar update (signed + hashed), Google `adb` (Authenticode-checked), winget packages (winget's trust model; restricted to Microsoft sources in 1.2.53) | Adequate |
 | Code signing of the exe | **Not code-signed** (no certificate) | Windows SmartScreen warns; integrity relies on GitHub + SHA256.txt. Recommend an Authenticode certificate (or Microsoft Store/MSIX signing) before company-wide use |
 | Commits | Signed by the cloud session's SSH key, shown "Unverified" on GitHub | Cosmetic; authenticity of releases comes from the update signature |
+| Dependabot (1.2.55) | Opens pull requests to update the pinned GitHub Actions weekly; nothing merges by itself | Good; review each PR (check the new commit belongs to the official action) |
+| Release job runs the built exe | `Elixar.exe --admx` makes the Group Policy template inside the release job | Acceptable (it is the code being released); combined with B-13 it could reach the job token — fix B-13 |
 | Dependency confusion / typosquatting | Not applicable (no package manager dependencies) | — |
 
 ---
@@ -164,7 +176,7 @@ No service, driver, browser extension, WMI subscription, Run-key entry for itsel
 
 **Scenario A — External application compromise.** *Preconditions:* none apply — Elixar exposes no service to the network. The only inbound socket is the OAuth loopback during a sign-in (random port, loopback-only, `state` + PKCE). *Impact:* not reachable from outside. *Missing controls:* none identified. *Verify:* `netstat -abno` on a test PC during idle and during sign-in.
 
-**Scenario B — Compromised dependency.** *Preconditions:* there are no third-party code dependencies; the realistic equivalents are a compromised GitHub Action or the WiX tool in the release job. *Path:* malicious action reads `ELIXAR_SIGNING_KEY` in the release job and signs a payload. *Impact:* see D. *Existing:* actions pinned to SHAs (1.2.53). *Missing:* environment approval must be switched on by the owner. *Verify:* Settings > Environments > release shows "Required reviewers".
+**Scenario B — Compromised dependency.** *Preconditions:* there are no third-party code dependencies; the realistic equivalents are a compromised GitHub Action or the WiX tool in the release job. *Path:* malicious action reads `ELIXAR_SIGNING_KEY` in the release job and signs a payload. *Impact:* see D. *Existing:* actions pinned to SHAs (1.2.53). *Missing:* environment approval must be switched on by the owner; `persist-credentials: false` on checkout (B-13). *Verify:* Settings > Environments > release shows "Required reviewers".
 
 **Scenario C — Stolen service credentials.** Elixar uses **no service accounts**. The only credentials are per-user mail tokens. *Path:* admin-level malware decrypts the DPAPI blob. *Impact:* that mailbox only. *Existing:* admin-only folder + DPAPI. *Recommended:* `email = block` on corporate PCs, or admin-consented app with Conditional Access. *Verify:* Entra sign-in logs for the Elixar app id.
 
@@ -227,6 +239,7 @@ Blocking items before company-wide use (not code bugs; they can't be closed by s
 3. A dynamic check on a representative company PC: network capture during idle, sign-in and cleaning; confirm only the connections in section C appear.
 4. Authenticode signing (or Store/MSIX signing), or an internal hash-allowlisting process for the exe.
 5. Pilot with EDR on, reviewing alerts for one to two weeks.
+6. Fix B-13 (`persist-credentials: false` in both workflows).
 
 ---
 
@@ -242,7 +255,7 @@ Blocking items before company-wide use (not code bugs; they can't be closed by s
 - **An attacker already admin on a PC** gains little extra from Elixar: at most a mail token (block email by policy) and write access to the fleet share (restrict by ACL).
 - **An outside network attacker** has no entry point: Elixar exposes no listener beyond a short-lived, loopback-only sign-in callback.
 
-**Required measures:** section I, items 1–9, and the five release-gate items above.
+**Required measures:** section I, items 1–9, and the six release-gate items above.
 
 ---
 
