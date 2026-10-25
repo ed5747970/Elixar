@@ -13,6 +13,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
+        with:
+          persist-credentials: false   # the job's token isn't left in .git/config for later steps (audit B-13)
       - name: Build and run the self-test
         shell: powershell
         # what went wrong is also written as annotations (shown on the run's page, readable without signing in)
