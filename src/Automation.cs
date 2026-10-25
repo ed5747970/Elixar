@@ -748,9 +748,10 @@ namespace CDriveCleaner
             if (lblSchedCheck == null) return;
             string chk = Policy.Get("sched.check"), day = Policy.Get("sched.clean.day");
             bool logon = Policy.Get("sched.logon") == "on";
-            lblSchedCheck.Text = Lang.T(chk == "off" && !logon ? "When: off (set in Policy manager)" :
-                                        "When: " + (chk != "off" ? "every day at " + chk : "") + (chk != "off" && logon ? " and " : "") + (logon ? "a few minutes after you sign in" : "") + " (set in Policy manager)");
-            lblSchedClean.Text = Lang.T(day == "off" ? "Weekly clean: off (set in Policy manager)" : "Weekly clean: every " + day + " at " + Policy.Get("sched.clean.time") + " (set in Policy manager)");
+            const string sfx = " (set in Policy manager)";
+            lblSchedCheck.Text = Lang.T(chk == "off" && !logon ? "When: off" + sfx :
+                                        "When: " + (chk != "off" ? "every day at " + chk : "") + (chk != "off" && logon ? " and " : "") + (logon ? "a few minutes after you sign in" : "") + sfx);
+            lblSchedClean.Text = Lang.T(day == "off" ? "Weekly clean: off" + sfx : "Weekly clean: every " + day + " at " + Policy.Get("sched.clean.time") + sfx);
         }
 
         // how low is too low (the % in Automation), from the schedule when it isn't on screen yet

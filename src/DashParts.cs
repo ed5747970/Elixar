@@ -238,6 +238,13 @@ namespace CDriveCleaner
             var ns = TextRenderer.MeasureText(g, "Elixar", nf);
             TextRenderer.DrawText(g, "Elixar", nf, new Point(x, (Height - ns.Height) / 2), Color.White);
             var tf = TagFont ?? Font;
+            // the edition, as a small pill after the name
+            string ed = Lang.T("for " + Edition.Short);
+            var es = TextRenderer.MeasureText(g, ed, tf);
+            var er = new Rectangle(x + ns.Width + 6, (Height - es.Height) / 2 - 1, es.Width + 10, es.Height + 2);
+            using (var pb = new SolidBrush(Color.FromArgb(Edition.Business ? 70 : 45, 255, 255, 255))) g.FillRectangle(pb, er);
+            TextRenderer.DrawText(g, ed, tf, new Point(er.X + 5, er.Y + 1), Color.White);
+            ns.Width += er.Width + 8;
             string tag = Lang.T("The cure for a cluttered PC");
             var ts = TextRenderer.MeasureText(g, tag, tf);
             TextRenderer.DrawText(g, tag, tf, new Point(x + ns.Width + 8, (Height - ts.Height) / 2 + 1), Color.FromArgb(190, 225, 230));

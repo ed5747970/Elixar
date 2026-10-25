@@ -1,7 +1,21 @@
-ELIXAR  (version 1.2.55)
+ELIXAR  (version 1.2.56)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+TWO EDITIONS
+- Elixar for Private (Elixar.zip / Elixar.msi): every Elixar feature, for home
+  PCs, free for personal and noncommercial use.
+- Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): the same,
+  plus Cure Agent + Cure Server (business license, see LICENSE).
+
+NEW IN 1.2.56
+- Elixar is now two apps: Elixar for Private and Elixar for Business.
+- Cure (Business): Cure Agent on every PC sends its status (free space, what
+  can be cleaned, disk health, last clean, app updates) to your own Cure Server;
+  IT sees all PCs in the Cure Console web page. Reports only: nothing can be
+  started on a PC from the console. Set-up steps: User Guide > Cure.
+- Build: the GitHub job's token is no longer kept in the checked-out code.
 
 NEW IN 1.2.55  (for companies)
 - Company PCs: Email is now off too (with Phone and Sysprep); IT can allow it

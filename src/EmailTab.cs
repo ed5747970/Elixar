@@ -180,6 +180,7 @@ namespace CDriveCleaner
             {
                 mailStatus.ForeColor = Theme.MapFore(CautionColor);
                 mailStatus.Text = (Policy.ByCompany("email") ? string.Format(Lang.T("Email is turned off on company PCs (this PC is joined to {0}). Ask your IT department."), Policy.Company())
+                                                             : Policy.Source("email") == "organization" ? Lang.T("Email is turned off by your organization's policy. Ask your IT department.")
                                                              : Lang.T("Email is turned off by the policy (Policy manager).")) +
                                   (signed ? "\n" + Lang.T("No emails are sent. You can disconnect the account that is still connected.") : "");
                 foreach (Control c in new Control[] { pnlChoose, pnlGoogle, pnlMicrosoft, pnlOther, pnlReports, btnMailTest, btnMailSave, btnMailCleanOn }) c.Enabled = false;

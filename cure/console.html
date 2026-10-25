@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cure Console</title>
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+<header>
+  <div class="logo">E</div>
+  <div><h1>Cure Console</h1><div class="sub">Elixar for Business</div></div>
+  <div class="right"><span class="badge">Reports only</span><span id="user"></span></div>
+</header>
+<nav>
+  <a href="#" class="on" id="navPcs">PCs</a><a href="api/v1/export.csv" id="navExport">Export (CSV)</a>
+  <span class="ro" id="status">Loading...</span>
+</nav>
+<main>
+<section class="view on" id="overview">
+  <div class="kpis" id="kpis"></div>
+  <div class="row">
+    <div class="card">
+      <h2>PCs</h2>
+      <div class="tools"><input id="find" placeholder="Find a PC..."><span id="filters"></span></div>
+      <table><thead><tr><th>PC</th><th>Status</th><th>C: free</th><th class="n">Can be cleaned</th><th>Disk</th><th>Last clean</th><th class="n">App updates</th><th>Elixar</th><th>Last report</th></tr></thead>
+      <tbody id="rows"></tbody></table>
+      <div class="foot">Elixar never sends file names, emails or what's in your files. The Cure Console only reads: nothing can be started on a PC from here.</div>
+    </div>
+    <div class="card alerts"><h2>Alerts</h2><ul id="alerts"></ul></div>
+  </div>
+</section>
+<section class="view" id="pc">
+  <div class="crumb"><a href="#" id="back">PCs</a> › <span id="pcName"></span></div>
+  <div class="kpis" id="pcKpis"></div>
+  <div class="det">
+    <div class="card"><h2>Drives</h2><table id="drives"></table><h2 class="gap">Disks</h2><table id="disks"></table></div>
+    <div class="card"><h2>This PC</h2><dl id="facts"></dl></div>
+    <div class="card"><h2>Free space on C:, by day</h2><svg class="spark" viewBox="0 0 300 120" preserveAspectRatio="none" id="spark"></svg><div class="lock" id="trend"></div></div>
+  </div>
+</section>
+</main>
+<script src="console.js"></script>
+</body>
+</html>

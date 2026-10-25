@@ -80,7 +80,7 @@ namespace CDriveCleaner
 
             using (var g = CreateGraphics()) s = Math.Max(1f, g.DpiX / 96f);
 
-            Text = testMode ? "Elixar - TEST MODE (cleaning is switched off)" : LinuxUi ? "Elixar - disk care" : "Elixar - drive C: care";
+            Text = testMode ? "Elixar - TEST MODE (cleaning is switched off)" : Edition.Name + (LinuxUi ? " - disk care" : " - drive C: care");
             Font = new Font("Segoe UI", 9f);
             StartPosition = FormStartPosition.CenterScreen;
             var wa = Screen.PrimaryScreen.WorkingArea;
@@ -810,6 +810,7 @@ namespace CDriveCleaner
         }
 
         public List<string> TabNames { get { return tabs.TabPages.Cast<TabPage>().Select(p => p.Text).ToList(); } }
+        public List<string> ToolsTabNames { get { return toolsTabs.TabPages.Cast<TabPage>().Select(p => p.Text).ToList(); } }
         public List<string> CleanerItemNames { get { return items.Select(i => i.Name).ToList(); } }
 
         public bool DashboardFilled()

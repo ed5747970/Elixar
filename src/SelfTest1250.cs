@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -27,9 +28,128 @@ namespace CDriveCleaner
             check(why == null, name + (why == null ? "" : "  (" + why + ")"));
         }
 
+#if BUSINESS
+        static int FreePort() { var l = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0); l.Start(); int p = ((System.Net.IPEndPoint)l.LocalEndpoint).Port; l.Stop(); return p; }
+
+        // raw request to the test server: status code and body
+        static int Http(string method, string url, byte[] body, Dictionary<string, string> headers, out string answer)
+        {
+            var rq = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+            rq.Method = method; rq.Proxy = null; rq.Timeout = 15000;
+            foreach (var h in headers ?? new Dictionary<string, string>()) rq.Headers[h.Key] = h.Value;
+            if (body != null) { rq.ContentType = "application/json"; rq.ContentLength = body.Length; using (var s = rq.GetRequestStream()) s.Write(body, 0, body.Length); }
+            System.Net.HttpWebResponse rs;
+            try { rs = (System.Net.HttpWebResponse)rq.GetResponse(); }
+            catch (System.Net.WebException we) { rs = we.Response as System.Net.HttpWebResponse; if (rs == null) throw; }
+            using (rs) using (var r = new StreamReader(rs.GetResponseStream())) { answer = r.ReadToEnd(); foreach (var k in rs.Headers.AllKeys) answer += "\n#" + k + ": " + rs.Headers[k]; return (int)rs.StatusCode; }
+        }
+
+        static void Cure(string R, Action<bool, string> check)
+        {
+            Run(check, "Cure Agent and Cure Server: a PC enrolls with the token and sends signed reports; a wrong token, a wrong or old signature, a repeated report, too many reports and a too-big report are refused; a removed PC is refused and enrolls again", () =>
+            {
+                string dir = Path.Combine(R, "cure"); if (Directory.Exists(dir)) Directory.Delete(dir, true); Directory.CreateDirectory(dir);
+                int port = FreePort(); string url = "http://127.0.0.1:" + port + "/";
+                var srv = new CureServer { Https = false, Port = port, DataDir = Path.Combine(dir, "server"), TokenHash = CureServer.HashToken("join-me"), UserOverride = c => c.Request.Headers["X-Test-User"] };
+                srv.Start();
+                CureAgent.AllowHttpLoopback = true; CureAgent.DeviceFileOverride = Path.Combine(dir, "device.dat");
+                CureAgent.ConfigOverride = () => new CureConfig { Server = url, Token = "join-me" };
+                CureAgent.CollectOverride = () => new CureReport { Computer = "SPOOFED-NAME", Elixar = "1.2.56", Total = 100L << 30, Free = 5L << 30, CleanSafe = 3L << 30, DiskLevel = "Healthy", Model = "<img src=x onerror=alert(1)>", Windows = "W\u0000in" };
+                try
+                {
+                    var r1 = CureAgent.SendOnce();
+                    if (!r1.Sent) return "first report: " + r1.Error;
+                    var dev = CureAgent.LoadDevice(); var d = srv.Devices().Single();
+                    if (dev == null || dev.Id != d.Id || d.Computer != Environment.MachineName.ToUpperInvariant()) return "enroll";
+                    var rep = srv.Latest(d.Id);
+                    if (rep == null || rep.Computer != d.Computer || rep.Windows.Contains("\u0000") || rep.Free != 5L << 30) return "stored report (the enrolled name wins, control characters go)";
+                    if (CureAgent.SendOnce().Sent) return "a second report within a minute was taken";
+                    string a; byte[] body = Encoding.UTF8.GetBytes("{\"Computer\":\"X\"}");
+                    if (Http("POST", url + "api/v1/enroll", Encoding.UTF8.GetBytes("{\"token\":\"wrong\",\"computer\":\"PC1\"}"), null, out a) != 403) return "wrong token";
+                    if (Http("POST", url + "api/v1/enroll", Encoding.UTF8.GetBytes("{\"token\":\"join-me\",\"computer\":\"<script>\"}"), null, out a) != 400) return "bad computer name";
+                    Func<string, string, string, int> post = (time, nonce, sign) => { string x; return Http("POST", url + "api/v1/report", body, new Dictionary<string, string> { { "X-Cure-Device", d.Id }, { "X-Cure-Time", time }, { "X-Cure-Nonce", nonce }, { "X-Cure-Sign", sign } }, out x); };
+                    string now = CureProtocol.UnixNow(), n1 = CureProtocol.Nonce();
+                    if (post(now, n1, new string('0', 64)) != 401) return "wrong signature";
+                    string old = (long.Parse(now) - 3600).ToString();
+                    if (post(old, n1, CureProtocol.Sign(dev.Key, old, n1, body)) != 400) return "old report";
+                    string n0 = srv.Devices().Count > 0 ? CureProtocol.Nonce() : "";
+                    if (post(now, n1, CureProtocol.Sign(dev.Key, now, n1, body)) != 429) return "too many reports";
+                    if (post(now, n1, CureProtocol.Sign(dev.Key, now, n1, body)) != 409) return "a repeated report";
+                    if (Http("POST", url + "api/v1/report", new byte[CureProtocol.MaxBody + 10], null, out a) != 413) return "too big";
+                    if (Http("GET", url + "api/v1/report", null, null, out a) != 405) return "GET to report";
+                    // a removed PC is refused; the agent then forgets its key and enrolls again
+                    srv.Remove(d.Computer);
+                    var r2 = CureAgent.SendOnce();
+                    if (r2.Sent || CureAgent.LoadDevice() != null) return "removed PC";
+                    var r3 = CureAgent.SendOnce();
+                    if (!r3.Sent || srv.Devices().Count(x => !x.Revoked) != 1) return "enroll again: " + r3.Error;
+                    return null;
+                }
+                finally
+                {
+                    srv.Stop(); CureAgent.AllowHttpLoopback = false; CureAgent.ConfigOverride = null; CureAgent.CollectOverride = null; CureAgent.DeviceFileOverride = null;
+                }
+            });
+
+            Run(check, "Cure Console: only a signed-in member of the allowed group sees it, it only reads, every answer forbids framing and outside scripts, and the page never puts a PC's text in as HTML", () =>
+            {
+                string dir = Path.Combine(R, "cure2"); if (Directory.Exists(dir)) Directory.Delete(dir, true); Directory.CreateDirectory(dir);
+                int port = FreePort(); string url = "http://127.0.0.1:" + port + "/";
+                var srv = new CureServer { Https = false, Port = port, DataDir = Path.Combine(dir, "server"), TokenHash = CureServer.HashToken("t"), Group = "CONTOSO\\Cure", UserOverride = c => c.Request.Headers["X-Test-User"] };
+                var keepG = CureServer.InGroupOverride; CureServer.InGroupOverride = (u, g) => u == "CONTOSO\\it" && g == "CONTOSO\\Cure";
+                srv.Start();
+                try
+                {
+                    string a;
+                    if (Http("GET", url + "api/v1/pcs", null, null, out a) != 401) return "no sign-in";
+                    if (Http("GET", url + "api/v1/pcs", null, new Dictionary<string, string> { { "X-Test-User", "CONTOSO\\guest" } }, out a) != 403) return "not in the group";
+                    var it = new Dictionary<string, string> { { "X-Test-User", "CONTOSO\\it" } };
+                    if (Http("GET", url + "api/v1/pcs", null, it, out a) != 200 || !a.Contains("\"pcs\":[]")) return "allowed: " + a;
+                    if (!a.Contains("#Content-Security-Policy: default-src 'none'; script-src 'self'") || !a.Contains("#X-Frame-Options: DENY") || !a.Contains("#X-Content-Type-Options: nosniff")) return "headers";
+                    if (Http("POST", url + "api/v1/pcs", new byte[0], it, out a) != 405) return "the console changed something";
+                    if (Http("GET", url, null, it, out a) != 200 || !a.Contains("Cure Console") || !a.Contains("<script src=\"console.js\">") || a.Contains("onclick")) return "page";
+                    if (Http("GET", url + "console.js", null, it, out a) != 200 || a.Contains("innerHTML") || a.Contains("outerHTML") || a.Contains("insertAdjacentHTML") || a.Contains("eval(") || !a.Contains("textContent")) return "script";
+                    if (Http("GET", url + "api/v1/pc?id=nope", null, it, out a) != 404) return "unknown PC";
+                    if (Http("GET", url + "api/v1/export.csv", null, it, out a) != 200 || !a.StartsWith("PC,State")) return "csv";
+                    return null;
+                }
+                finally { srv.Stop(); CureServer.InGroupOverride = keepG; }
+            });
+
+            Run(check, "Cure setup: services are made only from Elixar's protected folder, with quoted paths, the agent as LocalSystem and the server as its own NT SERVICE account; the server's address is reserved for it and the firewall opens only on the domain network", () =>
+            {
+                var keep = CureSetup.RunOverride; CureSetup.RunOverride = (exe, args) => 0; CureSetup.Ran.Clear();
+                try
+                {
+                    try { CureSetup.Q("a\"b"); return "a quote got into a command"; } catch (ArgumentException) { }
+                    if (CureSetup.InstallAgent(@"C:\Program Files\Elixar\CureAgent.exe", new CureConfig { Server = "http://evil.example/" }) == null) return "http server accepted";
+                    if (CureSetup.InstallAgent(@"C:\Program Files\Elixar\CureAgent.exe", new CureConfig { Server = "https://cure.contoso.local:8443/", Token = "x" }) != null) return "agent";
+                    string ran = string.Join("\n", CureSetup.Ran);
+                    if (!ran.Contains("sc.exe create CureAgent binPath= \"\\\"C:\\Program Files\\Elixar\\CureAgent.exe\\\" --service\"") || !ran.Contains("obj= LocalSystem")) return "agent service: " + ran;
+                    CureSetup.Ran.Clear();
+                    var r = CureSetup.InstallServer(@"C:\Program Files\Elixar\CureServer.exe", 8443, null, "CONTOSO\\Cure Console Users");
+                    ran = string.Join("\n", CureSetup.Ran);
+                    if (r.Error != null || r.Token == null || r.Token.Length < 40 || r.Thumbprint.Length != 40) return "server: " + r.Error;
+                    if (!ran.Contains("obj= \"NT SERVICE\\CureServer\"") || !ran.Contains("http add sslcert ipport=0.0.0.0:8443 certhash=" + r.Thumbprint) ||
+                        !ran.Contains("http add urlacl url=https://+:8443/ user=\"NT SERVICE\\CureServer\"") || !ran.Contains("localport=8443 profile=domain")) return "server commands: " + ran;
+                    if (CureSetup.InstallServer(@"C:\Program Files\Elixar\CureServer.exe", 8443, "zz", null).Error == null) return "bad thumbprint";
+                    var reg = CureSetup.AgentReg("https://cure.contoso.local:8443/", "tok", r.Thumbprint);
+                    if (!reg.Contains("[HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Elixar\\Cure]") || !reg.Contains("\"EnrollToken\"=\"tok\"")) return "reg";
+                    // the agent only takes a certificate it was told about
+                    if (CureAgent.CertOk(null, System.Net.Security.SslPolicyErrors.None, "")) return "no certificate";
+                    return null;
+                }
+                finally { CureSetup.RunOverride = keep; CureSetup.Ran.Clear(); }
+            });
+        }
+#endif
+
         public static void All(string root, Action<bool, string> check)
         {
             string R = Path.Combine(root, "t1250"); Directory.CreateDirectory(R);
+#if BUSINESS
+            Cure(R, check);
+#endif
 
             // ---------- app updates ----------
             Run(check, "App updates: winget's list is read (an id that isn't a plain package id is refused) and the Updates tab shows it", () =>
@@ -386,6 +506,25 @@ namespace CDriveCleaner
                     if ((loc == "he-IL") != phone.Any(c => c >= 0x5D0 && c <= 0x5EA)) return loc + " language";
                 }
                 if (Lang.Code != langBefore) return "the language was left changed";
+                return null;
+            });
+
+            Run(check, Edition.Business ? "Elixar for Business: every Elixar feature plus Cure Agent and Cure Server, and updates come from Business's own release files"
+                                        : "Elixar for Private: every Elixar feature, no Cure code at all, and updates come from Private's own release files", () =>
+            {
+                bool b = Edition.Business;
+                if (b ? (Edition.ZipAsset != "Elixar-Business.zip" || Edition.ManifestAsset != "elixar-business-manifest" || Edition.Name != "Elixar for Business" || Edition.Id != "business")
+                      : (Edition.ZipAsset != "Elixar.zip" || Edition.ManifestAsset != "elixar-manifest" || Edition.Name != "Elixar for Private" || Edition.Id != "private")) return "edition";
+                bool hasCure = typeof(Edition).Assembly.GetType("CDriveCleaner.CureAgent") != null && typeof(Edition).Assembly.GetType("CDriveCleaner.CureServer") != null;
+                if (hasCure != b) return "Cure code";
+                MainForm.ForceWindowsUi = true;
+                try
+                {
+                    using (var f = new MainForm(true))
+                        if (!f.NavRightItems.Contains("Policy manager") || !f.ToolsTabNames.Contains("Sysprep") || !f.TabNames.Contains("Policy manager"))
+                            return "tabs: " + string.Join(",", f.NavRightItems) + " / " + string.Join(",", f.ToolsTabNames);
+                }
+                finally { MainForm.ForceWindowsUi = false; }
                 return null;
             });
 

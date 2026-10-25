@@ -692,9 +692,14 @@ namespace CDriveCleaner
                     var rel = Updates.ParseRelease("{\"tag_name\":\"v1.9.2\",\"html_url\":\"https://github.com/elisar/elixar/releases/tag/v1.9.2\",\"body\":\"Notes\",\"assets\":[" +
                         "{\"name\":\"Elixar.zip\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/Elixar.zip\"}," +
                         "{\"name\":\"elixar-manifest.txt\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-manifest.txt\"}," +
-                        "{\"name\":\"elixar-manifest.sig\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-manifest.sig\"}]}");
+                        "{\"name\":\"elixar-manifest.sig\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-manifest.sig\"}," +
+                        "{\"name\":\"Elixar-Business.zip\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/Elixar-Business.zip\"}," +
+                        "{\"name\":\"elixar-business-manifest.txt\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-business-manifest.txt\"}," +
+                        "{\"name\":\"elixar-business-manifest.sig\",\"browser_download_url\":\"https://github.com/elisar/elixar/releases/download/v1.9.2/elixar-business-manifest.sig\"}]}");
                     var man = Updates.ParseManifest("version=1.9.2.0\nzip-sha256=aa11\nexe-sha256=BB22\n");
-                    check(rel.Version == new Version(1, 9, 2) && rel.ZipUrl.EndsWith("Elixar.zip") && rel.SigUrl.EndsWith(".sig") && man.Version == new Version(1, 9, 2, 0) && man.ZipSha256 == "AA11" &&
+                    var manB = Updates.ParseManifest("version=1.9.2.0\nzip-sha256=aa11\nexe-sha256=BB22\nedition=business\n");
+                    check(rel.Version == new Version(1, 9, 2) && rel.ZipUrl.EndsWith("/" + Edition.ZipAsset) && rel.ManifestUrl.EndsWith("/" + Edition.ManifestAsset + ".txt") && rel.SigUrl.EndsWith("/" + Edition.ManifestAsset + ".sig") &&
+                          man.Edition == "private" && manB.Edition == "business" && man.Version == new Version(1, 9, 2, 0) && man.ZipSha256 == "AA11" &&
                           Updates.ParseTag("v2.0") == new Version(2, 0) && Updates.ParseTag("nightly") == null, "Updates: reads GitHub's release and the signed manifest");
                     using (var key = new System.Security.Cryptography.RSACryptoServiceProvider(2048, new System.Security.Cryptography.CspParameters(24)))
                     {

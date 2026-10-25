@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
         with:
-          persist-credentials: false   # the job's token isn't left in .git/config for later steps (audit B-13)
+          persist-credentials: false   # the job's token isn't left in .git/config for later steps
       - name: Build and run the self-test
         shell: powershell
         # what went wrong is also written as annotations (shown on the run's page, readable without signing in)
@@ -32,9 +32,9 @@ jobs:
             $why = @(); for ($i = 0; $i -lt $log.Count; $i++) { if ($log[$i] -match '^FAIL') { $why += $log[$i]; $why += ($log[($i+1)..([Math]::Min($i+4, $log.Count-1))] | Where-Object { $_ -match '^\s' }) } }
             if ($why) { Write-Host ("::error title=Details::" + ((($why | Select-Object -First 150) -join "`n") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A')) }
             # the whole self-test report
-            $rep = 'out\selftest-report.txt'
-            if (Test-Path $rep) {
-              $all = (Get-Content $rep) -join "`n"
+            $reps = @('out\selftest-report.txt', 'out\business\selftest-report.txt') | Where-Object { Test-Path $_ }
+            if ($reps) {
+              $all = ($reps | ForEach-Object { "== $_"; Get-Content $_ }) -join "`n"
               # GitHub keeps 4 KB of each annotation and 10 notices per step
               for ($k = 0; $k -lt [Math]::Min($all.Length, 39000); $k += 3900) {
                 $part = $all.Substring($k, [Math]::Min(3900, $all.Length - $k))
@@ -58,4 +58,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
         with:
           name: selftest-report
-          path: out/selftest-report.txt
+          path: |
+            out/selftest-report.txt
+            out/business/selftest-report.txt
