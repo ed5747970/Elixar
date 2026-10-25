@@ -1,7 +1,24 @@
-ELIXAR  (version 1.2.52)
+ELIXAR  (version 1.2.53)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.53  (security audit: backdoor and compromise review)
+- No backdoor, hidden account, remote access or telemetry was found; the full
+  report is in audit-reports/BACKDOOR_AND_COMPROMISE_ASSESSMENT.md (source).
+- Elixar's logs (what it changed and cleaned, with file paths) moved to
+  C:\ProgramData\Elixar\logs, readable by administrators only.
+- Policy manager: "Check for Elixar updates" can be turned off (IT presets do),
+  so Elixar makes no connection of its own.
+- App updates come only from Microsoft's winget or Store source.
+- The Android tools' background server is stopped when Elixar closes (when
+  Elixar started it).
+- Uninstall asks whether to delete the Undo backups and logs too; IT:
+  Elixar.exe --uninstall --quiet --purge.
+- Disconnecting a Microsoft account shows where to remove Elixar's permission
+  at Microsoft too.
+- Build: pinned GitHub Actions, read-only test build, a "release" environment
+  that can require your approval before the signing key is used.
 
 NEW IN 1.2.52
 - First release built and fully self-tested on a real Windows PC (GitHub).

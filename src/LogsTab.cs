@@ -2,6 +2,7 @@
 // apps, security and settings - with search, filters, details, undo for registry values, and export.
 
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -36,6 +37,14 @@ namespace CDriveCleaner
         public bool LogsUndoEnabled { get { return btnLogsUndo.Enabled; } }
         public void LogsSetFilter(int kind, int period, string search) { logsKind.SelectedIndex = kind; logsPeriod.SelectedIndex = period; logsSearch.Text = search ?? ""; LogsFill(); }
         public void ShowLogs() { tabs.SelectedTab = pageLogs; }
+
+        // the logs are in a folder only administrators can read, so they open in Windows' Notepad from System32 (with Elixar's
+        // administrator rights; a program opened the normal way couldn't read them)
+        void OpenLog(string file)
+        {
+            if (!Win.IsWindows || !Sys.IsAdmin()) { Shell.Open(file); return; }
+            Process.Start(new ProcessStartInfo(Win.SystemExe("notepad.exe"), "\"" + file + "\"") { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(Win.SystemExe("notepad.exe")) });
+        }
         public void LogsClickUndo() { LogsUndo(); }
         public void LogsFocus() { logsList.Focus(); }
         public List<string> LogsSections { get { return logsSections.Items.Cast<Rubric>().Select(r => r.Key + ":" + r.Count).ToList(); } }
@@ -125,11 +134,11 @@ namespace CDriveCleaner
                 try
                 {
                     ChangeLog.EnsureText();
-                    if (File.Exists(ChangeLog.TextPath)) Shell.Open(ChangeLog.TextPath); else Lang.Box(this, "Nothing changed yet.", "Elixar");
+                    if (File.Exists(ChangeLog.TextPath)) OpenLog(ChangeLog.TextPath); else Lang.Box(this, "Nothing changed yet.", "Elixar");
                 }
                 catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); }
             };
-            btnLogsText.Click += (o, e) => { try { if (File.Exists(logFile)) Shell.Open(logFile); else Lang.Box(this, "There is no activity log yet.", "Elixar"); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); } };
+            btnLogsText.Click += (o, e) => { try { if (File.Exists(logFile)) OpenLog(logFile); else Lang.Box(this, "There is no activity log yet.", "Elixar"); } catch (Exception ex) { Lang.Box(this, ex.Message, "Elixar"); } };
         }
 
         void OnLogsTab() { LogsLoad(); }

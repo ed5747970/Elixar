@@ -684,6 +684,27 @@ namespace CDriveCleaner
         }
         public static string FileIn(string name) { return Path.Combine(Data, name); }
 
+        // Elixar's logs (what it changed and cleaned, with file paths): only administrators can read them, not other people
+        // who sign in to this PC. Logs from before this folder existed are moved into it once.
+        static bool logsReady;
+        public static string LogIn(string name)
+        {
+            if (!Win.IsWindows) return FileIn(name);
+            string dir = Path.Combine(Data, "logs");
+            if (!logsReady && Sys.IsAdmin())
+            {
+                if (!Locked.Lock(dir, false)) return FileIn(name);   // not safe to use: keep writing where it was
+                logsReady = true;
+            }
+            if (!logsReady) return FileIn(name);
+            string now = Path.Combine(dir, name);
+            // the log and the files made from it (changes.txt, changes-old.jsonl...) move together
+            string stem = Path.GetFileNameWithoutExtension(name);
+            foreach (var n in new[] { name, stem + ".txt", stem + "-old" + Path.GetExtension(name), stem + "-old.txt" }.Distinct())
+                try { string from = FileIn(n), to = Path.Combine(dir, n); if (!File.Exists(to) && File.Exists(from) && !Links.IsLink(from)) File.Move(from, to); } catch { }
+            return now;
+        }
+
         // a scratch folder only administrators can open, for files an administrator writes and then uses
         // (the user's Temp folder can be changed by any program between the write and the use)
         public static string Work

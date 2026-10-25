@@ -300,6 +300,26 @@ namespace CDriveCleaner
                 finally { Lang.Code = keep; }
             });
 
+            // ---------- security audit fixes (1.2.53) ----------
+            Run(check, "Audit fixes: IT can switch off update checks, app updates come only from Microsoft's winget or Store source, and the update rule is in the IT presets", () =>
+            {
+                var r = Policy.Rule("updates.check");
+                if (r == null || r.Default != "allow" || Policy.Preset("Golden image (IT)")["updates.check"] != "block" || Policy.Preset("Balanced (same as Default)")["updates.check"] != "allow") return "rule";
+                if (!WinGet.UpgradeArgs("7zip.7zip", "winget").Contains("--exact --source winget ") || WinGet.UpgradeArgs("7zip.7zip", "evilsource").Contains("--source")) return "source";
+                var keep = WinGet.RunOverride; string ran = null; WinGet.RunOverride = a => { ran = a; return "Successfully installed"; };
+                try
+                {
+                    bool bad = WinGet.Upgrade(new AppUpdate { Name = "X", Id = "x.x", Version = "1", Available = "2", Source = "my-own-feed" }, null);
+                    if (bad || ran != null) return "an app from another source was updated";
+                    bool good = WinGet.Upgrade(new AppUpdate { Name = "X", Id = "x.x", Version = "1", Available = "2", Source = "winget" }, null);
+                    if (!good || ran == null || !ran.Contains("--source winget")) return "winget source: " + ran;
+                }
+                finally { WinGet.RunOverride = keep; }
+                if (Adb.StartedServer) return "adb flag";
+                Adb.StopOwnServer();   // nothing started: nothing to stop
+                return null;
+            });
+
             // ---------- sponsor ----------
             Run(check, "Sponsor button: shows only when the build knows Elixar's GitHub address, and opens only GitHub Sponsors, Ko-fi or Buy Me a Coffee", () =>
             {

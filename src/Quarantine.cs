@@ -128,6 +128,7 @@ namespace CDriveCleaner
             return root != null && !root.StartsWith("C:", StringComparison.OrdinalIgnoreCase);
         }
 
+        public static List<string> Roots() { return AllRoots().ToList(); }
         static IEnumerable<string> AllRoots()
         {
             if (OverrideRoot != null) { yield return OverrideRoot; yield break; }

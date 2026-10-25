@@ -20,6 +20,15 @@ namespace CDriveCleaner
     {
         public static string Exe;            // adb.exe, or the fake used by the self-test
         public static string Prefix = "";    // extra arguments put first (fake adb only)
+        // adb starts a background server (127.0.0.1:5037) that keeps running, with Elixar's administrator rights, after Elixar
+        // closes. When Elixar is the one that started it, it is stopped when Elixar closes (a server you started yourself is left alone).
+        public static bool StartedServer;
+        public static void StopOwnServer()
+        {
+            if (!StartedServer) return;
+            StartedServer = false;
+            try { string o; Run(new[] { "kill-server" }, out o, 10000); } catch { }
+        }
         public const string ToolsUrl = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip";
 
         public static string ToolsDir
@@ -163,6 +172,7 @@ namespace CDriveCleaner
                     p.WaitForExit();
                     output = outTask.Result;
                     lock (err) if (err.Length > 0) output += (output.Length > 0 && !output.EndsWith("\n") ? "\n" : "") + err;
+                    if (err.ToString().IndexOf("daemon started successfully", StringComparison.OrdinalIgnoreCase) >= 0) StartedServer = true;
                     return p.ExitCode;
                 }
             }

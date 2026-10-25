@@ -73,12 +73,18 @@ namespace CDriveCleaner
         }
 
         // removes the schedules, Start menu entry, apps-list entry and the Program Files copy; your Undo backups stay until they expire
-        public static int Uninstall(bool quiet) { return Uninstall(quiet, false); }
+        public static int Uninstall(bool quiet) { return Uninstall(quiet, false, false); }
+        public static int Uninstall(bool quiet, bool msi) { return Uninstall(quiet, msi, false); }
         // msi: run by the MSI while it uninstalls; Windows Installer removes the files and the Start menu entry itself
-        public static int Uninstall(bool quiet, bool msi)
+        // purge: also Elixar's Undo backups (copies of files it removed), its logs, settings and policy file on this PC
+        public static int Uninstall(bool quiet, bool msi, bool purge)
         {
-            if (!quiet && Lang.Box(null, "Remove Elixar from this PC?\n\nThe schedules, the Start menu entry and the copy in Program Files are removed. Undo backups are kept until their 7 days are up.",
+            if (!quiet && Lang.Box(null, "Remove Elixar from this PC?\n\nThe schedules, the email sign-in, the Start menu entry and the copy in Program Files are removed.",
                     "Elixar", System.Windows.Forms.MessageBoxButtons.OKCancel, System.Windows.Forms.MessageBoxIcon.Question) != System.Windows.Forms.DialogResult.OK) return 1;
+            // without Elixar nothing deletes old Undo backups any more, so ask what to do with them
+            if (!quiet && !purge)
+                purge = Lang.Box(null, "Also delete Elixar's Undo backups (copies of the files it removed) and its logs?\n\nYes: nothing of Elixar stays on this PC.\nNo: they stay in C:\\ProgramData\\Elixar and \"Elixar Undo\" folders until you delete them.",
+                                 "Elixar", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes;
             string o;
             foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask, Automation.TidyTask, Automation.PolicyCleanTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
             try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
@@ -104,8 +110,20 @@ namespace CDriveCleaner
                 Process.Start(new ProcessStartInfo(cmd, RemoveFolderArgs(ping, Install.Dir)) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = sys });
             }
             catch { }
+            if (purge) Purge();
             if (!quiet) Lang.Box(null, "Elixar was removed.", "Elixar");
             return 0;
         }
-    }
+    
+        // everything Elixar keeps on this PC: Undo backups on every drive, C:\ProgramData\Elixar (logs, policy, settings files)
+        // and your Elixar settings. Your organization's policy (HKLM\SOFTWARE\Policies\Elixar) is IT's and is left alone.
+        public static void Purge()
+        {
+            foreach (var root in Quarantine.Roots())
+                try { if (Directory.Exists(root)) SafeDelete.Delete(root); } catch { }
+            try { if (Directory.Exists(Paths.Data)) SafeDelete.Delete(Paths.Data); } catch { }
+            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Elixar", false); } catch { }
+            try { using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) hklm.DeleteSubKeyTree(@"Software\Elixar", false); } catch { }
+        }
+}
 }

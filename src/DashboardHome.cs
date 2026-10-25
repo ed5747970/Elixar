@@ -19,7 +19,7 @@ namespace CDriveCleaner
     {
         public class Entry { public DateTime Time; public string Kind = "", Text = ""; public long Bytes; }
         public static string OverrideFile;   // self-test only
-        static string File_ { get { return OverrideFile ?? Paths.FileIn("activity.txt"); } }
+        static string File_ { get { return OverrideFile ?? Paths.LogIn("activity.txt"); } }
         static readonly object gate = new object();
         const int Keep = 60;
 
@@ -818,6 +818,7 @@ namespace CDriveCleaner
             t.Controls.Add(hero, 0, 0); t.Controls.Add(tileGrid, 0, 1); t.Controls.Add(bottom, 0, 2);
             t.Resize += (o, e) => LayoutTiles(tiles.Length == 7 ? (t.ClientSize.Width >= S(1250) ? 7 : 4) : (t.ClientSize.Width >= S(1000) ? 6 : 3));
             FormClosing += (o, e) => { if (!e.Cancel) formClosing = true; };
+            FormClosed += (o, e) => { if (!testMode) Adb.StopOwnServer(); };
             dashOverview = t;
             return t;
         }

@@ -64,10 +64,17 @@ namespace CDriveCleaner
         // a package id is letters, digits and . _ + - (anything else is refused: it goes on winget's command line)
         public static bool ValidId(string id) { return Regex.IsMatch(id ?? "", @"^[A-Za-z0-9][A-Za-z0-9._+\-]{0,127}$"); }
 
-        public static string UpgradeArgs(string id)
+        public static string UpgradeArgs(string id) { return UpgradeArgs(id, null); }
+
+        // only Microsoft's own sources: an extra source added on this PC can't answer for a package id
+        public static readonly string[] TrustedSources = { "winget", "msstore" };
+        public static bool TrustedSource(string source) { return source != null && TrustedSources.Contains(source.Trim(), StringComparer.OrdinalIgnoreCase); }
+
+        public static string UpgradeArgs(string id, string source)
         {
             if (!ValidId(id)) throw new ArgumentException("not a package id");
-            return "upgrade --id " + id + " --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity";
+            string src = TrustedSource(source) ? " --source " + source.Trim().ToLowerInvariant() : "";
+            return "upgrade --id " + id + " --exact" + src + " --silent --accept-package-agreements --accept-source-agreements --disable-interactivity";
         }
 
         // winget's table: the header gives where each column starts; the line of dashes under it starts the rows
@@ -122,7 +129,12 @@ namespace CDriveCleaner
 
         public static bool Upgrade(AppUpdate u, Action<string> log)
         {
-            string o = Run(UpgradeArgs(u.Id), 30 * 60 * 1000);
+            if (!TrustedSource(u.Source))
+            {
+                if (log != null) log("  " + u.Name + ": not updated (it comes from \"" + u.Source + "\", not from Microsoft's winget or Store source)");
+                return false;
+            }
+            string o = Run(UpgradeArgs(u.Id, u.Source), 30 * 60 * 1000);
             bool ok = !o.StartsWith("ERROR") && !o.Contains("\nEXIT ") || o.Contains("Successfully installed");
             string last = o.Replace("\r", "\n").Split('\n').Select(x => x.Trim()).LastOrDefault(x => x.Length > 0 && !x.StartsWith("EXIT")) ?? "";
             if (log != null) log("  " + u.Name + ": " + (ok ? "updated to " + u.Available : "not updated (" + last + ")"));

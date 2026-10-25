@@ -73,7 +73,7 @@ namespace CDriveCleaner
         {
             this.testMode = testMode;
             items = Catalog.Build();
-            logFile = Paths.FileIn("cleaner-log.txt");
+            logFile = Paths.LogIn("cleaner-log.txt");
             // the self-test window never reads or overwrites your saved scan
             snapFile = testMode ? null : Paths.FileIn("last-scan.txt");
             if (snapFile != null) lastScan = ScanSnapshot.Load(snapFile);
@@ -375,6 +375,8 @@ namespace CDriveCleaner
         public void CheckForUpdates(bool interactive)
         {
             if (updBusy || testMode) return;
+            if (!interactive && !Policy.Allowed("updates.check")) return;   // the policy (or IT) turned update checks off: no connection at all
+            if (interactive && Policy.Blocked(this, "updates.check")) return;
             if (!interactive)
             {
                 DateTime last;

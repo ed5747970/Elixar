@@ -31,7 +31,8 @@ namespace CDriveCleaner
             "  Elixar.exe --report <folder|file.json> [--with-updates]   status file for Policy manager > Fleet report\n" +
             "  Elixar.exe --policy <file.elixarpolicy> use this policy as the Custom policy\n" +
             "  Elixar.exe --tweaks on|default         every Windows tweak on, or all back to Windows' default\n" +
-            "  Elixar.exe --update-apps               update every app winget can update\n\n" +
+            "  Elixar.exe --update-apps               update every app winget can update (Microsoft's winget and Store sources only)\n" +
+            "  Elixar.exe --uninstall --quiet [--purge]  remove Elixar; --purge also deletes its Undo backups, logs and settings\n\n" +
             "Exit codes: 0 done, 1 problem, 2 blocked by the policy, 3 not administrator, 4 wrong command.\n" +
             "In cmd, start it with  start /wait Elixar.exe ...  so the prompt waits for it (then %errorlevel% is the exit code).\n" +
             "Everything Elixar changes is written in Logs, the same as from the window.";

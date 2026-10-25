@@ -17,9 +17,11 @@ env:
   TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || github.ref_name }}
 jobs:
   release:
+    # the "release" environment: in Settings > Environments it can require your approval before the signing key is used
+    environment: release
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
       - name: Build and run the self-test
         shell: powershell
         run: .\build.ps1 -SelfTest

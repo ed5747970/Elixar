@@ -130,7 +130,7 @@ namespace CDriveCleaner
                     }
                     catch { }
                     // keep --install / --uninstall when asking for admin rights
-                    string pass = string.Join(" ", args.Where(x => x == "--install" || x == "--uninstall" || x == "--quiet"));
+                    string pass = string.Join(" ", args.Where(x => x == "--install" || x == "--uninstall" || x == "--quiet" || x == "--purge"));
                     Process.Start(new ProcessStartInfo(self, pass) { UseShellExecute = true, Verb = "runas" });
                 }
                 catch (Win32Exception)
@@ -155,7 +155,7 @@ namespace CDriveCleaner
 
             int au = Array.IndexOf(args, "--apply-update");
             if (au >= 0 && au + 2 < args.Length) { int pid; int.TryParse(args[au + 2], out pid); return Updates.Apply(args[au + 1], pid); }
-            if (args.Contains("--uninstall")) { Application.EnableVisualStyles(); return Setup.Uninstall(args.Contains("--quiet"), args.Contains("--msi")); }
+            if (args.Contains("--uninstall")) { Application.EnableVisualStyles(); return Setup.Uninstall(args.Contains("--quiet"), args.Contains("--msi"), args.Contains("--purge")); }
             if (args.Contains("--install"))
             {
                 Application.EnableVisualStyles();

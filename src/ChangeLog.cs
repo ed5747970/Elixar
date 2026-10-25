@@ -49,7 +49,7 @@ namespace CDriveCleaner
         static readonly Random rnd = new Random();
         [ThreadStatic] static int quiet;
 
-        static string File_ { get { return OverrideFile ?? Paths.FileIn("changes.jsonl"); } }
+        static string File_ { get { return OverrideFile ?? Paths.LogIn("changes.jsonl"); } }
         public static string FilePath { get { return File_; } }
         static string OldFile(string f) { return Path.Combine(Path.GetDirectoryName(f) ?? "", Path.GetFileNameWithoutExtension(f) + "-old.jsonl"); }
 

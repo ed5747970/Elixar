@@ -286,6 +286,10 @@ namespace CDriveCleaner
             string o2; Automation.RunSchtasks(Automation.DeleteArgs(Automation.MailTask), out o2);
             Log("Email reports: disconnected.");
             UpdateMailUi();
+            // Microsoft has no way for an app to cancel its own sign-in: the copy on this PC is deleted, and this removes it at Microsoft too
+            if (kind == "microsoft" && !testMode)
+                Lang.Box(this, "The Microsoft sign-in is deleted from this PC.\n\nTo also remove Elixar's permission at Microsoft (recommended on a work account): open https://myapps.microsoft.com (work or school account) or https://account.live.com/consent/Manage (personal account) and remove Elixar.",
+                         "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         void RunMail(string doing, Func<string> work, string done)

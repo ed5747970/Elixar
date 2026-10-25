@@ -68,6 +68,7 @@ namespace CDriveCleaner
             R("phone", "What Elixar may change", "Phone tools", "The Phone tab: clean, move files and remove apps on a phone.", "allow", Allow),
             R("sysprep", "What Elixar may change", "Sysprep and golden image tools", "Tools > Sysprep: fixes, answer files, image cleanup.", "allow", Allow),
             R("email", "What Elixar may change", "Email", "Connect an email account, reports and Gmail cleaning.", "allow", Allow),
+            R("updates.check", "What Elixar may change", "Check for Elixar updates", "Once a week and when you ask, from GitHub (api.github.com). Not allowed: Elixar never connects for updates; IT updates it.", "allow", Allow),
             R("pin.open", "Access", "PIN or password to open Elixar", "Required: Elixar asks for one to be set and it can't be turned off.", "choice",
               "choice", "Your choice (Settings)", "required", "Required"),
             R("pin.policy", "Access", "PIN or password to change this policy", "Needed: changing the policy asks for the PIN or password first.", "off",
@@ -101,6 +102,7 @@ namespace CDriveCleaner
                     s("clean.restore", "always"); s("undo.days", "7"); s("bin.days", "30"); s("low.clean", "on"); break;
                 case "Golden image (IT)":
                     foreach (var t in Tweaks.All) s(Tweaks.PolicyKey(t), "on");
+                    s("updates.check", "block");
                     s("clean.restore", "never"); s("undo.days", "7"); s("bin.days", "off"); s("low.clean", "off"); s("phone", "block"); s("email", "block"); s("pin.policy", "on"); break;
                 case "Locked down (shared PC)":
                     s("clean.level", "safe"); s("clean.restore", "always"); s("apps.remove", "block"); s("startup.change", "block"); s("drivers.remove", "block");
