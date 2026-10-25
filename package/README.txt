@@ -1,7 +1,14 @@
-ELIXAR  (version 1.2.53)
+ELIXAR  (version 1.2.54)
 The cure for a cluttered PC
 Made by Elisar
 =======================
+
+NEW IN 1.2.54  (company PCs)
+- On a PC joined to a company (Active Directory domain or Microsoft Entra ID)
+  the Phone tab and Tools > Sysprep are greyed out and locked, so they can't
+  affect the company. A home PC with only a work account added is not affected.
+- IT can still allow them on chosen PCs: HKLM\SOFTWARE\Policies\Elixar,
+  phone = allow / sysprep = allow.
 
 NEW IN 1.2.53  (security audit: backdoor and compromise review)
 - No backdoor, hidden account, remote access or telemetry was found; the full

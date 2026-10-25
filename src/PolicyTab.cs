@@ -36,6 +36,9 @@ namespace CDriveCleaner
         public void PolicyUsePreset(string name) { polPreset.SelectedIndex = Array.IndexOf(Policy.PresetNames, name); PolicyPreset(); }
         public string PolicySave() { return PolicySaveNow(); }
         public bool PolicyComboEnabled(string key) { return polCombos[key].Enabled; }
+        public string PolicyOrgText { get { return polOrg == null ? null : polOrg.Text; } }
+        // the Sysprep tools' "turned off" note, or null when they can be used
+        public string SysprepOffText { get { return pageSysprep != null && sysprepBlocked != null && pageSysprep.Controls.Cast<Control>().Any(c => c != sysprepBlocked && !c.Enabled) ? sysprepBlocked.Text : null; } }
         public void ShowPolicy() { tabs.SelectedTab = pagePolicy; }
         public void PolicyScrollTo(string key) { var sp = polGrid.Parent as ScrollableControl; if (sp != null) sp.ScrollControlIntoView(polCombos[key]); }
         public void ShowAutomationTab() { tabs.SelectedTab = pageAuto; }
@@ -221,7 +224,7 @@ namespace CDriveCleaner
                 string v = org.ContainsKey(r.Key) ? org[r.Key] : polCustom ? polEdit[r.Key] : r.Default;
                 cb.SelectedIndex = Math.Max(0, Array.IndexOf(r.Values, v));
                 cb.Enabled = polCustom && !org.ContainsKey(r.Key);
-                if (org.ContainsKey(r.Key)) { mark.Text = "🔒 " + Lang.T("Set by your organization"); mark.ForeColor = Theme.MapFore(Color.FromArgb(150, 90, 0)); }
+                if (org.ContainsKey(r.Key)) { mark.Text = "🔒 " + Lang.T(Policy.ByCompany(r.Key) ? "Off on company PCs" : "Set by your organization"); mark.ForeColor = Theme.MapFore(Color.FromArgb(150, 90, 0)); }
                 else if (v != r.Default) { mark.Text = "● " + Lang.T("Changed"); mark.ForeColor = Theme.MapFore(Theme.Accent); }
                 else mark.Text = "";
             }
@@ -229,7 +232,9 @@ namespace CDriveCleaner
             int diff = polCustom ? Policy.Differences(polEdit) : 0;
             polStatus.Text = Lang.T(polCustom ? "Custom policy" : "Default policy") + "  ·  " +
                              Lang.T(!polCustom ? "Elixar's own rules" : diff == 0 ? "same as Default" : diff == 1 ? "1 rule differs from Default" : diff + " rules differ from Default");
-            polOrg.Text = org.Count == 0 ? "" : Lang.T(org.Count == 1 ? "1 rule is set by your organization and can't be changed here." : org.Count + " rules are set by your organization and can't be changed here.");
+            int byCo = Policy.CompanyBlocks.Count(Policy.ByCompany), bySet = org.Count - byCo;
+            polOrg.Text = (byCo == 0 ? "" : string.Format(Lang.T("This PC is joined to {0}: the Phone tools and Sysprep tools are off."), Policy.Company()) + (bySet > 0 ? "  " : "")) +
+                          (bySet == 0 ? "" : Lang.T(bySet == 1 ? "1 rule is set by your organization and can't be changed here." : bySet + " rules are set by your organization and can't be changed here."));
             polPreset.Enabled = btnPolPreset.Enabled = polCustom;
             PolicyRefreshItems();
             bool dirty = polCustom != Policy.UseCustom || Policy.Rules.Any(r => polEdit[r.Key] != (Policy.Custom.ContainsKey(r.Key) ? Policy.Custom[r.Key] : r.Default)) ||
@@ -358,7 +363,7 @@ namespace CDriveCleaner
                 var was = (Tuple<bool, string>)it.Tag;
                 bool ok = Policy.Allowed(key);
                 it.Enabled = was.Item1 && ok;
-                it.Tip = ok ? was.Item2 : Lang.T("Turned off by the policy (Policy manager).");
+                it.Tip = ok ? was.Item2 : Policy.ByCompany(key) ? Lang.T("Turned off on company PCs. Ask your IT department.") : Lang.T("Turned off by the policy (Policy manager).");
             };
             navOn(pagePhone, "phone");
             navOn(pageEmail, "email");
@@ -375,15 +380,20 @@ namespace CDriveCleaner
             if (pageSysprep != null)
             {
                 bool ok = Policy.Allowed("sysprep");
-                foreach (Control c in pageSysprep.Controls) if (c != sysprepBlocked) c.Enabled = ok;
+                foreach (Control c in pageSysprep.Controls) if (c != sysprepBlocked) c.Enabled = ok;   // Windows greys out every button inside
                 if (!ok && sysprepBlocked == null)
                 {
                     sysprepBlocked = new Label { Dock = DockStyle.Top, AutoSize = false, Height = S(34), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(S(12), 0, 0, 0),
-                                                 Text = Lang.T("Sysprep and golden image tools are turned off by the policy (Policy manager)."), Font = new Font("Segoe UI Semibold", 9.5f),
+                                                 Font = new Font("Segoe UI Semibold", 9.5f),
                                                  BackColor = Theme.Dark ? Color.FromArgb(70, 55, 20) : Color.FromArgb(255, 243, 205), ForeColor = Theme.Dark ? Color.FromArgb(255, 220, 150) : Color.FromArgb(110, 75, 0) };
                     pageSysprep.Controls.Add(sysprepBlocked);
                 }
-                if (sysprepBlocked != null) sysprepBlocked.Visible = !ok;
+                if (sysprepBlocked != null)
+                {
+                    sysprepBlocked.Visible = !ok;
+                    sysprepBlocked.Text = Policy.ByCompany("sysprep") ? string.Format(Lang.T("Sysprep and golden image tools are turned off on company PCs (this PC is joined to {0}). Ask your IT department."), Policy.Company())
+                                                                      : Lang.T("Sysprep and golden image tools are turned off by the policy (Policy manager).");
+                }
             }
             // Automation: the rules the policy fixes can't be changed there
             if (cmbUndoDays != null)

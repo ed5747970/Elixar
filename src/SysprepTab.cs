@@ -63,7 +63,7 @@ namespace CDriveCleaner
             spList.Resize += (o, e) => { foreach (Control c in spList.Controls) c.Width = Math.Max(S(500), spList.ClientSize.Width - S(24)); };
         }
 
-        void OnSysprepTab() { if (!spLoaded) { spLoaded = true; SysprepRefresh(); } }
+        void OnSysprepTab() { if (!spLoaded && Policy.Allowed("sysprep")) { spLoaded = true; SysprepRefresh(); } }   // turned off: no checks at all
 
         public void SysprepRefresh()
         {

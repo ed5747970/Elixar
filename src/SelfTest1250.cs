@@ -320,6 +320,30 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "Company PC: on a PC joined to a domain or Entra ID the Phone and Sysprep tools are off and locked; IT can allow them; a home PC is not affected", () =>
+            {
+                var keepC = Policy.CompanyOverride; var keepO = Policy.OrgOverride; var org = new Dictionary<string, string>(); Policy.OrgOverride = () => org;
+                try
+                {
+                    Policy.CompanyOverride = () => null;
+                    if (!Policy.Allowed("phone") || !Policy.Allowed("sysprep") || Policy.ByCompany("phone")) return "home PC";
+                    Policy.CompanyOverride = () => "CONTOSO";
+                    if (Policy.Allowed("phone") || Policy.Allowed("sysprep") || !Policy.ByCompany("phone") || !Policy.ByCompany("sysprep") || Policy.Source("sysprep") != "organization") return "company PC";
+                    if (!Policy.Allowed("email") || !Policy.Allowed("apps.remove") || Policy.ByCompany("email")) return "other rules changed";
+                    var c = Policy.Defaults(); c["phone"] = "allow";
+                    bool keepU = Policy.UseCustom; var keepCu = Policy.Custom; Policy.UseCustom = true; Policy.Custom = c;
+                    bool still = !Policy.Allowed("phone"); Policy.UseCustom = keepU; Policy.Custom = keepCu;
+                    if (!still) return "a custom policy turned the phone back on";
+                    org["sysprep"] = "allow";
+                    if (!Policy.Allowed("sysprep") || Policy.ByCompany("sysprep") || Policy.Allowed("phone")) return "IT allows sysprep";
+                    org["phone"] = "block";
+                    if (Policy.ByCompany("phone") || Policy.Allowed("phone")) return "IT blocks phone";
+                    DomainJoin.Name();   // the real check never throws (on Linux there's no netapi32)
+                    return null;
+                }
+                finally { Policy.CompanyOverride = keepC; Policy.OrgOverride = keepO; }
+            });
+
             // ---------- sponsor ----------
             Run(check, "Sponsor button: shows only when the build knows Elixar's GitHub address, and opens only GitHub Sponsors, Ko-fi or Buy Me a Coffee", () =>
             {

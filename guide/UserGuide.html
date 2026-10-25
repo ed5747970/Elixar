@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.53</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.54</p></div>
 </div></header>
 <main class="wrap">
 
@@ -362,6 +362,7 @@
   <tr><td><code>--update-apps</code></td><td>Updates every app winget can update</td></tr>
 </table>
 <p>Exit codes: 0 done, 1 problem, 2 blocked by the policy, 3 not administrator, 4 wrong command.</p>
+<p><strong>Company PCs</strong>: when the PC is joined to an Active Directory domain or to Microsoft Entra ID, Elixar greys out the Phone tab and Tools &gt; Sysprep and locks both rules (&ldquo;Off on company PCs&rdquo; in Policy manager); nothing on a phone and no image tools can be used, and Elixar doesn&rsquo;t even check for them. A home PC with only a work account added is not affected. To allow them on a PC (an imaging PC, say), set <code>phone</code> or <code>sysprep</code> to <code>allow</code> in <code>HKLM\SOFTWARE\Policies\Elixar</code>.</p>
 <p><strong>Removing Elixar completely</strong>: <code>Elixar.exe --uninstall --quiet --purge</code> also deletes its Undo backups, logs and settings (run it before <code>msiexec /x</code> when Elixar came from the MSI). <strong>Network</strong>: Elixar connects by itself only to check for updates (api.github.com, once a week); Policy manager &gt; &ldquo;Check for Elixar updates&rdquo; turns that off. Everything else (email, Android tools, app updates, web search) happens only when someone uses it, and each can be blocked by policy.</p>
 <p><strong>MSI</strong>: <code>Elixar-1.2.50.msi</code> installs Elixar for all users in Program Files with a Start menu entry (<code>msiexec /i Elixar-1.2.50.msi /qn</code>); uninstalling it also removes Elixar&rsquo;s schedules. The source (<code>package/Elixar.wxs</code>) builds with msitools&rsquo; wixl or WiX.</p>
 <p><strong>Fleet report</strong>: run <code>Elixar.exe --report \\server\share\elixar</code> on each PC (for example as a daily scheduled task). Each PC writes one small file with its name, free space, how much Elixar saved, its policy fingerprint, tweaks and app updates waiting &mdash; no user names or file names. Open that folder in Policy manager &gt; Fleet report to see every PC in one table (lowest free space first, old reports in orange), and save it as CSV.</p>
@@ -465,6 +466,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-25</td><td>1.2.54</td><td>Company PCs: on a PC joined to an Active Directory domain or Microsoft Entra ID, the Phone tab and the Sysprep tools are greyed out and locked; IT can allow them by policy</td></tr>
   <tr><td>2026-10-25</td><td>1.2.53</td><td>Security audit (backdoor and compromise review, no backdoor found): logs readable by administrators only; update checks can be turned off in Policy manager; app updates only from Microsoft&rsquo;s sources; the Android tools&rsquo; server stops with Elixar; uninstall can remove Undo backups and logs (<code>--purge</code>); pinned build actions</td></tr>
   <tr><td>2026-10-24</td><td>1.2.52</td><td>First release built and self-tested on a real Windows PC and signed for the updater. Fixes: the folders above a duplicate going to the Recycle Bin are really held; iPhone copies keep their real file names when Windows hides extensions; answer files with a language Windows doesn&rsquo;t have are refused</td></tr>
   <tr><td>2026-10-24</td><td>1.2.51</td><td>Space map redrawn as a circle (sunburst): the folder in the middle, three rings of folders around it, a &ldquo;Biggest here&rdquo; list beside it, and brighter warning-sign colours</td></tr>

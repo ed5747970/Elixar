@@ -1807,6 +1807,11 @@ namespace CDriveCleaner
             d["Remove Elixar from this PC?\n\nThe schedules, the email sign-in, the Start menu entry and the copy in Program Files are removed."] = "להסיר את Elixar מהמחשב?\n\nהתזמונים, החיבור לדואר, הקיצור בתפריט התחל והעותק ב-Program Files יוסרו.";
             d["Also delete Elixar's Undo backups (copies of the files it removed) and its logs?\n\nYes: nothing of Elixar stays on this PC.\nNo: they stay in C:\\ProgramData\\Elixar and \"Elixar Undo\" folders until you delete them."] = "למחוק גם את גיבויי הביטול של Elixar (עותקים של הקבצים שהסיר) ואת היומנים שלו?\n\nכן: שום דבר של Elixar לא נשאר במחשב.\nלא: הם נשארים ב-C:\\ProgramData\\Elixar ובתיקיות \"Elixar Undo\" עד שתמחקו אותם.";
             d["The Microsoft sign-in is deleted from this PC.\n\nTo also remove Elixar's permission at Microsoft (recommended on a work account): open https://myapps.microsoft.com (work or school account) or https://account.live.com/consent/Manage (personal account) and remove Elixar."] = "החיבור ל-Microsoft נמחק מהמחשב.\n\nכדי להסיר גם את ההרשאה של Elixar אצל Microsoft (מומלץ בחשבון עבודה): פתחו את https://myapps.microsoft.com (חשבון עבודה או לימודים) או https://account.live.com/consent/Manage (חשבון אישי) והסירו את Elixar.";
+            d["turned off on company PCs (this PC is joined to {0})."] = "כבוי במחשבי חברה (המחשב הזה מחובר ל-{0}).";
+            d["Off on company PCs"] = "כבוי במחשבי חברה";
+            d["This PC is joined to {0}: the Phone tools and Sysprep tools are off."] = "המחשב הזה מחובר ל-{0}: כלי הטלפון וכלי Sysprep כבויים.";
+            d["Turned off on company PCs. Ask your IT department."] = "כבוי במחשבי חברה. פנו למחלקת ה-IT.";
+            d["Sysprep and golden image tools are turned off on company PCs (this PC is joined to {0}). Ask your IT department."] = "הכלים של Sysprep ותמונת זהב כבויים במחשבי חברה (המחשב הזה מחובר ל-{0}). פנו למחלקת ה-IT.";
             d["Recycle Bin and Undo"] = "סל המיחזור וביטול";
             d["Every day, empty what has been in the Recycle Bin for more than"] = "בכל יום, לרוקן מסל המיחזור את מה שנמצא בו יותר מ-";
             d["On every internal drive, only your own Recycle Bin. What you deleted recently stays, so you can still get it back."] = "בכל כונן פנימי, רק סל המיחזור שלך. מה שמחקת לאחרונה נשאר, כך שעדיין אפשר להחזיר אותו.";

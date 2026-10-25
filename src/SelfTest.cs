@@ -1735,12 +1735,23 @@ namespace CDriveCleaner
                                 var f2 = new MainForm(true);
                                 pui &= !f2.PolicyComboEnabled("email") && f2.NavGreyed.Contains("Email");
                                 f2.Dispose(); f.Dispose(); org.Clear();
+                                // a company PC: Phone and Sysprep greyed out and locked; IT can allow Sysprep
+                                Policy.CompanyOverride = () => "CONTOSO";
+                                var f3 = new MainForm(true); f3.ShowPolicy(); f3.PolicySetMode(true);
+                                bool co = f3.NavGreyed.Contains("Phone") && !f3.PolicyComboEnabled("phone") && !f3.PolicyComboEnabled("sysprep") && f3.PolicyComboEnabled("email") &&
+                                          (f3.SysprepOffText ?? "").Contains("CONTOSO") && (f3.PolicyOrgText ?? "").Contains("CONTOSO");
+                                f3.Dispose();
+                                org["sysprep"] = "allow"; var f4 = new MainForm(true);
+                                co &= f4.SysprepOffText == null && f4.NavGreyed.Contains("Phone");
+                                f4.Dispose(); org.Clear(); Policy.CompanyOverride = null;
+                                if (!co) pwhy += " [company PC]";
+                                pui &= co;
                                 if (!pui) pwhy += " [tab]";
                             }
                             catch (Exception ex2) { pwhy += " ERROR: " + ex2.GetType().Name + ": " + ex2.Message; }
                             finally
                             {
-                                MainForm.PolicyConfirmHook = null;
+                                MainForm.PolicyConfirmHook = null; Policy.CompanyOverride = null;
                                 Policy.OverrideFile = keepPf; ChangeLog.OverrideFile = keepCl; TidyPrefs.OverrideFile = keepTp; Policy.OrgOverride = keepOg; Policy.Load();
                             }
                             check(model, "Policy: Default is how Elixar works without a policy; Custom rules work, are written to Logs, and are kept when you switch back to Default; an organization's rule wins" + (model ? "" : pwhy));

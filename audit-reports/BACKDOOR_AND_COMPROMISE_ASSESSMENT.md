@@ -181,7 +181,7 @@ Elixar is an endpoint tool: "isolation" means **limiting what each PC's copy may
 2. **Organization policy** (`HKLM\SOFTWARE\Policies\Elixar` via GPO/Intune; export from Policy manager > "Export for IT (.reg)"):
    - `updates.check = block` (IT pushes updates)
    - `email = block` (or allow only with an admin-consented Entra app + Conditional Access)
-   - `sysprep = block` except on imaging PCs
+   - `sysprep = block` except on imaging PCs — **automatic from 1.2.54** on PCs joined to an AD domain or Microsoft Entra ID (together with `phone = block`); IT re-allows with `sysprep = allow` / `phone = allow`
    - `apps.update = block` if Intune/SCCM already patch apps; otherwise leave on (Microsoft sources only)
    - `drivers.remove = block`, `phone = block` unless needed
    - `pin.policy = on` on shared PCs
@@ -256,3 +256,4 @@ Blocking items before company-wide use (not code bugs; they can't be closed by s
 | Microsoft disconnect explains how to remove the consent at Microsoft | `EmailTab.cs` |
 | CI: Actions pinned to SHAs, read-only test token, `release` environment | `.github/workflows/ci.yml`, `release.yml` |
 | Self-test for the fixes (249 checks pass on Linux; Windows run on GitHub) | `SelfTest1250.cs` |
+| **1.2.54:** on a PC joined to an AD domain or Microsoft Entra ID, Phone and Sysprep tools are off and locked (no phone or image checks run); IT can allow them by policy | `Policy.cs` (`DomainJoin`, `Company`, `ByCompany`), `PolicyTab.cs`, `PhoneTab.cs`, `SysprepTab.cs` |

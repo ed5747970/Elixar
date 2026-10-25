@@ -2,12 +2,15 @@
 // Default = Elixar's own rules (exactly how Elixar works without a policy). Custom = your copy; switching back keeps it.
 // An organization can set rules for every PC through Group Policy / Intune (HKLM\SOFTWARE\Policies\Elixar): those win and are locked.
 // The policy file is kept in Elixar's data folder, which only administrators can change.
+// On a company PC (joined to an Active Directory domain or to Microsoft Entra ID) the Phone tab and the Sysprep tools are off
+// and locked, as if the organization had set them; IT can allow them in HKLM\SOFTWARE\Policies\Elixar (phone / sysprep = allow).
 
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
@@ -149,10 +152,34 @@ namespace CDriveCleaner
         static Dictionary<string, string> orgCache;
         public static Dictionary<string, string> Org()
         {
+            var d = OrgSet();
+            if (Company() == null || CompanyBlocks.All(d.ContainsKey)) return d;
+            d = new Dictionary<string, string>(d);
+            foreach (var k in CompanyBlocks) if (!d.ContainsKey(k)) d[k] = "block";
+            return d;
+        }
+        // only what IT wrote in the registry
+        static Dictionary<string, string> OrgSet()
+        {
             if (OrgOverride != null) return OrgOverride() ?? new Dictionary<string, string>();
             if (orgCache == null) orgCache = ReadOrg();
             return orgCache;
         }
+
+        // ---- company PCs ----
+        public static readonly string[] CompanyBlocks = { "phone", "sysprep" };
+        public static Func<string> CompanyOverride;   // self-test and previews: the company this PC is joined to (null = none)
+        static string companyCache; static bool companyRead;
+        // the domain or Entra ID organization this PC is joined to; null on a home PC
+        public static string Company()
+        {
+            if (CompanyOverride != null) return CompanyOverride();
+            if (OrgOverride != null) return null;   // self-test: only what the test sets
+            if (!companyRead) { companyCache = Win.IsWindows ? DomainJoin.Name() : null; companyRead = true; }
+            return companyCache;
+        }
+        // true when this rule is off only because this is a company PC (IT didn't set it)
+        public static bool ByCompany(string key) { return Company() != null && CompanyBlocks.Contains(key) && !OrgSet().ContainsKey(key); }
         static Dictionary<string, string> ReadOrg()
         {
             var d = new Dictionary<string, string>();
@@ -204,6 +231,12 @@ namespace CDriveCleaner
         {
             if (Allowed(key)) return false;
             var r = Rule(key);
+            if (ByCompany(key))
+            {
+                Lang.Box(owner, Lang.T(r.Name) + ": " + string.Format(Lang.T("turned off on company PCs (this PC is joined to {0})."), Company()) + "\n\n" + Lang.T("Ask your IT department to change it."),
+                         "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return true;
+            }
             string who = Source(key) == "organization" ? Lang.T("your organization's policy") : Lang.T("the policy on this PC");
             Lang.Box(owner, Lang.T(r.Name) + ": " + Lang.T("not allowed by") + " " + who + ".\n\n" +
                      Lang.T(Source(key) == "organization" ? "Ask your IT department to change it." : "Change it in Policy manager (next to Logs)."),
@@ -367,6 +400,56 @@ namespace CDriveCleaner
         public static int Differences(Dictionary<string, string> rules)
         {
             return Rules.Count(r => rules.ContainsKey(r.Key) && rules[r.Key] != r.Default) + rules.Count(kv => IsItemKey(kv.Key) && kv.Value != ItemRule.DefaultText);
+        }
+    }
+
+    // is this PC joined to a company? Active Directory (NetGetJoinInformation) or Microsoft Entra ID (NetGetAadJoinInformation, Windows 10+).
+    // A personal PC with only a work account added ("workplace join") is not a company PC.
+    public static class DomainJoin
+    {
+        [DllImport("netapi32.dll", CharSet = CharSet.Unicode)] static extern int NetGetJoinInformation(string server, out IntPtr name, out int status);
+        [DllImport("netapi32.dll")] static extern int NetApiBufferFree(IntPtr buffer);
+        [DllImport("netapi32.dll", CharSet = CharSet.Unicode)] static extern int NetGetAadJoinInformation(string tenantId, out IntPtr info);
+        [DllImport("netapi32.dll")] static extern void NetFreeAadJoinInformation(IntPtr info);
+        const int NetSetupDomainName = 3, DSREG_DEVICE_JOIN = 1;
+
+        public static string Name() { return ActiveDirectory() ?? Entra(); }
+
+        public static string ActiveDirectory()
+        {
+            IntPtr p = IntPtr.Zero;
+            try
+            {
+                int status;
+                if (NetGetJoinInformation(null, out p, out status) != 0 || status != NetSetupDomainName) return null;
+                return Str(p) ?? "a domain";
+            }
+            catch { return null; }
+            finally { if (p != IntPtr.Zero) try { NetApiBufferFree(p); } catch { } }
+        }
+
+        public static string Entra()
+        {
+            IntPtr p = IntPtr.Zero;
+            try
+            {
+                if (NetGetAadJoinInformation(null, out p) != 0 || p == IntPtr.Zero) return null;
+                if (Marshal.ReadInt32(p) != DSREG_DEVICE_JOIN) return null;
+                // DSREG_JOIN_INFO: joinType, pJoinCertificate, pszDeviceId, pszIdpDomain, pszTenantId, pszJoinUserEmail, pszTenantDisplayName, ...
+                int z = IntPtr.Size;
+                string n = Str(Marshal.ReadIntPtr(p, 6 * z)) ?? Str(Marshal.ReadIntPtr(p, 3 * z));
+                return n ?? "Microsoft Entra ID";
+            }
+            catch { return null; }   // older Windows: no Entra ID
+            finally { if (p != IntPtr.Zero) try { NetFreeAadJoinInformation(p); } catch { } }
+        }
+        static string Str(IntPtr p)
+        {
+            if (p == IntPtr.Zero) return null;
+            string s = Marshal.PtrToStringUni(p);
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            s = new string(s.Trim().Where(c => !char.IsControl(c)).Take(80).ToArray());
+            return s.Length == 0 ? null : s;
         }
     }
 }

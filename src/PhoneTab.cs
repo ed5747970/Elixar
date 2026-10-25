@@ -249,6 +249,7 @@ namespace CDriveCleaner
 
         public void DetectPhone()
         {
+            if (!Policy.Allowed("phone")) return;   // turned off (policy or company PC): no adb, no phone checks
             if (phBusy) return;
             phLoaded = true; SetPhBusy(true);
             lblPhone.Text = "Looking for a phone..."; lblPhNote.Text = "";
