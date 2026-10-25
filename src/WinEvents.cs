@@ -76,16 +76,17 @@ namespace CDriveCleaner
         static void Ensure()
         {
             if (ready) return;
-            using (ChangeLog.Quiet())
-            {
-                // the source must write to Elixar's own log, never to a log everyone can read (Application)
-                if (EventLog.SourceExists(Source) && !string.Equals(EventLog.LogNameFromSourceName(Source, "."), LogName, StringComparison.OrdinalIgnoreCase))
-                    EventLog.DeleteEventSource(Source);
-                if (!EventLog.SourceExists(Source)) EventLog.CreateEventSource(new EventSourceCreationData(Source, LogName));
-                Sys.Run("wevtutil.exe", "sl " + LogName + " /ca:" + Access + " " + Size, 30000);
-                if (!Sys.Run("wevtutil.exe", "gl " + LogName, 30000).Contains("S-1-5-32-573")) throw new InvalidOperationException("the Elixar log's access could not be set");
-            }
+            // (no ChangeLog.Quiet here: it would also hush changes other threads write meanwhile; wevtutil sl/gl aren't logged anyway)
+            // the source must write to Elixar's own log, never to a log everyone can read (Application)
+            if (EventLog.SourceExists(Source) && !string.Equals(EventLog.LogNameFromSourceName(Source, "."), LogName, StringComparison.OrdinalIgnoreCase))
+                EventLog.DeleteEventSource(Source);
+            bool made = false;
+            if (!EventLog.SourceExists(Source)) { EventLog.CreateEventSource(new EventSourceCreationData(Source, LogName)); made = true; }
+            Sys.Run("wevtutil.exe", "sl " + LogName + " /ca:" + Access + " " + Size, 30000);
+            if (!Sys.Run("wevtutil.exe", "gl " + LogName, 30000).Contains("S-1-5-32-573")) throw new InvalidOperationException("the Elixar log's access could not be set");
             ready = true;
+            if (made) ChangeLog.Add("Settings", "Created the Elixar log in Event Viewer", "Applications and Services Logs > Elixar", "", "Administrators and Event Log Readers can read it; 20 MB",
+                                    "Every change in Logs is also written there for security tools. Policy manager can turn it off; --purge removes it.", false);
         }
 
         public static bool Exists() { try { return Win.IsWindows && EventLog.Exists(LogName); } catch { return false; } }
