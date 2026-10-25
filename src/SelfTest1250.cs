@@ -550,6 +550,9 @@ namespace CDriveCleaner
                 WinEvents.Write(new ChangeLog.Entry { Kind = "Files", Action = "test log only" });   // the self-test's own log: never to the real Event Log
                 var a = WinEvents.Access;
                 if (!a.Contains("(A;;0x1;;;S-1-5-32-573)") || a.Contains(";;;BU)") || a.Contains(";;;AU)") || a.Contains(";;;IU)") || a.Contains(";;;WD)")) return "access";
+                // the check that stops writing: Windows' default list (which also has Event Log Readers) doesn't pass, Elixar's does
+                string dflt = "channelAccess: O:BAG:SYD:(A;;0xf0007;;;SY)(A;;0x7;;;BA)(A;;0x3;;;IU)(A;;0x1;;;S-1-5-32-573)\n  logging:\n    retention: false\n    maxSize: 1052672";
+                if (WinEvents.Configured(dflt) || WinEvents.Configured(dflt.Replace("1052672", "20971520")) || !WinEvents.Configured("channelAccess: " + a + "\n    retention: false\n    maxSize: 20971520")) return "configured check";
                 // on GitHub's Windows test PC: really make the log, write, read back, check who can read it, then remove it
                 if (Win.IsWindows && Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
                 {
@@ -562,7 +565,7 @@ namespace CDriveCleaner
                     string ca = Sys.Run("wevtutil.exe", "gl " + WinEvents.LogName, 30000);
                     if (!had) WinEvents.Remove();
                     if (!found) return "the event wasn't in the log";
-                    if (!ca.Contains("S-1-5-32-573") || ca.Contains(";;;IU)") || ca.Contains(";;;AU)") || !ca.Contains("20971520") || !System.Text.RegularExpressions.Regex.IsMatch(ca, @"retention:\s*false")) return "log access: " + ca.Replace("\r", " ").Replace("\n", " ");
+                    if (!WinEvents.Configured(ca)) return "log access: " + ca.Replace("\r", " ").Replace("\n", " ");
                     if (!had && WinEvents.Exists()) return "not removed";
                 }
                 return null;

@@ -82,11 +82,41 @@ namespace CDriveCleaner
                 EventLog.DeleteEventSource(Source);
             bool made = false;
             if (!EventLog.SourceExists(Source)) { EventLog.CreateEventSource(new EventSourceCreationData(Source, LogName)); made = true; }
-            Sys.Run("wevtutil.exe", "sl " + LogName + " /ca:" + Access + " " + Size, 30000);
-            if (!Sys.Run("wevtutil.exe", "gl " + LogName, 30000).Contains("S-1-5-32-573")) throw new InvalidOperationException("the Elixar log's access could not be set");
+            // Windows can take a moment to know a new log: set the access in the registry (what Windows reads for this kind of log),
+            // tell the Event Log service, and check the exact result. Nothing is written until only the right people can read it.
+            try
+            {
+                using (var b = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64))
+                using (var k = b.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog\" + LogName, true))
+                    if (k != null)
+                    {
+                        k.SetValue("CustomSD", Access, Microsoft.Win32.RegistryValueKind.String);
+                        k.SetValue("MaxSize", 20971520, Microsoft.Win32.RegistryValueKind.DWord);
+                        k.SetValue("Retention", 0, Microsoft.Win32.RegistryValueKind.DWord);
+                        k.SetValue("AutoBackupLogFiles", 0, Microsoft.Win32.RegistryValueKind.DWord);
+                    }
+            }
+            catch { }
+            bool ok = false;
+            for (int i = 0; i < 8 && !ok; i++)
+            {
+                if (i > 0) System.Threading.Thread.Sleep(500 * i);
+                Sys.Run("wevtutil.exe", "sl " + LogName + " /ca:" + Access + " " + Size, 30000);
+                ok = Configured(Sys.Run("wevtutil.exe", "gl " + LogName, 30000));
+            }
+            if (!ok) throw new InvalidOperationException("the Elixar log's access could not be set");
             ready = true;
             if (made) ChangeLog.Add("Settings", "Created the Elixar log in Event Viewer", "Applications and Services Logs > Elixar", "", "Administrators and Event Log Readers can read it; 20 MB",
                                     "Every change in Logs is also written there for security tools. Policy manager can turn it off; --purge removes it.", false);
+        }
+
+        // wevtutil gl: exactly Elixar's access list, 20 MB, oldest events make room
+        public static bool Configured(string gl)
+        {
+            var ca = System.Text.RegularExpressions.Regex.Match(gl ?? "", @"channelAccess:\s*(\S+)");
+            var ms = System.Text.RegularExpressions.Regex.Match(gl ?? "", @"maxSize:\s*(\d+)");
+            var rt = System.Text.RegularExpressions.Regex.Match(gl ?? "", @"retention:\s*(\w+)");
+            return ca.Success && ca.Groups[1].Value == Access && ms.Success && ms.Groups[1].Value == "20971520" && rt.Success && rt.Groups[1].Value == "false";
         }
 
         public static bool Exists() { try { return Win.IsWindows && EventLog.Exists(LogName); } catch { return false; } }
