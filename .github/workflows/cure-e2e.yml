@@ -91,10 +91,10 @@ jobs:
           New-ItemProperty $pol -Name Interval -Value 5 -PropertyType DWord -Force | Out-Null
           Restart-Service CureAgent
           $seen = $null
-          for ($i = 0; $i -lt 30 -and -not $seen; $i++) {
+          for ($i = 0; $i -lt 48 -and -not $seen; $i++) {
             Start-Sleep 10
             $r = Web '/api/v1/pcs'
-            if ($r.StatusCode -eq 200) { $seen = (($r.Content | ConvertFrom-Json).pcs | Where-Object { $_.pc -eq $pc }) }
+            if ($r.StatusCode -eq 200) { $seen = (($r.Content | ConvertFrom-Json).pcs | Where-Object { $_.pc -eq $pc -and $_.seen }) }   # enrolled AND its first report arrived
           }
           Check "the agent service (SYSTEM) enrolled and reported over HTTPS with the pinned certificate" ([bool]$seen) "last answer: $($r.StatusCode) $($r.Content)"
           Write-Host (& $agent --status | Out-String)
