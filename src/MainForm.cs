@@ -610,7 +610,7 @@ namespace CDriveCleaner
             btnCheckFix = tool("\u2713  Check & fix");
             btnCheckFix.Font = new Font("Segoe UI Semibold", 9.5f); btnCheckFix.BackColor = Color.FromArgb(91, 76, 196); btnCheckFix.ForeColor = Color.White;
             btnCheckFix.FlatAppearance.BorderColor = Color.FromArgb(91, 76, 196); btnCheckFix.FlatAppearance.MouseOverBackColor = Color.FromArgb(110, 96, 214);
-            btnCheckFix.Visible = !LinuxUi;
+            btnCheckFix.Visible = !LinuxUi; btnCheckFix.UseMnemonic = false;   // "&" is part of the name
             new ToolTip().SetToolTip(btnCheckFix, Lang.T("One button: checks what fills and slows this PC, then fixes the safe parts when you say so"));
             btnCheckFix.Click += (o, e) => OpenCheckFix();
             head.Controls.Add(picker, 0, 0); head.Controls.Add(btnCheckFix, 1, 0); head.Controls.Add(btnDashRefresh, 2, 0);

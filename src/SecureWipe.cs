@@ -40,8 +40,10 @@ namespace CDriveCleaner
         public static Func<string, string, int> RunOverride;  // self-test: (exe, args) -> exit code
 
         // ---------- drives ----------
+        public static Func<List<WipeDrive>> DrivesOverride;   // previews
         public static List<WipeDrive> Drives()
         {
+            if (DrivesOverride != null) return DrivesOverride();
             var media = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (MediaOverride == null && Win.IsWindows)
                 try

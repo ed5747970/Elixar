@@ -236,6 +236,7 @@ namespace CDriveCleaner
             MinimizeBox = false; MaximizeBox = false; ShowIcon = false; ShowInTaskbar = false;
             ClientSize = new Size(S(720), S(600)); MinimumSize = new Size(S(560), S(420)); BackColor = Color.White;
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(S(18), S(14), S(18), S(14)) };
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             head = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = Lang.T("Checking this PC..."), Margin = new Padding(0, 0, 0, S(2)) };
@@ -282,7 +283,8 @@ namespace CDriveCleaner
         {
             report = r;
             head.Text = Lang.T("Here's what Elixar found");
-            sub.Text = Lang.T("Checked in " + Math.Max(1, (int)r.Took.TotalSeconds) + " seconds. Only the safe fixes are ticked; nothing is done until you click Fix.");
+            int secs = Math.Max(1, (int)r.Took.TotalSeconds);
+            sub.Text = Lang.T("Checked in " + secs + (secs == 1 ? " second" : " seconds") + ". Only the safe fixes are ticked; nothing is done until you click Fix.");
             Action<string, string, Color> card = (k, v, c) => { cardValue[k].Text = Lang.T(v); cardValue[k].ForeColor = c; };
             Color green = Color.FromArgb(46, 125, 50), orange = Color.FromArgb(180, 95, 6), red = Color.FromArgb(198, 40, 40);
             card("Can be freed", Fs.Fmt(r.CanFree), r.CanFree > 0 ? green : Color.DimGray);
@@ -302,7 +304,7 @@ namespace CDriveCleaner
                 titleRow.Controls.Add(new Label { AutoSize = true, Text = Lang.T(it.Title), Font = new Font("Segoe UI Semibold", 9.5f), ForeColor = it.Warning ? red : Color.FromArgb(24, 32, 43), Margin = new Padding(0) });
                 titleRow.Controls.Add(new Label { AutoSize = true, Text = Lang.T(it.Tag), Font = new Font("Segoe UI", 8f), ForeColor = tagColor, Margin = new Padding(S(8), S(2), 0, 0) });
                 text.Controls.Add(titleRow);
-                text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(S(520), 0), Text = Lang.T(it.Detail), ForeColor = Color.DimGray, Margin = new Padding(0, S(1), 0, 0) });
+                text.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(S(480), 0), Text = Lang.T(it.Detail), ForeColor = Color.DimGray, Margin = new Padding(0, S(1), 0, 0) });
                 var right = new Label { AutoSize = true, Text = Lang.T(it.Right), ForeColor = Color.DimGray, Margin = new Padding(S(8), S(10), 0, 0) };
                 rows.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                 rows.Controls.Add(cb, 0, row); rows.Controls.Add(text, 1, row); rows.Controls.Add(right, 2, row);
