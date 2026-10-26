@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.56</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.57</p></div>
 </div></header>
 <main class="wrap">
 
@@ -498,6 +498,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-26</td><td>1.2.57</td><td>Cure tested end to end on a real Windows PC. Fixed: Cure Agent and Cure Server wouldn't install (Elixar didn't recognise Windows' own installer account, so Program Files looked unprotected); the MSI's CUREAGENT=1 (Intune, Group Policy, SCCM) didn't make the agent; the server's own certificate wasn't picked up. An agent waiting for Group Policy settings looks again every 5 minutes</td></tr>
   <tr><td>2026-10-26</td><td>1.2.56</td><td>Two editions: Elixar for Private (every feature, for home PCs) and Elixar for Business (no Sysprep tools; the Domain PCs tab with Cure Agent and Cure Server: every company PC, the ones at risk first, and what to clean on each, reports only)</td></tr>
   <tr><td>2026-10-25</td><td>1.2.55</td><td>Email is also off on company PCs; Group Policy / Intune template (ADMX) from Policy manager or <code>--admx</code>; every change also goes to an admin-only &ldquo;Elixar&rdquo; log in Event Viewer; PolyForm Noncommercial license</td></tr>
   <tr><td>2026-10-25</td><td>1.2.54</td><td>Company PCs: on a PC joined to an Active Directory domain or Microsoft Entra ID, the Phone tab and the Sysprep tools are greyed out and locked; IT can allow them by policy</td></tr>

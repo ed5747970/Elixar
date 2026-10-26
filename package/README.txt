@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.56)
+ELIXAR  (version 1.2.57)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,21 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.57  (Elixar for Business: Cure)
+- Cure is now tested end to end on a real Windows PC with every change: the
+  MSI, Cure Server, a Cure Agent set up the Group Policy way, a real report,
+  the Cure Console, what must be refused, and an uninstall that leaves nothing.
+- Fixed: Cure Agent and Cure Server wouldn't install. Elixar didn't recognise
+  Windows' own installer account (TrustedInstaller), so Program Files looked
+  unprotected to it. (It was stricter than needed, never looser.)
+- Fixed: msiexec ... CUREAGENT=1 (Intune, Group Policy, SCCM) didn't make the
+  Cure Agent service.
+- Fixed: Cure Server didn't pick up the certificate Windows made for it.
+- A Cure Agent waiting for its Group Policy settings looks again every
+  5 minutes (it could wait up to an hour).
+- CureServer.exe --remove-pc now says what it does: a PC still running Cure
+  Agent joins again unless you make a new token (--new-token).
 
 NEW IN 1.2.56
 - Elixar is now two apps: Elixar for Private and Elixar for Business.
