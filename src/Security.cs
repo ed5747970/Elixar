@@ -174,9 +174,16 @@ namespace CDriveCleaner
             var res = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
             var list = files.Where(f => !string.IsNullOrEmpty(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (!Win.IsWindows || list.Count == 0) return res;
-            // the file list goes in as data, never as part of the script
-            string script = "$files = @(" + string.Join(",", list.Select(f => "'" + f.Replace("'", "''").Replace("\u2018", "\u2018\u2018").Replace("\u2019", "\u2019\u2019") + "'")) + "); " + SigScript.Replace("$input |", "$files |");
-            string o = StoreData.RunPs(script, 120000);
+            // the file list goes in as quoted data, never as part of the script; in batches that fit one command line
+            var outs = new StringBuilder();
+            for (int i = 0; i < list.Count; )
+            {
+                var batch = new List<string>(); int len = 0;
+                while (i < list.Count && (batch.Count == 0 || len + list[i].Length * 2 + 4 < 20000)) { len += list[i].Length * 2 + 4; batch.Add(list[i]); i++; }
+                string script = "$files = @(" + string.Join(",", batch.Select(f => Sys.PsQuote(f))) + "); " + SigScript.Replace("$input |", "$files |");
+                outs.Append(StoreData.RunPs(script, 120000)).Append('\n');
+            }
+            string o = outs.ToString();
             foreach (var raw in (o ?? "").Split('\n'))
             {
                 var p = raw.TrimEnd('\r').Split('\t');

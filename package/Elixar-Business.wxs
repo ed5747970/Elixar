@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Elixar for Business: a per-machine MSI for Intune, Group Policy or SCCM, with Cure Agent and Cure Server.
-     Build:  wixl -a x64 -D Version=1.2.57 -D Exe=out\business\Elixar.exe -D Agent=out\business\CureAgent.exe -D Server=out\business\CureServer.exe -o Elixar-Business.msi Elixar-Business.wxs
+     Build:  wixl -a x64 -D Version=1.2.58 -D Exe=out\business\Elixar.exe -D Agent=out\business\CureAgent.exe -D Server=out\business\CureServer.exe -o Elixar-Business.msi Elixar-Business.wxs
      Cure Agent on every PC (settings from Group Policy):   msiexec /i Elixar-Business.msi /qn CUREAGENT=1
      or with the settings here:   msiexec /i Elixar-Business.msi /qn CURESERVER=https://cure.contoso.local:8443/ CURETOKEN=... CURETHUMBPRINT=...
      Cure Server: install the MSI on the server, then run CureServer.exe with its install option (see the User Guide)

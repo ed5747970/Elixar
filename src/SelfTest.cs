@@ -282,6 +282,26 @@ namespace CDriveCleaner
                               "Schedules with admin rights start through a fixed launcher that clears the variables that could make .NET load someone else's code" + (win ? "" : " (launcher text checked)"));
                         check(Sys.PsSafe("Get-Date").StartsWith("$env:PSModulePath = Join-Path $PSHOME 'Modules'; ") && StoreData.RunPsScriptFor("x").StartsWith("$env:PSModulePath"),
                               "PowerShell as administrator uses only Windows' own modules (not ones planted in Documents)");
+                        {
+                            // how PowerShell is started: no encoded command, no policy bypass (what antivirus programs flag as malware),
+                            // and the script reaches PowerShell exactly as written: quotes, backslashes, other alphabets, new lines
+                            string pa = Sys.PsArgs("'x'");
+                            string enc = string.Join("", new[] { "-Encoded", "Command" }), byp = string.Join("", new[] { "Bypass" });
+                            bool plain = pa.StartsWith("-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -Command \"") && !pa.Contains(enc) && !pa.Contains(byp) &&
+                                         Sys.ArgQuote("a\\b\"c\\\\") == "\"a\\b\\\"c\\\\\\\\\"";
+                            string tricky = "a\"b\\\\c\\\" d 'q' \u05e9\u05dc\u05d5\u05dd \u2019x\u2019 end\\";
+                            string got = win ? StoreData.RunPs("[Console]::OutputEncoding = [Text.Encoding]::UTF8\n" + Sys.PsQuote(tricky) + "\n'second line'", 60000) : null;
+                            var lines = got == null ? null : got.Replace("\r", "").Split('\n').Where(l => l.Length > 0).ToList();
+                            check(plain && (!win || (lines.Count == 2 && lines[0] == tricky && lines[1] == "second line")),
+                                  "PowerShell gets its script as plain text - no encoded command and no policy bypass, the ways malware hides what it runs - and exactly as written" + (win ? "" : " (command line checked)") +
+                                  (win && !(lines.Count == 2 && lines[0] == tricky) ? " (got: " + got + ")" : ""));
+                            // nothing in Elixar's own program looks like the commands ransomware and hiding tools use
+                            string me = typeof(SelfTest).Assembly.Location, text = "";
+                            try { var b = File.ReadAllBytes(me); text = Encoding.Unicode.GetString(b) + Encoding.Unicode.GetString(b, 1, b.Length - 1); } catch { }
+                            var bad = new[] { enc, "-ExecutionPolicy " + byp, string.Join(" ", new[] { "delete", "shadows" }), string.Join(" ", new[] { "wevtutil", "cl" }) }
+                                      .Where(x => text.Contains(x)).ToList();
+                            check(text.Length > 0 && bad.Count == 0, "Elixar's program has none of the command lines ransomware uses (encoded PowerShell, policy bypass, deleting all restore points, clearing event logs)" + (bad.Count > 0 ? ": " + string.Join(", ", bad) : ""));
+                        }
                         if (win)
                         {
                             UserDirs.ProfileOverride = @"C:\Users\elisar";
@@ -1484,10 +1504,10 @@ namespace CDriveCleaner
                                 // Windows commands: only the ones that change something, in plain words
                                 cmd = ChangeLog.Describe("dism.exe", "/Online /Cleanup-Image /StartComponentCleanup") != null && ChangeLog.Describe("dism.exe", "/Online /Cleanup-Image /AnalyzeComponentStore /English") == null &&
                                       ChangeLog.Describe("schtasks.exe", "/Query /TN x") == null && ChangeLog.Describe("schtasks.exe", "/Create /TN x /XML y") != null &&
-                                      ChangeLog.Describe("vssadmin.exe", "list shadows") == null && ChangeLog.Describe("vssadmin.exe", "delete shadows /for=C: /all /quiet") != null &&
+                                      ChangeLog.Describe("vssadmin.exe", "list shadows") == null && ChangeLog.Describe("vssadmin.exe", "resize shadowstorage /for=C: /on=C: /maxsize=10%") != null &&
                                       ChangeLog.Describe("powercfg.exe", "/a") == null && ChangeLog.Describe("wevtutil.exe", "el") == null && ChangeLog.Describe("cmd.exe", "/c dir") == null;
                                 int before = ChangeLog.Read().Count;
-                                ChangeLog.Command("vssadmin.exe", "delete shadows /for=C: /all /quiet", "Successfully deleted", 0);
+                                ChangeLog.Command("vssadmin.exe", "resize shadowstorage /for=C: /on=C: /maxsize=10%", "Successfully deleted", 0);
                                 ChangeLog.Command("vssadmin.exe", "list shadows", "", 0);
                                 cmd &= ChangeLog.Read().Count == before + 1 && ChangeLog.Read()[0].Kind == "Windows command";
                                 // PowerShell: each changing command with its target; read-only scripts and passwords stay out
@@ -1540,7 +1560,7 @@ namespace CDriveCleaner
                                     RegLog.Set(k, "Shown", "light", Microsoft.Win32.RegistryValueKind.String, "ui");
                                     RegLog.Set(k, "Shown", "dark", Microsoft.Win32.RegistryValueKind.String, "ui");
                                 }
-                                ChangeLog.Command("vssadmin.exe", "delete shadows /for=C: /all /quiet", "", 0);
+                                ChangeLog.Command("vssadmin.exe", "resize shadowstorage /for=C: /on=C: /maxsize=10%", "", 0);
                                 var lf = new MainForm(true);
                                 lf.LogsLoad();
                                 bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && lf.LogsRowCount == 3;

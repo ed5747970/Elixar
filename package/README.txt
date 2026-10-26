@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.57)
+ELIXAR  (version 1.2.58)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,15 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.58  (fewer antivirus false alarms)
+- PowerShell is started with its script as plain, readable text: no encoded
+  command and no execution-policy bypass (the way malware hides what it runs).
+- The golden-image cleanup (Sysprep) clears event logs and restore points
+  through Windows' own interfaces instead of the command lines ransomware uses.
+- A self-test checks that Elixar's program has none of those command lines.
+- If your antivirus still blocks Elixar: see ANTIVIRUS.md in the source, or
+  User Guide > Troubleshooting.
 
 NEW IN 1.2.57  (Elixar for Business: Cure)
 - Cure is now tested end to end on a real Windows PC with every change: the

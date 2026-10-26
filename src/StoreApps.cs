@@ -173,8 +173,9 @@ namespace CDriveCleaner
 
         public static string RunPs(string script, int timeoutMs)
         {
-            var psi = new ProcessStartInfo(Win.SystemExe("powershell.exe"),
-                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(RunPsScriptFor(script))))
+            string args = Sys.PsArgs(script);
+            if (args.Length > Sys.MaxPsArgs) { ChangeLog.PowerShell(script, "too long"); return "ERROR: the PowerShell script is too long"; }
+            var psi = new ProcessStartInfo(Win.SystemExe("powershell.exe"), args)
             {
                 UseShellExecute = false, CreateNoWindow = true,
                 RedirectStandardOutput = true, RedirectStandardError = true,

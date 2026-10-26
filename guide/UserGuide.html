@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.57</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.58</p></div>
 </div></header>
 <main class="wrap">
 
@@ -485,6 +485,7 @@
 <table>
   <tr><th>You see</th><th>Do this</th></tr>
   <tr><td>&ldquo;Windows protected your PC&rdquo;</td><td>Click More info &rsaquo; Run anyway once (check SHA256.txt if unsure), then install Elixar from the Settings tab and use the Start menu entry</td></tr>
+  <tr><td>Your antivirus blocks or deletes Elixar (for example &ldquo;Trojan:Win32/Wacatac&rdquo;)</td><td>A false alarm: Elixar cleans files, makes restore points and (Business) runs services, which antivirus programs watch for. First check the file: its SHA-256 must match SHA256.txt from the GitHub release. Then report it as a false positive to your antivirus maker (Microsoft Defender: microsoft.com/wdsi/filesubmission, &ldquo;Software developer&rdquo; or &ldquo;Home customer&rdquo;); they usually clear it in 1-3 days. Until then you can allow that one file in your antivirus. Never turn the antivirus off for it. At a company, IT can allow it by its signature or hash</td></tr>
   <tr><td>&ldquo;Elixar did not start, because something was put next to Elixar.exe&rdquo;</td><td>Delete the file it names (Elixar.exe.config, .local or .manifest), or download Elixar again into a new folder. Elixar never uses these files</td></tr>
   <tr><td>&ldquo;These settings for your Windows account make every .NET program load extra code&rdquo;</td><td>Click Yes to remove them, unless you know a developer tool you use needs them</td></tr>
   <tr><td>Something stopped working after Elixar changed something</td><td>Open Logs, find the change by its time or kind, and click Undo this change (or put files back in Tools &rsaquo; Undo). Save the log as .csv to send it to whoever helps you</td></tr>
@@ -498,6 +499,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-26</td><td>1.2.58</td><td>Fewer antivirus false alarms: PowerShell is started with its script as plain text (no encoded command, no execution-policy bypass), the golden-image cleanup clears event logs and restore points through Windows' own interfaces, and the program has none of the command lines ransomware uses. Troubleshooting: what to do when an antivirus blocks Elixar</td></tr>
   <tr><td>2026-10-26</td><td>1.2.57</td><td>Cure tested end to end on a real Windows PC. Fixed: Cure Agent and Cure Server wouldn't install (Elixar didn't recognise Windows' own installer account, so Program Files looked unprotected); the MSI's CUREAGENT=1 (Intune, Group Policy, SCCM) didn't make the agent; the server's own certificate wasn't picked up. An agent waiting for Group Policy settings looks again every 5 minutes</td></tr>
   <tr><td>2026-10-26</td><td>1.2.56</td><td>Two editions: Elixar for Private (every feature, for home PCs) and Elixar for Business (no Sysprep tools; the Domain PCs tab with Cure Agent and Cure Server: every company PC, the ones at risk first, and what to clean on each, reports only)</td></tr>
   <tr><td>2026-10-25</td><td>1.2.55</td><td>Email is also off on company PCs; Group Policy / Intune template (ADMX) from Policy manager or <code>--admx</code>; every change also goes to an admin-only &ldquo;Elixar&rdquo; log in Event Viewer; PolyForm Noncommercial license</td></tr>

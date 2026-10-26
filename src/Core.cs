@@ -317,10 +317,34 @@ namespace CDriveCleaner
             return "$env:PSModulePath = Join-Path $PSHOME 'Modules'; " + script;
         }
 
+        // How Elixar starts PowerShell: the script as plain, readable text on the command line. No encoded (base64) command
+        // and no execution-policy bypass - that is how malware hides what it runs, and antivirus programs flag it.
+        // RemoteSigned lets Windows' own modules load (a company's Group Policy still decides over it).
+        public const int MaxPsArgs = 30000;   // Windows allows 32767 characters for a whole command line
+        public static string PsArgs(string script)
+        {
+            return "-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -Command " + ArgQuote(PsSafe(script));
+        }
+
+        // one command-line argument, exactly as Windows' programs read it back (quotes and the backslashes before them escaped)
+        public static string ArgQuote(string s)
+        {
+            var sb = new StringBuilder("\"");
+            int bs = 0;
+            foreach (char c in s ?? "")
+            {
+                if (c == '\\') { bs++; continue; }
+                if (c == '"') { sb.Append('\\', bs * 2 + 1).Append('"'); bs = 0; continue; }
+                sb.Append('\\', bs).Append(c); bs = 0;
+            }
+            return sb.Append('\\', bs * 2).Append('"').ToString();
+        }
+
         public static string RunPowerShell(string script, int timeoutMs)
         {
-            string enc = Convert.ToBase64String(Encoding.Unicode.GetBytes(PsSafe(script)));
-            string r = Run("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc, timeoutMs);
+            string args = PsArgs(script);
+            if (args.Length > MaxPsArgs) { ChangeLog.PowerShell(script, "too long"); return "ERROR: the PowerShell script is too long"; }
+            string r = Run("powershell.exe", args, timeoutMs);
             ChangeLog.PowerShell(script, r);
             return r;
         }

@@ -656,11 +656,17 @@ namespace CDriveCleaner
                 Info = "Clears Windows' event logs, so every new PC starts with empty logs instead of this PC's history.",
                 Measure = () => Fs.SizeOf(logs),
                 Clean = log => {
-                    var names = Sys.Run("wevtutil.exe", "el", 120000).Split('\n').Select(x => x.Trim()).Where(x => x.Length > 0 && x.IndexOf('"') < 0).ToList();
-                    int done = 0;
-                    foreach (var n in names) { Sys.Run("wevtutil.exe", "cl \"" + n + "\"", 30000); if (++done % 200 == 0) log("  " + done + " / " + names.Count + " logs"); }
-                    log("  " + names.Count + " logs cleared.");
-                    ChangeLog.Add("Windows command", "Cleared Windows' event logs (" + names.Count + ")", "wevtutil cl", "", "", "Golden image cleanup", false);
+                    // Windows' event log API (the same one Event Viewer uses)
+                    var session = System.Diagnostics.Eventing.Reader.EventLogSession.GlobalSession;
+                    var names = session.GetLogNames().ToList();
+                    int done = 0, cleared = 0;
+                    foreach (var n in names)
+                    {
+                        try { session.ClearLog(n); cleared++; } catch { }   // some logs can't be cleared (analytic, in use): left as they are
+                        if (++done % 200 == 0) log("  " + done + " / " + names.Count + " logs");
+                    }
+                    log("  " + cleared + " logs cleared.");
+                    ChangeLog.Add("Settings", "Cleared Windows' event logs (" + cleared + ")", "Event Viewer logs", "", "", "Golden image cleanup", false);
                 } });
             l.Add(new CleanItem {
                 Name = "Hibernation file (hiberfil.sys)", Tier = Tier.Review, DefaultOn = false, Where = sys + @"\hiberfil.sys",
@@ -675,7 +681,14 @@ namespace CDriveCleaner
                                                "Get-CimInstance Win32_ShadowStorage | Where-Object { $_.Volume.DeviceID -eq $v } | ForEach-Object { $u += [int64]$_.UsedSpace }; $u", 120000).Trim();
                     long n; return long.TryParse(o.Split('\n')[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out n) ? n : -1;
                 },
-                Clean = log => { Sys.Run("vssadmin.exe", "delete shadows /for=" + sys + " /all /quiet", 10 * 60 * 1000); log("  Restore points deleted."); } });
+                Clean = log =>
+                {
+                    // only this drive's restore points, through Windows' own restore point classes
+                    string r = StoreData.RunPs("$v = (Get-CimInstance Win32_Volume -Filter \"DriveLetter='" + sys + "'\").DeviceID; $n = 0; " +
+                                               "Get-CimInstance Win32_ShadowCopy | Where-Object { $_.VolumeName -eq $v } | ForEach-Object { Remove-CimInstance -InputObject $_; $n++ }; \"$n\"", 10 * 60 * 1000).Trim();
+                    int n; log(int.TryParse(r.Split('\n')[0].Trim(), out n) ? "  " + n + " restore points deleted." : "  Restore points: " + r);
+                    ChangeLog.Add("Settings", "Deleted the restore points of " + sys, "System Protection", "", "", "Golden image cleanup", false);
+                } });
             return l;
         }
 
