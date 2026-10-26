@@ -1,0 +1,172 @@
+# Cure end to end on a real Windows PC in the cloud: the Business MSI, the Cure Server service (HTTPS, its own certificate,
+# a group for the console), a Cure Agent service that gets its settings the way Group Policy gives them, a real report,
+# the console, the checks that must say no, and a clean uninstall. Everything runs on a throwaway machine.
+name: Cure end-to-end
+on:
+  push:
+    branches: [ main, 'preview/**' ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cure:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
+        with:
+          persist-credentials: false
+      - name: Build Elixar for Business and its MSI
+        shell: pwsh
+        run: |
+          .\build.ps1
+          if ($LASTEXITCODE) { throw "build failed" }
+          dotnet tool install --global wix --version 4.0.5
+          $v3 = ((Get-Item out\business\Elixar.exe).VersionInfo.FileVersion.Split('.')[0..2]) -join '.'
+          Copy-Item package\Elixar-Business.wxs ElixarBiz4.wxs
+          wix convert ElixarBiz4.wxs; $global:LASTEXITCODE = 0
+          wix build -arch x64 -d Version=$v3 -d Exe=out\business\Elixar.exe -d Agent=out\business\CureAgent.exe -d Server=out\business\CureServer.exe -o Elixar-Business.msi ElixarBiz4.wxs
+          if ($LASTEXITCODE -or -not (Test-Path Elixar-Business.msi)) { throw "The Business MSI didn't build" }
+      - name: Install, report, check, uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $script:fails = @(); $script:passes = 0
+          function Check([string]$name, [bool]$ok, [string]$why = '') {
+            if ($ok) { Write-Host "PASS  $name"; $script:passes++ } else { Write-Host "FAIL  $name  $why"; $script:fails += "$name  $why" }
+          }
+          function Msi([string]$a, [string]$log) { (Start-Process msiexec.exe -ArgumentList "$a /qn /l*v `"$PWD\$log`"" -Wait -PassThru).ExitCode }
+          function Svc([string]$n) { $s = Get-Service $n -ErrorAction SilentlyContinue; if ($s) { "$($s.Status)" } else { "none" } }
+          # who opens the console: $viewer (a plain user in the group), 'admin' (this runner's administrator), or nobody
+          function Web([string]$path, [string]$method = 'GET', $who = 'viewer', $body = $null, $headers = @{}) {
+            $p = @{ Uri = "https://localhost:8443$path"; Method = $method; SkipCertificateCheck = $true; SkipHttpErrorCheck = $true; UseBasicParsing = $true; Headers = $headers; TimeoutSec = 30 }
+            if ($who -eq 'viewer') { $p.Credential = $script:viewer } elseif ($who -eq 'admin') { $p.UseDefaultCredentials = $true }
+            if ($body -ne $null) { $p.Body = $body; $p.ContentType = 'application/json' }
+            try { Invoke-WebRequest @p } catch { [pscustomobject]@{ StatusCode = -1; Content = "$_"; Headers = @{} } }
+          }
+          $dir = 'C:\Program Files\Elixar'; $agent = "$dir\CureAgent.exe"; $server = "$dir\CureServer.exe"; $pc = $env:COMPUTERNAME.ToUpper()
+          $pol = 'HKLM:\SOFTWARE\Policies\Elixar\Cure'
+
+          # 1. the MSI the way Intune / Group Policy installs it: Cure Agent on, settings to come from Group Policy
+          $code = Msi "/i `"$PWD\Elixar-Business.msi`" CUREAGENT=1" 'msi-install.log'
+          Check "MSI installs (CUREAGENT=1)" ($code -eq 0) "exit $code"
+          Check "files in Program Files\Elixar" ((Test-Path "$dir\Elixar.exe") -and (Test-Path $agent) -and (Test-Path $server))
+          Start-Sleep 5
+          Check "MSI made the Cure Agent service" ((Svc CureAgent) -eq 'Running') "service: $(Svc CureAgent)"
+          $bin = (Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName
+          Check "agent service runs the Program Files exe with --service, as LocalSystem" ($bin -eq "`"$agent`" --service") "$bin"
+
+          # 2. Cure Server on this PC; the console is for one local group (the runner's account is put in it)
+          # a plain (not administrator) test account on this throwaway PC, in that group
+          $pw = (-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 24 | ForEach-Object { [char]$_ })) + 'a1!'
+          Write-Host "::add-mask::$pw"
+          New-LocalUser -Name cureviewer -Password (ConvertTo-SecureString $pw -AsPlainText -Force) -PasswordNeverExpires | Out-Null
+          New-LocalGroup -Name CureViewers | Out-Null; Add-LocalGroupMember -Group CureViewers -Member cureviewer
+          $script:viewer = New-Object System.Management.Automation.PSCredential("$env:COMPUTERNAME\cureviewer", (ConvertTo-SecureString $pw -AsPlainText -Force))
+          $out = (& $server --install --group "$env:COMPUTERNAME\CureViewers" 2>&1 | Out-String)
+          $token = [regex]::Match($out, 'Enrollment token:\s+(\S+)').Groups[1].Value
+          $thumb = [regex]::Match($out, 'Certificate:\s+([0-9a-fA-F]{40})').Groups[1].Value
+          $url = [regex]::Match($out, 'Cure Console:\s+(https://\S+)').Groups[1].Value
+          if ($token) { Write-Host "::add-mask::$token" }
+          Check "CureServer --install" ($LASTEXITCODE -eq 0 -and $token -and $thumb -and $url) ($out -replace [regex]::Escape("$token"), '***')
+          Start-Sleep 5
+          Check "server service running" ((Svc CureServer) -eq 'Running') "$(Svc CureServer)"
+          $sv = Get-CimInstance Win32_Service -Filter "Name='CureServer'"
+          Check "server runs as its own virtual account" ($sv.StartName -eq 'NT SERVICE\CureServer') "$($sv.StartName)"
+          Check "certificate bound to 8443" ((netsh http show sslcert ipport=0.0.0.0:8443 | Out-String) -match $thumb)
+          Check "address reserved for the service only" ((netsh http show urlacl url=https://+:8443/ | Out-String) -match 'NT SERVICE\\CureServer')
+          $fw = Get-NetFirewallRule -DisplayName 'Cure Server (Elixar for Business)' -ErrorAction SilentlyContinue
+          Check "firewall rule on the domain profile only" ($fw -and "$($fw.Profile)" -eq 'Domain') "$($fw.Profile)"
+          $acl = (Get-Acl 'C:\ProgramData\Elixar\CureServer').Access | Where-Object { $_.FileSystemRights -match 'Write|Modify|FullControl' } | ForEach-Object { "$($_.IdentityReference)" }
+          Check "server data folder: only admins, SYSTEM and the service can write" (-not ($acl | Where-Object { $_ -notmatch 'Administrators|SYSTEM|CureServer|CREATOR OWNER' })) ($acl -join ', ')
+          Check "the settings key isn't readable by users" (-not ((Get-Acl 'HKLM:\SOFTWARE\Elixar\CureServer').Access | Where-Object { "$($_.IdentityReference)" -match 'Users|Everyone' }))
+
+          # 3. the agent's settings, as a Group Policy would write them; the service picks them up
+          New-Item $pol -Force | Out-Null
+          New-ItemProperty $pol -Name Server -Value $url -Force | Out-Null
+          New-ItemProperty $pol -Name EnrollToken -Value $token -Force | Out-Null
+          New-ItemProperty $pol -Name Thumbprint -Value $thumb -Force | Out-Null
+          New-ItemProperty $pol -Name Interval -Value 5 -PropertyType DWord -Force | Out-Null
+          Restart-Service CureAgent
+          $seen = $null
+          for ($i = 0; $i -lt 30 -and -not $seen; $i++) {
+            Start-Sleep 10
+            $r = Web '/api/v1/pcs'
+            if ($r.StatusCode -eq 200) { $seen = (($r.Content | ConvertFrom-Json).pcs | Where-Object { $_.pc -eq $pc }) }
+          }
+          Check "the agent service (SYSTEM) enrolled and reported over HTTPS with the pinned certificate" ([bool]$seen) "last answer: $($r.StatusCode) $($r.Content)"
+          Write-Host (& $agent --status | Out-String)
+          if ($seen) {
+            $id = @($seen)[0].id
+            $one = Web "/api/v1/pc?id=$id"
+            Check "the console shows this PC's disk" ($one.StatusCode -eq 200 -and $one.Content -match '"Total":\d{9,}') "$($one.StatusCode)"
+            $j = $one.Content
+            Check "report has the full picture (items, places, apps)" ($j -match '"Items":\[\{' -and $j -match '"Apps":\[') ($j.Substring(0, [Math]::Min(400, $j.Length)))
+          }
+
+          # 4. the console
+          $page = Web '/'
+          Check "console page opens for a group member (not an admin)" ($page.StatusCode -eq 200 -and $page.Content -match 'console.js') "$($page.StatusCode)"
+          Check "console forbids outside scripts and framing" ("$($page.Headers['Content-Security-Policy'])" -match "default-src 'none'" -and "$($page.Headers['X-Frame-Options'])" -eq 'DENY')
+          Check "HSTS" ("$($page.Headers['Strict-Transport-Security'])" -match 'max-age')
+          Check "this server's administrators can open it" ((Web '/api/v1/pcs' 'GET' 'admin').StatusCode -eq 200)
+          Check "CSV export" ((Web '/api/v1/export.csv').StatusCode -eq 200)
+          Check "no sign-in: refused" ((Web '/api/v1/pcs' 'GET' 'nobody').StatusCode -eq 401)
+          Check "console only reads (POST refused)" ((Web '/api/v1/pcs' 'POST' 'viewer' '{}').StatusCode -eq 405)
+          Remove-LocalGroupMember -Group CureViewers -Member cureviewer
+          $nr = Web '/api/v1/pcs'
+          Check "a user not in the group: refused" ($nr.StatusCode -eq 403) "$($nr.StatusCode)"
+          Add-LocalGroupMember -Group CureViewers -Member cureviewer
+
+          # 5. what must say no
+          Check "wrong enrollment token" ((Web '/api/v1/enroll' 'POST' 'nobody' '{"token":"wrong","computer":"EVIL"}').StatusCode -eq 403)
+          Check "report with no signature" ((Web '/api/v1/report' 'POST' 'nobody' '{}').StatusCode -eq 401)
+          $bad = Web '/api/v1/report' 'POST' 'nobody' '{}' @{ 'X-Cure-Device' = 'x'; 'X-Cure-Time' = '1'; 'X-Cure-Nonce' = 'ab'; 'X-Cure-Sign' = ('0' * 64) }
+          Check "report from an unknown PC" ($bad.StatusCode -eq 401)
+          $plain = try { (Invoke-WebRequest 'http://localhost:8443/' -UseBasicParsing -TimeoutSec 10 -SkipHttpErrorCheck).StatusCode } catch { -1 }
+          Check "no plain HTTP" ($plain -ne 200) "$plain"
+          New-ItemProperty $pol -Name Thumbprint -Value ('ab' * 20) -Force | Out-Null
+          $o = (& $agent --send | Out-String)
+          Check "agent refuses a server with another certificate" ($LASTEXITCODE -ne 0 -and $o -match 'Not sent') $o
+          New-ItemProperty $pol -Name Thumbprint -Value $thumb -Force | Out-Null
+          Start-Sleep 65
+          $o = (& $agent --send | Out-String)
+          Check "agent --send" ($LASTEXITCODE -eq 0 -and $o -match 'Sent') $o
+
+          # 6. taking a PC off the list; a new token keeps it off
+          $o = (& $server --remove-pc $pc | Out-String); Check "remove-pc" ($LASTEXITCODE -eq 0) $o
+          Start-Sleep 5
+          $o = (& $agent --send | Out-String); Check "removed PC's report refused" ($LASTEXITCODE -ne 0) $o
+          $o = (& $server --new-token | Out-String); Check "new-token" ($LASTEXITCODE -eq 0) $o
+          Start-Sleep 5
+          $o = (& $agent --send | Out-String); Check "old token can't join again" ($LASTEXITCODE -ne 0 -and $o -match '403') $o
+
+          # 7. uninstall: nothing is left behind (the reports stay unless --purge)
+          $code = Msi "/x `"$PWD\Elixar-Business.msi`"" 'msi-remove.log'
+          Check "MSI uninstall" ($code -eq 0) "exit $code"
+          Start-Sleep 3
+          Check "no Cure services left" ((Svc CureAgent) -eq 'none' -and (Svc CureServer) -eq 'none') "agent $(Svc CureAgent), server $(Svc CureServer)"
+          Check "certificate binding removed" (-not ((netsh http show sslcert ipport=0.0.0.0:8443 | Out-String) -match $thumb))
+          Check "address reservation removed" (-not ((netsh http show urlacl url=https://+:8443/ | Out-String) -match 'CureServer'))
+          Check "firewall rule removed" (-not (Get-NetFirewallRule -DisplayName 'Cure Server (Elixar for Business)' -ErrorAction SilentlyContinue))
+          Check "server's own certificate removed" (-not (Test-Path "Cert:\LocalMachine\My\$thumb"))
+          Check "settings removed" (-not (Test-Path 'HKLM:\SOFTWARE\Elixar\Cure') -and -not (Test-Path 'HKLM:\SOFTWARE\Elixar\CureServer'))
+          Remove-LocalUser cureviewer -ErrorAction SilentlyContinue
+          Check "Program Files\Elixar removed" (-not (Test-Path $agent) -and -not (Test-Path $server))
+
+          Write-Host "`n$script:passes passed, $($script:fails.Count) failed"
+          if ($script:fails.Count) {
+            Write-Host ("::error title=Cure end-to-end::" + (($script:fails -join "`n") -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'))
+            Get-WinEvent -FilterHashtable @{ LogName = 'Application'; ProviderName = '.NET Runtime' } -MaxEvents 3 -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host ("::error title=.NET error::" + ($_.Message.Substring(0, [Math]::Min(5000, $_.Message.Length)) -replace '%','%25' -replace "`r",'' -replace "`n",'%0A'))
+            }
+            Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Service Control Manager' } -MaxEvents 8 -ErrorAction SilentlyContinue | Where-Object { $_.Message -match 'Cure' } | ForEach-Object { Write-Host "SCM: $($_.Message)" }
+            exit 1
+          }
+          Write-Host "::notice title=Cure end-to-end::$script:passes checks passed"
+      - name: Keep the MSI logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        with:
+          name: cure-e2e-logs
+          path: msi-*.log

@@ -353,14 +353,14 @@ namespace CDriveCleaner
 
         static string ReadSmall(Stream s) { using (var ms = new MemoryStream()) { Updates.CopyLimited(s, ms, 8192); return Encoding.UTF8.GetString(ms.ToArray()); } }
 
-        public class Result { public bool Sent; public string Error; public int NextMinutes; }
+        public class Result { public bool Sent, NoSettings; public string Error; public int NextMinutes; }
 
         // one report now (enrolls first when this PC has no id yet for this server)
         public static Result SendOnce()
         {
             var res = new Result();
             var c = Config();
-            if (!c.Ok) { res.Error = c.Error; return res; }
+            if (!c.Ok) { res.Error = c.Error; res.NoSettings = true; return res; }
             res.NextMinutes = c.Interval;
             try
             {
@@ -425,8 +425,9 @@ namespace CDriveCleaner
                 while (true)
                 {
                     var r = SendOnce();
-                    int minutes = r.Sent ? r.NextMinutes : Math.Min(60, CureProtocol.MinInterval << Math.Min(fails, 4));
-                    fails = r.Sent ? 0 : fails + 1;
+                    // no settings yet (waiting for Group Policy): look again every 5 minutes; that only reads the registry
+                    int minutes = r.Sent ? r.NextMinutes : r.NoSettings ? CureProtocol.MinInterval : Math.Min(60, CureProtocol.MinInterval << Math.Min(fails, 4));
+                    fails = r.Sent || r.NoSettings ? 0 : fails + 1;
                     WriteStatus(r);
                     double jitter = minutes * 60 * (0.9 + rnd.NextDouble() * 0.2);
                     if (stop.WaitOne(TimeSpan.FromSeconds(jitter))) return;

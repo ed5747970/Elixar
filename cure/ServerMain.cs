@@ -12,14 +12,15 @@ static class CureServerMain
         "        no --cert: Windows makes a certificate for this server (5 years)\n" +
         "        --group: who may open the Cure Console (this server's administrators always can)\n" +
         "  CureServer.exe --new-token        new enrollment token for new PCs (enrolled PCs keep reporting)\n" +
-        "  CureServer.exe --remove-pc <name> stop accepting reports from a PC\n" +
+        "  CureServer.exe --remove-pc <name> take a PC off the list (a PC still running Cure Agent joins again unless the token is changed)\n" +
         "  CureServer.exe --uninstall [--purge]   --purge also deletes the reports";
 
     static string Arg(string[] a, string name) { int i = Array.IndexOf(a, name); return i >= 0 && i + 1 < a.Length ? a[i + 1] : null; }
 
     static int Main(string[] args)
     {
-        if (args.Contains("--service") || !Environment.UserInteractive) { ServiceBase.Run(new CureServer.Service()); return 0; }
+        if (args.Contains("--service") || (args.Length == 0 && !Environment.UserInteractive))   // the service is started with --service; msiexec/Intune/SCCM run the install options without a desktop
+        { ServiceBase.Run(new CureServer.Service()); return 0; }
         try
         {
             if (args.Contains("--install"))
@@ -37,7 +38,7 @@ static class CureServerMain
                 CureSetup.StopServer();   // the running service keeps the list in memory
                 var s = CureServer.FromRegistry(); bool ok = s.Remove(Arg(args, "--remove-pc") ?? "");
                 CureSetup.StartServer();
-                Console.WriteLine(ok ? "Removed. That PC's reports are refused from now on." : "No PC by that name."); return ok ? 0 : 1;
+                Console.WriteLine(ok ? "Removed from the list. Its old key is refused; if Cure Agent still runs there, it joins again with the enrollment token (make a new one with --new-token to keep it out)." : "No PC by that name."); return ok ? 0 : 1;
             }
             if (args.Contains("--uninstall")) { CureSetup.UninstallServer(args.Contains("--purge")); Console.WriteLine("Cure Server is removed."); return 0; }
         }

@@ -19,7 +19,8 @@ static class CureAgentMain
 
     static int Main(string[] args)
     {
-        if (args.Contains("--service") || !Environment.UserInteractive) { ServiceBase.Run(new CureAgent.Service()); return 0; }
+        if (args.Contains("--service") || (args.Length == 0 && !Environment.UserInteractive))   // the service is started with --service; msiexec/Intune/SCCM run the install options without a desktop
+        { ServiceBase.Run(new CureAgent.Service()); return 0; }
         try
         {
             if (args.Contains("--install"))
