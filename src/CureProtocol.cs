@@ -25,11 +25,16 @@ namespace CDriveCleaner
 {
     public class CureDrive { public string Letter = ""; public long Total, Free; }
     public class CureDisk { public string Name = "", Kind = "", Level = "", Letters = ""; public int Wear = -1, Temp = -1; public string[] Reasons = new string[0]; }
+    // a cleaning item (the Cleaner's list) with its size on this PC, all accounts together
+    public class CureItem { public string Name = "", Tier = ""; public long Bytes = -1; public bool Auto; }
+    // a place on C: (the Dashboard's Details view), all accounts together
+    public class CurePlace { public string Name = "", Tier = "", Action = ""; public long Bytes = -1; }
+    public class CureApp { public string Name = "", Publisher = "", LastUsed = "", Installed = ""; public long Bytes = -1; }
 
     // what a PC reports (all optional except Computer; numbers are -1 when unknown)
     public class CureReport
     {
-        public int Format = 1;
+        public int Format = 2;
         public string Agent = "", Elixar = "", Edition = "", Computer = "", Company = "", Ou = "", Model = "", Windows = "";
         public string Time = "", BootTime = "", MeasuredAt = "", LastClean = "", DiskLevel = "", PolicyMode = "", PolicyFingerprint = "";
         public bool PendingReboot, EventLog;
@@ -38,6 +43,15 @@ namespace CDriveCleaner
         public CureDrive[] Drives = new CureDrive[0];
         public CureDisk[] Disks = new CureDisk[0];
         public string[] Locks = new string[0], Errors = new string[0];
+        // the full picture (format 2): what can be removed, what fills C:, the biggest apps, what starts with Windows
+        public long FillSafe = -1, FillReview = -1, FillCaution = -1, FillCritical = -1;
+        public CureItem[] Items = new CureItem[0];
+        public CurePlace[] Places = new CurePlace[0];
+        public CureApp[] Apps = new CureApp[0];
+        public string[] Startup = new string[0];
+        public int Accounts = -1;
+        public bool WeeklyClean;
+        public string PlacesAt = "";
     }
 
     public static class CureProtocol
@@ -93,11 +107,19 @@ namespace CDriveCleaner
                                                                                                            Wear = Math.Max(-1, Math.Min(d.Wear, 1000)), Temp = Math.Max(-1, Math.Min(d.Temp, 200)),
                                                                                                            Reasons = (d.Reasons ?? new string[0]).Take(8).Select(x => c(x, 200)).ToArray() }).ToArray(),
                 Locks = (r.Locks ?? new string[0]).Take(10).Select(x => c(x, 20)).ToArray(),
-                Errors = (r.Errors ?? new string[0]).Take(10).Select(x => c(x, 200)).ToArray()
+                Errors = (r.Errors ?? new string[0]).Take(10).Select(x => c(x, 200)).ToArray(),
+                FillSafe = nn(r.FillSafe), FillReview = nn(r.FillReview), FillCaution = nn(r.FillCaution), FillCritical = nn(r.FillCritical),
+                Items = (r.Items ?? new CureItem[0]).Where(x => x != null).Take(80).Select(x => new CureItem { Name = c(x.Name, 80), Tier = Tier(c(x.Tier, 10)), Bytes = nn(x.Bytes), Auto = x.Auto }).ToArray(),
+                Places = (r.Places ?? new CurePlace[0]).Where(x => x != null).Take(40).Select(x => new CurePlace { Name = c(x.Name, 80), Tier = Tier(c(x.Tier, 10)), Action = c(x.Action, 200), Bytes = nn(x.Bytes) }).ToArray(),
+                Apps = (r.Apps ?? new CureApp[0]).Where(x => x != null).Take(30).Select(x => new CureApp { Name = c(x.Name, 80), Publisher = c(x.Publisher, 80), LastUsed = c(x.LastUsed, 30), Installed = c(x.Installed, 30), Bytes = nn(x.Bytes) }).ToArray(),
+                Startup = (r.Startup ?? new string[0]).Take(60).Select(x => c(x, 80)).ToArray(),
+                Accounts = Math.Max(-1, Math.Min(r.Accounts, 10000)), WeeklyClean = r.WeeklyClean, PlacesAt = c(r.PlacesAt, 30), Format = Math.Max(1, Math.Min(r.Format, 99))
             };
             if (o.Total >= 0 && o.Free > o.Total) o.Free = o.Total;
             return o;
         }
+
+        static string Tier(string t) { return t == "safe" || t == "review" || t == "caution" || t == "critical" ? t : ""; }
 
         // a computer name Windows allows (letters, digits, - and _), so it can't smuggle anything into the console or files
         public static bool GoodName(string n) { return !string.IsNullOrEmpty(n) && n.Length <= 63 && n.All(ch => ch < 128 && (char.IsLetterOrDigit(ch) || ch == '-' || ch == '_')); }

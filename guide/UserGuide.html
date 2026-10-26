@@ -55,7 +55,7 @@
 <ol>
   <li><a href="#glance">At a glance</a></li><li><a href="#start">Getting started</a></li><li><a href="#dashboard">Dashboard</a></li>
   <li><a href="#cleaner">Cleaner</a></li><li><a href="#apps">Apps</a></li><li><a href="#tools">Tools</a></li>
-  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#editions">Private and Business</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#cure">Cure Agent and Console</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#it">For IT</a></li><li><a href="#security">Security</a></li>
+  <li><a href="#phone">Phone</a></li><li><a href="#automation">Automation</a></li><li><a href="#settings">Settings and updates</a></li><li><a href="#logs">Logs</a></li><li><a href="#editions">Private and Business</a></li><li><a href="#policy">Policy manager</a></li><li><a href="#domain">Domain PCs</a></li><li><a href="#cure">Cure Agent and Console</a></li><li><a href="#email">Email account</a></li><li><a href="#emailclean">Email cleaning</a></li><li><a href="#onedrive">OneDrive</a></li><li><a href="#it">For IT</a></li><li><a href="#security">Security</a></li>
   <li><a href="#files">Files and folders</a></li><li><a href="#trouble">Troubleshooting</a></li><li><a href="#history">Version history</a></li>
 </ol></nav>
 
@@ -300,8 +300,9 @@
 <table>
 <tr><th></th><th>Elixar for Private</th><th>Elixar for Business</th></tr>
 <tr><td>For</td><td>Home PCs. Free for personal and other noncommercial use.</td><td>Companies, IT departments and anyone using Elixar at work (business license).</td></tr>
-<tr><td>Every Elixar feature: cleaning, apps, tools, phone, email, automation, PIN, Logs, Policy manager, Sysprep tools, fleet report, Group Policy template, Event Log</td><td>Yes</td><td>Yes</td></tr>
-<tr><td>Cure Agent and Cure Console (all company PCs in one place)</td><td>&mdash;</td><td>Yes</td></tr>
+<tr><td>Cleaning, apps, tools, phone, email, automation, PIN, Logs, Policy manager, fleet report, Group Policy template, Event Log</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>Sysprep and golden image tools</td><td>Yes</td><td>&mdash;</td></tr>
+<tr><td><strong>Domain PCs</strong> tab, Cure Agent and Cure Server: every company PC in one place</td><td>&mdash;</td><td>Yes</td></tr>
 </table>
 <p>Each edition updates itself only to the same edition. To switch, install the other edition&rsquo;s MSI or copy: it replaces the one you have and keeps your settings.</p>
 
@@ -358,6 +359,15 @@
 <h2 id="onedrive">OneDrive</h2>
 <p>The <strong>OneDrive</strong> tab appears only when OneDrive is signed in on this PC with your account email. Elixar doesn't sign in or connect to anything: it reads OneDrive's own settings on this PC. The Dashboard also suggests it when files you haven't used for 3 months add up to 1 GB or more.</p>
 <p>It lists files of 1 MB and up that are on this PC and that you haven't opened for 1, 3, 6 or 12 months. <strong>Make selected online-only</strong> does the same as OneDrive's own &ldquo;Free up space&rdquo;: the files stay in OneDrive and in File Explorer, but take no space here until you open one (OneDrive then downloads it, which needs internet). Nothing is deleted. Files marked &ldquo;Always keep on this device&rdquo; are left alone, nothing is ticked for you, and reading the folder never downloads anything. Elixar changes only real OneDrive files inside your OneDrive folder (each must carry OneDrive's own cloud mark), so even a changed OneDrive setting can't point it at other files.</p>
+
+<h2 id="domain">Domain PCs (Business)</h2>
+<p>In Elixar for Business the <strong>Domain PCs</strong> tab, next to Dashboard, shows every PC whose Cure Agent reports to this PC (this PC is the Cure Server). The first time, the tab offers <strong>Make this PC the Cure Server</strong>: pick the port and, optionally, the domain group that may also open the web console. It prints the enrollment token and saves the settings for the PCs.</p>
+<ul>
+<li><strong>The cards on top</strong>: how many PCs report, how many are at risk of running out of space, disk warnings, how much can be freed on all of them, and what Elixar freed so far.</li>
+<li><strong>The list on the left</strong>: every PC by name, the ones at risk first (disk failing, C: almost full &ndash; under 10% or 10 GB free &ndash;, getting full &ndash; under 20% or full within 30 days at its pace &ndash;, worn disk, old Elixar), with its free space. Find a PC by name or show only the ones at risk.</li>
+<li><strong>Pick a PC</strong> to see it like Elixar&rsquo;s own Dashboard: why it&rsquo;s at risk, free space, what can be freed, disk health, last clean, app updates, startup programs, <em>What fills C:</em>, <strong>What to do on this PC</strong> (each suggestion says how much it frees and how), what can be removed (the Cleaner&rsquo;s items for all accounts together), what fills C: in detail, the biggest apps with when they were last used, disks and drives, and what starts with Windows.</li>
+</ul>
+<p>The tab only reads the reports: nothing is started on another PC from here. To act, use Policy manager / Group Policy (for example turn on the weekly clean) or Elixar on that PC. <strong>Remove this PC from the list</strong> stops accepting its reports.</p>
 
 <h2 id="cure">Cure Agent and Cure Console (Business)</h2>
 <p>Cure shows every company PC in one web page: free space, what can be cleaned, disk health, the last clean, app updates and problems. <strong>Stage 1 is reports only</strong>: the PCs send their status to your own server, and nothing can be started on a PC from the console.</p>
@@ -488,7 +498,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
-  <tr><td>2026-10-26</td><td>1.2.56</td><td>Two editions: Elixar for Private (every feature, for home PCs) and Elixar for Business (the same plus Cure Agent and Cure Console: every company PC in one web page, reports only)</td></tr>
+  <tr><td>2026-10-26</td><td>1.2.56</td><td>Two editions: Elixar for Private (every feature, for home PCs) and Elixar for Business (no Sysprep tools; the Domain PCs tab with Cure Agent and Cure Server: every company PC, the ones at risk first, and what to clean on each, reports only)</td></tr>
   <tr><td>2026-10-25</td><td>1.2.55</td><td>Email is also off on company PCs; Group Policy / Intune template (ADMX) from Policy manager or <code>--admx</code>; every change also goes to an admin-only &ldquo;Elixar&rdquo; log in Event Viewer; PolyForm Noncommercial license</td></tr>
   <tr><td>2026-10-25</td><td>1.2.54</td><td>Company PCs: on a PC joined to an Active Directory domain or Microsoft Entra ID, the Phone tab and the Sysprep tools are greyed out and locked; IT can allow them by policy</td></tr>
   <tr><td>2026-10-25</td><td>1.2.53</td><td>Security audit (backdoor and compromise review, no backdoor found): logs readable by administrators only; update checks can be turned off in Policy manager; app updates only from Microsoft&rsquo;s sources; the Android tools&rsquo; server stops with Elixar; uninstall can remove Undo backups and logs (<code>--purge</code>); pinned build actions</td></tr>

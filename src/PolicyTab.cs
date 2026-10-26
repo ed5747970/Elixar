@@ -112,7 +112,12 @@ namespace CDriveCleaner
                 polCombos[r.Key] = cb; add(cb, 1);
                 add(new Label { AutoSize = true, Text = r.Label(r.Default), ForeColor = Theme.Quiet, Margin = new Padding(S(10), S(7), S(6), 0) }, 2);
                 var mark = new Label { AutoSize = true, Margin = new Padding(S(4), S(7), 0, 0), Font = new Font("Segoe UI Semibold", 9f), UseMnemonic = false };
-                polMarks[r.Key] = mark; add(mark, 3);
+                polMarks[r.Key] = mark;
+                if (Edition.Business && r.Key == "sysprep")   // Elixar for Business has no Sysprep tools: the rule stays (Group Policy), the row doesn't show
+                {
+                    polGrid.RowStyles.RemoveAt(polGrid.RowStyles.Count - 1); polGrid.Controls.Remove(name); polGrid.Controls.Remove(cb); continue;
+                }
+                add(mark, 3);
                 row++;
             }
             scroll.Controls.Add(polGrid);

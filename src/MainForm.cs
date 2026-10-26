@@ -239,7 +239,13 @@ namespace CDriveCleaner
             BuildEmailClean();
             BuildLinuxTab();
             BuildOneDriveTab();
+#if BUSINESS
+            BuildDomainTab();
+#endif
             tabs.TabPages.Add(pageDash);
+#if BUSINESS
+            tabs.TabPages.Add(pageDomain);   // Elixar for Business: every PC's Cure Agent report
+#endif
             if (!LinuxUi) tabs.TabPages.Add(pageApps);
             tabs.TabPages.Add(pageClean);
             tabs.TabPages.Add(pageTools);
@@ -263,6 +269,9 @@ namespace CDriveCleaner
                 if (tabs.SelectedTab == pageLinux) OnLinuxTab();
                 if (tabs.SelectedTab == pageLogs) OnLogsTab();
                 if (tabs.SelectedTab == pagePolicy) OnPolicyTab();
+#if BUSINESS
+                if (tabs.SelectedTab == pageDomain) OnDomainTab();
+#endif
                 if (tabs.SelectedTab == pageOneDrive) OnOneDriveTab();
             };
             BuildNav();

@@ -14,8 +14,9 @@ The full user guide is in `guide/UserGuide.html` (also built into the app: press
 |---|---|---|
 | Download | `Elixar.zip` / `Elixar.msi` | `Elixar-Business.zip` / `Elixar-Business.msi` |
 | For | Home PCs (free, noncommercial) | Companies (business license) |
-| Every Elixar feature (incl. Policy manager, Sysprep tools, fleet report, Group Policy template, Event Log) | ✓ | ✓ |
-| **Cure Agent + Cure Console**: every company PC in one web page (reports only) | — | ✓ |
+| Cleaning, apps, tools, Policy manager, fleet report, Group Policy template, Event Log | ✓ | ✓ |
+| Sysprep and golden image tools | ✓ | — |
+| **Domain PCs** tab + Cure Agent / Cure Server: every company PC, the ones at risk first, what to clean on each (reports only) | — | ✓ |
 
 Both are built from the same code (`/define:BUSINESS` for Business) and both always obey an organization's Group Policy and the company-PC locks. Set-up of Cure: User Guide > Cure Agent and Cure Console.
 

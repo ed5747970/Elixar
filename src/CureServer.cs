@@ -217,6 +217,25 @@ namespace CDriveCleaner
                           .Select(p => new object[] { p[0], Long(p[1]), Long(p[2]), Long(p[3]) }).ToList() : new List<object[]>();
             return new Dictionary<string, object> { { "id", d.Id }, { "pc", d.Computer }, { "seen", d.LastSeen }, { "enrolled", d.Enrolled }, { "report", Latest(id) }, { "history", hist } };
         }
+        // one point a day: { 0, free, total, safe to clean }
+        public List<long[]> History(string id)
+        {
+            try
+            {
+                return File.Exists(HistoryFile(id)) ? File.ReadAllLines(HistoryFile(id)).Select(l => l.Split(',')).Where(p => p.Length >= 4)
+                                                          .Select(p => new[] { 0L, Long(p[1]), Long(p[2]), Long(p[3]) }).ToList() : new List<long[]>();
+            }
+            catch { return new List<long[]>(); }
+        }
+
+        // the Domain PCs tab (Elixar for Business on the server itself) reads the same files the service writes
+        public static bool InstalledHere()
+        {
+            if (!Win.IsWindows) return false;
+            try { using (var b = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64)) using (var k = b.OpenSubKey(SettingsKey)) return k != null; }
+            catch { return false; }
+        }
+
         static long Long(string s) { long v; return long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out v) ? v : -1; }
 
         public string Csv()

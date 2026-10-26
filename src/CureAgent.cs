@@ -109,7 +109,7 @@ namespace CDriveCleaner
         public static void ForgetDevice() { try { if (File.Exists(DeviceFile)) File.Delete(DeviceFile); } catch { } }
 
         // ---------- what this PC reports ----------
-        static List<CleanItem> measured; static DateTime measuredAt = DateTime.MinValue;
+        static List<CureItem> measured; static DateTime measuredAt = DateTime.MinValue;
         static DiskReport disks; static DateTime disksAt = DateTime.MinValue;
         static int appUpdates = -1; static DateTime updatesAt = DateTime.MinValue;
 
@@ -135,11 +135,27 @@ namespace CDriveCleaner
             // the slow ones are measured now and then and sent every time
             tryIt("clean", () =>
             {
-                if (measured == null || DateTime.Now - measuredAt > TimeSpan.FromHours(1)) { measured = MailReports.Measure(); measuredAt = DateTime.Now; }
-                Func<Tier, long> sum = t => measured.Where(i => i.Tier == t && i.Size > 0).Sum(i => i.Size);
-                r.CleanSafe = sum(Tier.Safe); r.CleanReview = sum(Tier.Review); r.CleanCaution = sum(Tier.Caution);
+                if (measured == null || DateTime.Now - measuredAt > TimeSpan.FromHours(1)) { measured = MeasureAllAccounts(); measuredAt = DateTime.Now; }
+                Func<string, long> sum = t => measured.Where(i => i.Tier == t && i.Bytes > 0).Sum(i => i.Bytes);
+                r.CleanSafe = sum("safe"); r.CleanReview = sum("review"); r.CleanCaution = sum("caution");
+                r.Items = measured.Where(i => i.Bytes > 0).OrderByDescending(i => i.Bytes).Take(80).ToArray();
                 r.MeasuredAt = measuredAt.ToString("s", CultureInfo.InvariantCulture);
             });
+            tryIt("what fills C:", () =>
+            {
+                if (places == null || DateTime.Now - placesAt > TimeSpan.FromHours(6)) { places = PlacesAllAccounts(); placesAt = DateTime.Now; }
+                Func<string, long> sum = t => places.Where(p => p.Tier == t && p.Bytes > 0).Sum(p => p.Bytes);
+                r.FillSafe = sum("safe"); r.FillReview = sum("review"); r.FillCaution = sum("caution"); r.FillCritical = sum("critical");
+                r.Places = places.Where(p => p.Bytes > 0).OrderByDescending(p => p.Bytes).Take(40).ToArray();
+                r.PlacesAt = placesAt.ToString("s", CultureInfo.InvariantCulture);
+            });
+            tryIt("apps", () =>
+            {
+                if (apps == null || DateTime.Now - appsAt > TimeSpan.FromHours(24)) { apps = BigApps(); appsAt = DateTime.Now; }
+                r.Apps = apps.ToArray();
+            });
+            tryIt("weekly clean", () => r.WeeklyClean = Policy.Get("sched.clean.day") != "off");
+            r.Accounts = Profiles().Count;
             tryIt("disks", () =>
             {
                 if (disks == null || DateTime.Now - disksAt > TimeSpan.FromHours(6)) { disks = DiskHealth.Read(); disksAt = DateTime.Now; }
@@ -151,11 +167,115 @@ namespace CDriveCleaner
                 if (DateTime.Now - updatesAt > TimeSpan.FromHours(24) && WinGet.Available) { string e; var l = WinGet.List(out e); if (e == null) { appUpdates = l.Count; updatesAt = DateTime.Now; } }
                 r.AppUpdates = appUpdates;
             });
-            tryIt("startup", () => r.StartupCount = StartupApps.Read(false).Count(e => e.Enabled && !e.Missing));
+            tryIt("startup", () =>
+            {
+                var on = StartupApps.Read(false).Where(e => e.Enabled && !e.Missing).ToList();
+                r.StartupCount = on.Count; r.Startup = on.Select(e => e.Name).Distinct().Take(60).ToArray();
+            });
             r.Locks = Policy.CompanyBlocks.Where(Policy.ByCompany).ToArray();
             r.EventLog = Policy.Get("eventlog") != "off";
             r.Errors = errors.Take(10).ToArray();
             return r;
+        }
+
+        static List<CurePlace> places; static DateTime placesAt = DateTime.MinValue;
+        static List<CureApp> apps; static DateTime appsAt = DateTime.MinValue;
+        public static Func<List<string>> ProfilesOverride;   // self-test
+
+        // the real people's profiles on this PC (not the service accounts)
+        public static List<string> Profiles()
+        {
+            if (ProfilesOverride != null) return ProfilesOverride();
+            var l = new List<string>();
+            if (!Win.IsWindows) return l;
+            try
+            {
+                string users = Path.Combine(Path.GetPathRoot(Environment.GetFolderPath(Environment.SpecialFolder.Windows)), "Users");
+                using (var b = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                using (var k = b.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"))
+                    if (k != null)
+                        foreach (var sid in k.GetSubKeyNames().Where(s => s.StartsWith("S-1-5-21-") && !s.EndsWith(".bak")))
+                            using (var p = k.OpenSubKey(sid))
+                            {
+                                string path = p == null ? null : p.GetValue("ProfileImagePath") as string;
+                                if (string.IsNullOrEmpty(path)) continue;
+                                path = Environment.ExpandEnvironmentVariables(path).TrimEnd('\\');
+                                if (path.StartsWith(users + "\\", StringComparison.OrdinalIgnoreCase) && Directory.Exists(path) && SafeDelete.NoLinks(path)) l.Add(path);
+                            }
+            }
+            catch { }
+            return l;
+        }
+
+        // Each account's own items (temp files, browser caches...) are measured in that account and added up;
+        // the PC's items (Windows Update, Recycle Bin...) once. Only sizes leave the PC, never whose they are.
+        public static List<CureItem> MeasureAllAccounts()
+        {
+            var total = new Dictionary<string, CureItem>();
+            var profiles = Profiles();
+            string keep = UserDirs.ProfileOverride;
+            try
+            {
+                bool first = true;
+                foreach (var prof in profiles.Count > 0 ? profiles.Cast<string>() : new string[] { null })
+                {
+                    UserDirs.ProfileOverride = prof;
+                    foreach (var it in Catalog.Build().Where(i => !i.Privacy))
+                    {
+                        bool own = prof != null && (it.Where ?? "").IndexOf(prof, StringComparison.OrdinalIgnoreCase) >= 0;
+                        if (!own && !first) continue;   // the PC's items: measured once
+                        long b; try { b = it.Measure(); } catch { b = -1; }
+                        CureItem c;
+                        if (!total.TryGetValue(it.Name, out c)) total[it.Name] = c = new CureItem { Name = it.Name, Tier = it.Tier.ToString().ToLowerInvariant(), Auto = it.DefaultOn, Bytes = 0 };
+                        if (b > 0) c.Bytes += b;
+                    }
+                    first = false;
+                }
+            }
+            finally { UserDirs.ProfileOverride = keep; }
+            return total.Values.ToList();
+        }
+
+        public static List<CurePlace> PlacesAllAccounts()
+        {
+            var total = new Dictionary<string, CurePlace>();
+            var profiles = Profiles();
+            string keep = UserDirs.ProfileOverride;
+            var t = System.Threading.Thread.CurrentThread; var pr = t.Priority; t.Priority = ThreadPriority.Lowest;   // walking C: is slow: never in the way
+            try
+            {
+                bool first = true;
+                foreach (var prof in profiles.Count > 0 ? profiles.Cast<string>() : new string[] { null })
+                {
+                    UserDirs.ProfileOverride = prof;
+                    var locs = DashData.Build();
+                    foreach (var l in locs) DashData.Measure(l);
+                    DashData.ComputeOwn(locs);
+                    foreach (var l in locs.Where(x => x.Bytes.HasValue))
+                    {
+                        bool own = prof != null && l.Path.StartsWith(prof + "\\", StringComparison.OrdinalIgnoreCase);
+                        if (!own && !first) continue;
+                        CurePlace c;
+                        if (!total.TryGetValue(l.Name, out c)) total[l.Name] = c = new CurePlace { Name = l.Name, Tier = l.Tier, Action = l.Action, Bytes = 0 };
+                        c.Bytes += l.Own;
+                    }
+                    first = false;
+                }
+            }
+            finally { UserDirs.ProfileOverride = keep; t.Priority = pr; }
+            return total.Values.ToList();
+        }
+
+        // the biggest installed apps, with when they were last used (Windows' Prefetch)
+        static List<CureApp> BigApps()
+        {
+            var list = AppsData.ReadInstalled();
+            var pf = AppsData.ReadPrefetch();
+            foreach (var a in list.OrderByDescending(x => x.ReportedBytes).Take(60)) { try { AppsData.FillDetails(a, pf); } catch { } }
+            return list.Select(a => new { a, b = Math.Max(a.ReportedBytes, a.MeasuredBytes) }).Where(x => x.b > 0).OrderByDescending(x => x.b).Take(30)
+                       .Select(x => new CureApp { Name = x.a.Name ?? "", Publisher = x.a.Publisher ?? "", Bytes = x.b,
+                                                  LastUsed = x.a.LastUsed.HasValue ? x.a.LastUsed.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                                                  Installed = x.a.Installed.HasValue ? x.a.Installed.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "" }).ToList();
         }
 
         static string OsName()

@@ -163,6 +163,9 @@ namespace CDriveCleaner
             Func<string, TabPage, bool, string, NavBar.Item> item = (t, p, on, why) => new NavBar.Item { Text = t, Page = p, Enabled = on, Tip = why };
             bool lx = LinuxUi;
             nav.Items.Add(item("Dashboard", pageDash, true, ""));
+#if BUSINESS
+            nav.Items.Add(item("Domain PCs", pageDomain, true, ""));
+#endif
             nav.Items.Add(item("Apps", pageApps, !lx, "Only on Windows: on Linux, remove apps with the App Center or apt."));
             nav.Items.Add(item("Cleaner", pageClean, true, ""));
             nav.Items.Add(item("Tools", pageTools, true, ""));

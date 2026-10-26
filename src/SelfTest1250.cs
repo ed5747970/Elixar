@@ -24,7 +24,13 @@ namespace CDriveCleaner
         static void Run(Action<bool, string> check, string name, Func<string> test)
         {
             string why;
-            try { why = test(); } catch (Exception ex) { why = "ERROR " + ex.GetType().Name + ": " + ex.Message; }
+            try { why = test(); }
+            catch (Exception ex)
+            {
+                // where it happened: Elixar's own frames from the stack
+                var at = (ex.StackTrace ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Contains("CDriveCleaner.")).Take(4);
+                why = "ERROR " + ex.GetType().Name + ": " + ex.Message + " @ " + string.Join(" < ", at);
+            }
             check(why == null, name + (why == null ? "" : "  (" + why + ")"));
         }
 
@@ -115,6 +121,87 @@ namespace CDriveCleaner
                 }
                 finally { srv.Stop(); CureServer.InGroupOverride = keepG; }
             });
+
+            Run(check, "Cure advice: a PC is at risk when C: is under 10% (or 10 GB) free, getting full under 20% or within 30 days at its pace, and the tips say what to clean there and how much it frees", () =>
+            {
+                const long G = 1L << 30;
+                Func<int, List<long[]>> hist = slopeMb => Enumerable.Range(0, 14).Select(i => new[] { 0L, 100 * G - i * (long)slopeMb * (1L << 20), 200 * G, 0L }).ToList();
+                var full = new CureReport { Total = 200 * G, Free = 8 * G, DiskLevel = "Healthy", Elixar = "1.2.56", LastClean = DateTime.Now.AddDays(-40).ToString("s"),
+                    Items = new[] { new CureItem { Name = "Your temp files", Tier = "safe", Bytes = 3 * G, Auto = true }, new CureItem { Name = "Recycle Bin", Tier = "review", Bytes = 6 * G },
+                                    new CureItem { Name = "Previous Windows installation (Windows.old)", Tier = "caution", Bytes = 15 * G } },
+                    Apps = new[] { new CureApp { Name = "Old CAD", Bytes = 5 * G, LastUsed = DateTime.Today.AddDays(-200).ToString("yyyy-MM-dd") }, new CureApp { Name = "Teams", Bytes = 2 * G, LastUsed = DateTime.Today.ToString("yyyy-MM-dd") } } };
+                if (CureAdvice.Risk(full, DateTime.Now, "1.2.56", null) != CureRisk.Full) return "full";
+                var ok = new CureReport { Total = 200 * G, Free = 100 * G, DiskLevel = "Healthy", Elixar = "1.2.56" };
+                if (CureAdvice.Risk(ok, DateTime.Now, "1.2.56", null) != CureRisk.Ok || CureAdvice.Risk(ok, DateTime.Now, "1.2.57", null) != CureRisk.Old) return "ok / old";
+                if (CureAdvice.Risk(ok, DateTime.Now.AddDays(-8), "1.2.56", null) != CureRisk.Silent || CureAdvice.Risk(null, DateTime.Now, "", null) != CureRisk.Silent) return "silent";
+                if (CureAdvice.Risk(ok, DateTime.Now, "1.2.56", hist(4000)) != CureRisk.Low || CureAdvice.DaysToFull(ok, hist(4000)) < 20 || CureAdvice.DaysToFull(ok, hist(4000)) > 30) return "pace: " + CureAdvice.DaysToFull(ok, hist(4000));
+                if (CureAdvice.DaysToFull(ok, hist(0)) != -1) return "steady";
+                var low = new CureReport { Total = 200 * G, Free = 30 * G, DiskLevel = "Healthy" };
+                if (CureAdvice.Risk(low, DateTime.Now, "", null) != CureRisk.Low) return "low";
+                if (CureAdvice.Risk(new CureReport { Total = 200 * G, Free = 8 * G, DiskLevel = "Failing" }, DateTime.Now, "", null) != CureRisk.Disk) return "disk";
+                var tips = CureAdvice.Tips(full, null);
+                if (tips.Count < 5 || !tips[0].Text.StartsWith("C: has only") || tips[0].Level != 2) return "first tip: " + (tips.Count > 0 ? tips[0].Text : "");
+                if (!tips.Any(t => t.Text.StartsWith("Run the Safe clean: frees 3.0 GB") && t.Text.Contains("weekly clean is off"))) return "safe clean";
+                if (!tips.Any(t => t.Text.StartsWith("Previous Windows installation (Windows.old): 15.0 GB") && t.Text.Contains("can't be undone"))) return "Windows.old";
+                if (!tips.Any(t => t.Text.StartsWith("Uninstall Old CAD")) || tips.Any(t => t.Text.StartsWith("Uninstall Teams"))) return "apps";
+                if (!tips.Any(t => t.Text == "Last cleaned 40 days ago.")) return "last clean";
+                if (CureAdvice.CouldFree(full) != 24 * G) return "could free " + CureAdvice.CouldFree(full);
+                return null;
+            });
+
+            Run(check, "Domain PCs tab (Elixar for Business): every PC that reports is listed by name, the ones at risk first; picking a PC shows why it's at risk, what fills C:, what can be removed and what to do", () =>
+            {
+                string dir = Path.Combine(R, "domain"); if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                var srv = new CureServer { Https = false, DataDir = dir, TokenHash = CureServer.HashToken("t") };
+                var js = CureProtocol.Json();
+                Action<string, long, long, string> pc = (name, total, free, disk) =>
+                {
+                    var en = srv.Enroll(Encoding.UTF8.GetBytes("{\"token\":\"t\",\"computer\":\"" + name + "\"}"), "");
+                    var o = js.Deserialize<Dictionary<string, object>>(en.Body); string id = (string)o["id"]; var key = Convert.FromBase64String((string)o["key"]);
+                    var rep = new CureReport { Elixar = "1.2.56", Total = total, Free = free, DiskLevel = disk, FillSafe = 1L << 30, FillReview = 1L << 30, FillCaution = 1L << 30, FillCritical = 50L << 30,
+                                               Items = new[] { new CureItem { Name = "Your temp files", Tier = "safe", Bytes = 2L << 30, Auto = true } } };
+                    var body = Encoding.UTF8.GetBytes(js.Serialize(rep)); string t = CureProtocol.UnixNow(), n = CureProtocol.Nonce();
+                    srv.Report(body, id, t, n, CureProtocol.Sign(key, t, n, body), "");
+                };
+                pc("PC-OK", 200L << 30, 120L << 30, "Healthy"); pc("PC-FULL", 200L << 30, 6L << 30, "Healthy"); pc("PC-DISK", 200L << 30, 90L << 30, "Failing"); pc("PC-LOW", 200L << 30, 30L << 30, "Healthy");
+                MainForm.ForceWindowsUi = true; MainForm.DomainDataOverride = dir;
+                try
+                {
+                    using (var f = new MainForm(true))
+                    {
+                        f.ShowDomain();
+                        if (f.DomainSetupShown) return "setup shown";
+                        if (!f.DomainPcNames.SequenceEqual(new[] { "PC-DISK", "PC-FULL", "PC-LOW", "PC-OK" })) return "order: " + string.Join(",", f.DomainPcNames);
+                        f.DomainPick("PC-FULL");
+                        if (!f.DomainHeader.StartsWith("PC-FULL") || !f.DomainHeader.Contains("Almost full") || !f.DomainHeader.Contains("At risk: C: has 6.0 GB free (3%)")) return "header: " + f.DomainHeader;
+                        if (!f.DomainTipTexts.Any(t => t.StartsWith("Run the Safe clean: frees 2.0 GB")) || f.DomainItemRows != 1) return "tips: " + string.Join(" | ", f.DomainTipTexts);
+                        f.DomainFilter(2);
+                        if (!f.DomainPcNames.SequenceEqual(new[] { "PC-FULL" })) return "filter";
+                    }
+                    MainForm.DomainDataOverride = null;
+                    if (!CureServer.InstalledHere())
+                        using (var f = new MainForm(true)) { f.ShowDomain(); if (!f.DomainSetupShown) return "no server here: the set-up isn't shown"; }
+                    return null;
+                }
+                finally { MainForm.ForceWindowsUi = false; MainForm.DomainDataOverride = null; }
+            });
+
+            if (Win.IsWindows)
+                Run(check, "Cure Agent counts every account: each person's own items (temp files) are measured in their profile and added up, the PC's items once", () =>
+                {
+                    string a = Path.Combine(R, "profA"), b = Path.Combine(R, "profB");
+                    foreach (var p in new[] { a, b }) { Directory.CreateDirectory(Path.Combine(p, "AppData", "Local", "Temp")); File.WriteAllBytes(Path.Combine(p, "AppData", "Local", "Temp", "x.tmp"), new byte[300000]); }
+                    var keep = CureAgent.ProfilesOverride; CureAgent.ProfilesOverride = () => new List<string> { a, b };
+                    try
+                    {
+                        var items = CureAgent.MeasureAllAccounts();
+                        var temp = items.FirstOrDefault(i => i.Name == "Your temp files");
+                        if (temp == null || temp.Bytes < 600000 || temp.Bytes > 700000) return "temp files: " + (temp == null ? "missing" : temp.Bytes.ToString());
+                        if (items.Count(i => i.Name == "Windows temp files") != 1) return "the PC's items twice";
+                        return null;
+                    }
+                    finally { CureAgent.ProfilesOverride = keep; }
+                });
 
             Run(check, "Cure setup: services are made only from Elixar's protected folder, with quoted paths, the agent as LocalSystem and the server as its own NT SERVICE account; the server's address is reserved for it and the firewall opens only on the domain network", () =>
             {
@@ -509,8 +596,8 @@ namespace CDriveCleaner
                 return null;
             });
 
-            Run(check, Edition.Business ? "Elixar for Business: every Elixar feature plus Cure Agent and Cure Server, and updates come from Business's own release files"
-                                        : "Elixar for Private: every Elixar feature, no Cure code at all, and updates come from Private's own release files", () =>
+            Run(check, Edition.Business ? "Elixar for Business: the Domain PCs tab and Cure, no Sysprep tools, and updates come from Business's own release files"
+                                        : "Elixar for Private: every Elixar feature (Sysprep too), no Cure code at all, and updates come from Private's own release files", () =>
             {
                 bool b = Edition.Business;
                 if (b ? (Edition.ZipAsset != "Elixar-Business.zip" || Edition.ManifestAsset != "elixar-business-manifest" || Edition.Name != "Elixar for Business" || Edition.Id != "business")
@@ -521,8 +608,8 @@ namespace CDriveCleaner
                 try
                 {
                     using (var f = new MainForm(true))
-                        if (!f.NavRightItems.Contains("Policy manager") || !f.ToolsTabNames.Contains("Sysprep") || !f.TabNames.Contains("Policy manager"))
-                            return "tabs: " + string.Join(",", f.NavRightItems) + " / " + string.Join(",", f.ToolsTabNames);
+                        if (!f.NavRightItems.Contains("Policy manager") || f.ToolsTabNames.Contains("Sysprep") == b || !f.TabNames.Contains("Policy manager") || f.TabNames.Contains("Domain PCs") != b)
+                            return "tabs: " + string.Join(",", f.TabNames) + " / " + string.Join(",", f.ToolsTabNames);
                 }
                 finally { MainForm.ForceWindowsUi = false; }
                 return null;
