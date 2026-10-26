@@ -246,14 +246,18 @@ namespace CDriveCleaner
         }
 
         // owner is Administrators/SYSTEM/TrustedInstaller and nobody else may write
-        public static bool IsLocked(string path)
+        public static bool IsLocked(string path) { return LockProblem(path) == null; }
+
+        // null when locked; otherwise who or what makes it changeable (shown when Elixar refuses to use the folder)
+        public static string LockProblem(string path)
         {
-            if (!Win.IsWindows) return Lx.OwnedSafely(path, true);
+            if (!Win.IsWindows) return Lx.OwnedSafely(path, true) ? null : "not owned safely";
             try
             {
                 FileSystemSecurity sec = Directory.Exists(path) ? (FileSystemSecurity)new DirectoryInfo(path).GetAccessControl()
                                                                  : new FileInfo(path).GetAccessControl();
-                if (!Trusted(sec.GetOwner(typeof(SecurityIdentifier)))) return false;
+                var owner = sec.GetOwner(typeof(SecurityIdentifier));
+                if (!Trusted(owner)) return "its owner is " + Name(owner);
                 foreach (FileSystemAccessRule r in sec.GetAccessRules(true, true, typeof(SecurityIdentifier)))
                 {
                     if (r.AccessControlType != AccessControlType.Allow) continue;
@@ -263,17 +267,22 @@ namespace CDriveCleaner
                         // CREATOR OWNER on folders only gives rights to things an admin created
                         var sid = r.IdentityReference as SecurityIdentifier;
                         if (sid != null && sid.IsWellKnown(WellKnownSidType.CreatorOwnerSid)) continue;
-                        return false;
+                        return Name(r.IdentityReference) + " may change it (" + r.FileSystemRights + ")";
                     }
                 }
                 if (File.Exists(path) || Directory.Exists(path))
                 {
                     var attrs = File.GetAttributes(path);
-                    if ((attrs & FileAttributes.ReparsePoint) != 0) return false;
+                    if ((attrs & FileAttributes.ReparsePoint) != 0) return "it's a link";
                 }
-                return true;
+                return null;
             }
-            catch { return false; }
+            catch (Exception e) { return "its permissions can't be read (" + e.Message + ")"; }
+        }
+
+        static string Name(IdentityReference id)
+        {
+            try { return id.Translate(typeof(NTAccount)).Value + " (" + id.Value + ")"; } catch { return id == null ? "nobody" : id.Value; }
         }
 
         // the folder and everything in it were made by administrators (or Windows), and nothing inside is a link

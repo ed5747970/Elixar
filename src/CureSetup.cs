@@ -68,7 +68,9 @@ namespace CDriveCleaner
             if (!Sys.IsAdmin()) return "Run this from an administrator command prompt.";
             string dir = Path.GetDirectoryName(Path.GetFullPath(exe));
             if (!string.Equals(dir.TrimEnd('\\'), Install.Dir.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return "Install Elixar for Business first (the MSI), then run this from " + Install.Dir + ".";
-            if (!SafeDelete.RealPathMatches(exe) || !Locked.IsLocked(dir)) return "Elixar's folder isn't protected (only administrators may change it), so no service was made.";
+            if (!SafeDelete.RealPathMatches(exe)) return "A link is in the way of " + exe + ", so no service was made.";
+            string why = Locked.LockProblem(dir);
+            if (why != null) return "Elixar's folder isn't protected (only administrators may change it): " + why + ". No service was made.";
             return null;
         }
 

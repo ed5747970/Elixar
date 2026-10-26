@@ -51,6 +51,8 @@ jobs:
           $code = Msi "/i `"$PWD\Elixar-Business.msi`" CUREAGENT=1" 'msi-install.log'
           Check "MSI installs (CUREAGENT=1)" ($code -eq 0) "exit $code"
           Check "files in Program Files\Elixar" ((Test-Path "$dir\Elixar.exe") -and (Test-Path $agent) -and (Test-Path $server))
+          Write-Host "Folder permissions:"; icacls $dir; Write-Host "Owner: $((Get-Acl $dir).Owner)"
+          Write-Host (Select-String -Path msi-install.log -Pattern 'InstallCureAgent|CureAgent.exe' -SimpleMatch | Select-Object -First 6 | Out-String)
           Start-Sleep 5
           Check "MSI made the Cure Agent service" ((Svc CureAgent) -eq 'Running') "service: $(Svc CureAgent)"
           $bin = (Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName
@@ -65,10 +67,10 @@ jobs:
           $script:viewer = New-Object System.Management.Automation.PSCredential("$env:COMPUTERNAME\cureviewer", (ConvertTo-SecureString $pw -AsPlainText -Force))
           $out = (& $server --install --group "$env:COMPUTERNAME\CureViewers" 2>&1 | Out-String)
           $token = [regex]::Match($out, 'Enrollment token:\s+(\S+)').Groups[1].Value
-          $thumb = [regex]::Match($out, 'Certificate:\s+([0-9a-fA-F]{40})').Groups[1].Value
+          $thumb = [regex]::Match($out, 'Certificate:\s+([0-9a-fA-F]{40})').Groups[1].Value; if (-not $thumb) { $thumb = 'none-made' }
           $url = [regex]::Match($out, 'Cure Console:\s+(https://\S+)').Groups[1].Value
           if ($token) { Write-Host "::add-mask::$token" }
-          Check "CureServer --install" ($LASTEXITCODE -eq 0 -and $token -and $thumb -and $url) ($out -replace [regex]::Escape("$token"), '***')
+          Check "CureServer --install" ($LASTEXITCODE -eq 0 -and $token -and $thumb -and $url) $(if ($token) { $out.Replace($token, '***') } else { $out })
           Start-Sleep 5
           Check "server service running" ((Svc CureServer) -eq 'Running') "$(Svc CureServer)"
           $sv = Get-CimInstance Win32_Service -Filter "Name='CureServer'"
