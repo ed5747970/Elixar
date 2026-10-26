@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.58)
+ELIXAR  (version 1.2.59)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,21 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.59
+- Check & fix (Dashboard): one button checks what fills and slows the PC -
+  Safe items to clean, startup programs you can open yourself (game
+  launchers, chat, music), app updates, the Recycle Bin (never ticked for
+  you), disk health and a waiting restart. Only safe fixes are ticked; a
+  restore point is made first; every change is in Logs.
+- Repair Windows (Tools): Windows' own DISM and SFC, one after the other,
+  with progress and the result in plain words.
+- Secure wipe (Tools): wipe a drive's free space (once, or 3 times) so
+  deleted files can't be recovered - the wipe files delete themselves, even
+  if it's stopped - and shred files you pick. On an SSD it runs TRIM
+  instead, and says why. Windows', apps' and Elixar's files are refused.
+- Release: code signing through SSL.com eSigner (see ANTIVIRUS.md); every
+  signature is checked before a release goes out.
 
 NEW IN 1.2.58  (fewer antivirus false alarms)
 - PowerShell is started with its script as plain, readable text: no encoded

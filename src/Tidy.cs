@@ -215,6 +215,7 @@ namespace CDriveCleaner
             var p = TidyPrefs.Load();
             Automation.Log("Daily tidy started.");
             try { Quarantine.PurgeOld(m => Automation.Log(m)); } catch (Exception e) { Automation.Log("  Undo: " + e.Message); }
+            try { SecureWipe.CleanupLeftovers(); } catch { }
             if (p.BinDays > 0)
             {
                 int n; long b = RecycleAging.EmptyOld(p.BinDays, m => Automation.Log(m), out n);

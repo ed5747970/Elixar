@@ -35,6 +35,9 @@ Microsoft usually clears a false positive within 1–3 days, and then updates ev
 
 ## For the publisher: the lasting fix
 
-1. **Code-sign every release.** `release.yml` signs all programs once the `CODESIGN_PFX` and `CODESIGN_PASSWORD` secrets are set. Certificates bought since June 2023 are kept on a hardware token or a cloud signing service, so they can't be exported as a .pfx. Signing then needs the certificate authority's cloud-signing step added to `release.yml`.
+1. **Code-sign every release.** The Release workflow signs all four programs and both MSIs before it publishes. It does nothing until one of these is set up in GitHub > Settings > Secrets and variables > Actions:
+   - **SSL.com eSigner** (recommended; works for an individual in Israel). Buy an IV or OV code-signing certificate from SSL.com and enrol it in eSigner cloud signing. Then add four secrets: `ES_USERNAME` and `ES_PASSWORD` (your SSL.com account), `ES_CREDENTIAL_ID` (eSigner > credential ID), and `ES_TOTP_SECRET` (the secret shown when you set up eSigner's 2-factor). eSigner checks each file for malware before it signs.
+   - **A .pfx file** (only for older certificates that can still be exported): `CODESIGN_PFX` (the file as base64) and `CODESIGN_PASSWORD`.
+   Each signed program is checked (`Get-AuthenticodeSignature`) before the release goes out. If a signature is wrong, the release stops.
 2. **Submit each new release** to Microsoft as **Software developer**, right after publishing it.
 3. Signed releases build a reputation with SmartScreen and antivirus programs over time, and false alarms become rare.

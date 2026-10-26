@@ -1812,6 +1812,8 @@ namespace CDriveCleaner
                         }
                         // 1.2.50: app updates, space map, safe-to-delete, tweaks, uninstall + leftovers, startup impact, savings, fleet, command line, languages, sponsor
                         SelfTest1250.All(root, check);
+                        // 1.2.59: Check & fix, Repair Windows, Secure wipe
+                        SelfTest1259.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

@@ -47,7 +47,7 @@ namespace CDriveCleaner
         readonly Dictionary<string, ListViewGroup> fileGroups = new Dictionary<string, ListViewGroup>();
         ListView dashList, filesList;
         Label dashHeader, dashStatus, dashNote, filesStatus;
-        Button btnDashRefresh, btnFindFiles;
+        Button btnDashRefresh, btnFindFiles, btnCheckFix;
         List<DashLoc> dashLocs;
         bool dashBusy, filesBusy;
         static readonly Color CriticalColor = Color.FromArgb(199, 54, 47);
@@ -578,9 +578,9 @@ namespace CDriveCleaner
             // header, two rows:  [drives .............. Refresh  Explore  Folder map  Remove apps]
             //                    [status line ......................... Overview | Details]
             // every control is centred in its row, so pills, switch and buttons line up
-            var head = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 5, RowCount = 2, Margin = new Padding(S(5), 0, S(5), S(6)) };
+            var head = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 6, RowCount = 2, Margin = new Padding(S(5), 0, S(5), S(6)) };
             head.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 4; i++) head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            for (int i = 0; i < 5; i++) head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             head.RowStyles.Add(new RowStyle(SizeType.AutoSize)); head.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             dashHeader = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = "Drive C:", Margin = new Padding(0) };
             statusTail = Lang.T("Waiting for the first scan...");
@@ -606,9 +606,16 @@ namespace CDriveCleaner
             var btnMap = tool("Folder map");
             var btnDashApps = tool("Remove apps...");
             btnDashApps.Visible = !LinuxUi;
-            head.Controls.Add(picker, 0, 0); head.Controls.Add(btnDashRefresh, 1, 0);
-            head.Controls.Add(btnExplore, 2, 0); head.Controls.Add(btnMap, 3, 0); head.Controls.Add(btnDashApps, 4, 0);
-            head.Controls.Add(dashStatus, 0, 1); head.Controls.Add(dashView, 1, 1); head.SetColumnSpan(dashView, 4);
+            // Check & fix: the one button for everyday care (Windows)
+            btnCheckFix = tool("\u2713  Check & fix");
+            btnCheckFix.Font = new Font("Segoe UI Semibold", 9.5f); btnCheckFix.BackColor = Color.FromArgb(91, 76, 196); btnCheckFix.ForeColor = Color.White;
+            btnCheckFix.FlatAppearance.BorderColor = Color.FromArgb(91, 76, 196); btnCheckFix.FlatAppearance.MouseOverBackColor = Color.FromArgb(110, 96, 214);
+            btnCheckFix.Visible = !LinuxUi;
+            new ToolTip().SetToolTip(btnCheckFix, Lang.T("One button: checks what fills and slows this PC, then fixes the safe parts when you say so"));
+            btnCheckFix.Click += (o, e) => OpenCheckFix();
+            head.Controls.Add(picker, 0, 0); head.Controls.Add(btnCheckFix, 1, 0); head.Controls.Add(btnDashRefresh, 2, 0);
+            head.Controls.Add(btnExplore, 3, 0); head.Controls.Add(btnMap, 4, 0); head.Controls.Add(btnDashApps, 5, 0);
+            head.Controls.Add(dashStatus, 0, 1); head.Controls.Add(dashView, 1, 1); head.SetColumnSpan(dashView, 5);
             btnMap.Click += (o, e) => OpenMap(CurRoot());
             btnDashApps.Click += (o, e) => ShowStoreTab();
             btnExplore.Click += (o, e) => OpenDrill(CurRoot());

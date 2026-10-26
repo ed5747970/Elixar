@@ -176,6 +176,7 @@ namespace CDriveCleaner
             // the PIN, when one is set (Elixar restarting itself a moment ago doesn't ask again)
             if (!testUi && !PinLock.TakeTicket() && !PinLock.Unlock(null)) return 0;
             if (!testUi) OfferInstalledUpdate();
+            if (!testUi && Win.IsWindows) System.Threading.Tasks.Task.Factory.StartNew(SecureWipe.CleanupLeftovers);   // a wipe stopped by a power cut
             Application.Run(new MainForm(testUi));
             return 0;
         }

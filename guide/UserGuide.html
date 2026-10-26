@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.58</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.59</p></div>
 </div></header>
 <main class="wrap">
 
@@ -85,6 +85,17 @@
 
 <h2 id="dashboard">Dashboard</h2>
 <p>The Dashboard opens first. It tells you at a glance how your drives are doing and what you can do about it. Looking never deletes anything; every clean asks first.</p>
+<h3>Check &amp; fix</h3>
+<p>The purple <strong>&#10003; Check &amp; fix</strong> button next to the drives is the one button for everyday care. It checks in about a minute (nothing changes while it checks) and shows four numbers - space that can be freed, startup programs that slow Windows down, app updates, disk health - and a list of fixes:</p>
+<table>
+  <tr><th>Fix</th><th>Ticked for you?</th><th>What it does</th></tr>
+  <tr><td>Clean the Safe items</td><td>Yes</td><td>The same Safe items as the weekly clean (temp files, Windows Update downloads, caches). Apps that are open are skipped, never closed</td></tr>
+  <tr><td>Turn off startup programs you can open yourself</td><td>Yes</td><td>Only game launchers, chat, music and updaters (Steam, Discord, Spotify, Teams, Adobe Creative Cloud&hellip;) - never security software, drivers' helpers or anything that syncs your files. Turn any back on in Tools &rsaquo; Startup</td></tr>
+  <tr><td>Update apps</td><td>Yes</td><td>Updates from winget and the Microsoft Store only</td></tr>
+  <tr><td>Empty the Recycle Bin</td><td>Never</td><td>Your decision</td></tr>
+  <tr><td>Disk failing or worn, restart waiting</td><td>&ndash;</td><td>Information only, with what to do</td></tr>
+</table>
+<p>Click <strong>Fix selected</strong>: a restore point is made first (when startup programs or apps change), then each fix runs and is written to Logs.</p>
 <h3>Choosing a drive</h3>
 <p>The switch at the top left lists <strong>C: Windows</strong>, every other drive in the PC (and USB drives), and <strong>All drives</strong>. Refresh (F5), Explore and Folder map work on the drive you picked.</p>
 <p>Under the switch, Elixar shows which physical disk the drive is on and this PC's name, for example <strong>Disk 0 of ELISAR-PC</strong>. The number is the one Windows' Disk Management shows (it starts at 0); two drives on the same disk show the same number. In All drives, every card has its own line.</p>
@@ -169,7 +180,7 @@
 <h3>Uninstall and leftovers in one step</h3>
 <p>After an app&rsquo;s own uninstaller finishes, Elixar notices Windows no longer lists it and looks for the folders it left behind: named after the app (or inside its publisher&rsquo;s folder) in Program Files, ProgramData and AppData, and not used by anything still installed. It shows the list and asks before moving them to Undo, so they can be put back.</p>
 <h2 id="tools">Tools</h2>
-<p>The Tools tab has inner tabs for deeper jobs.</p>
+<p>The Tools tab has inner tabs for deeper jobs, including <strong>Repair Windows</strong> and <strong>Secure wipe</strong>.</p>
 <h3>Space map</h3>
 <p>Click <strong>Map this drive</strong>: Elixar reads the drive once and draws it as a circle. The middle is the folder shown; the first ring is the folders in it, each slice as wide as the space it takes; the outer rings go one and two levels deeper. Colours are the warning signs (red Critical, orange Caution, purple Review, green Safe, blue for folders the Dashboard doesn&rsquo;t list). Point at a slice to see its name and size in the middle; <strong>Biggest here</strong> on the right lists the largest with a bar each. Double-click a slice to go inside; click the middle or <strong>Back up a level</strong> to go up. Links and junctions are never followed, so nothing is counted twice. Click a slice (or a row in the list), then <strong>Is this safe to delete?</strong> for a plain answer, <strong>Open in Explorer</strong>, or <strong>Move to Undo...</strong> (never for Critical or Windows&rsquo; own folders; asks first; kept in Tools &gt; Undo). The Dashboard&rsquo;s Folder map opens it too.</p>
 <h3>Is this safe to delete?</h3>
@@ -213,6 +224,15 @@
 <p>Finds files with exactly the same content in Documents, Pictures, Videos, Music, Desktop, Downloads or folders you add. Windows, apps and AppData are never searched. Extra copies go to Undo (kept for the days you chose in Automation) and at least one copy of each file is always kept.</p>
 <h3>Leftovers</h3>
 <p>Folders in AppData and ProgramData left behind by apps you removed. A folder is listed only when no installed app, publisher, service, program that starts with Windows or running program matches its name, nothing in it changed for 3 months, and it holds at least 1 MB. Folders of Windows, drivers, browsers, games platforms and security programs are never listed, and neither are folders named with a code instead of a name. These are guesses, so nothing is ticked: look first (double-click opens a folder). What you pick goes to Undo for 7 days, so you can put it back.</p>
+<h3>Repair Windows</h3>
+<p>For when Windows misbehaves: updates fail, Settings or built-in apps don't open, or errors mention missing system files. Click <strong>Repair Windows</strong>: Windows' own <strong>DISM</strong> checks the component store (the copies Windows repairs itself from) and downloads fresh parts from Windows Update when needed, then <strong>SFC</strong> checks every Windows system file and repairs the damaged ones. Your files, settings and apps are not touched. It takes 15&ndash;30 minutes, needs the internet, and you can keep working. Each step shows its progress and its result in plain words (healthy, repaired, or what to do next); <strong>Stop</strong> is safe at any time. If it says so, restart the PC to finish.</p>
+<h3>Secure wipe</h3>
+<p>Makes deleted files impossible to recover - for when you sell or give away a PC or a disk, or deleted something private.</p>
+<ul>
+  <li><strong>Wipe free space</strong>: pick a drive and <em>Wipe once</em> (zeros; enough for today's disks) or <em>Wipe 3 times</em> (random, random, zeros). Only free space is written - your files are not touched. Elixar fills the free space with files that Windows deletes by itself when they close, so nothing is left behind even if it's stopped or the power goes off. On the Windows drive 0.5 GB stays free so Windows keeps working.</li>
+  <li><strong>On an SSD</strong> overwriting doesn't reach the old data (the SSD writes somewhere else), so Elixar runs Windows' <strong>TRIM</strong> instead, which tells the SSD to erase what was deleted. To give an SSD away, use its maker's Secure Erase, or Windows' Reset this PC &rsaquo; Remove everything &rsaquo; Clean the drive.</li>
+  <li><strong>Shred files</strong>: add files (or drag them in); each is overwritten, renamed and deleted. It can't be undone - shredded files don't go to the Recycle Bin or Undo. Windows', apps' (Program Files, ProgramData, AppData) and Elixar's own files, folders and links are refused.</li>
+</ul>
 <h3>Sysprep</h3>
 <p>Gets this PC ready for Sysprep before you capture an image (Sysprep with Generalize). <strong>Check this PC</strong> lists what would stop Sysprep and offers Microsoft's fix for each; nothing changes without asking, and a restore point is made before a fix:</p>
 <ul>
@@ -499,6 +519,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-27</td><td>1.2.59</td><td>Check &amp; fix on the Dashboard (one button: Safe clean, startup programs you can open yourself, app updates, disk and Windows status; a restore point first). Tools &rsaquo; Repair Windows (DISM and SFC). Tools &rsaquo; Secure wipe (wipe free space, shred files; TRIM on SSDs). Release code signing through SSL.com eSigner</td></tr>
   <tr><td>2026-10-26</td><td>1.2.58</td><td>Fewer antivirus false alarms: PowerShell is started with its script as plain text (no encoded command, no execution-policy bypass), the golden-image cleanup clears event logs and restore points through Windows' own interfaces, and the program has none of the command lines ransomware uses. Troubleshooting: what to do when an antivirus blocks Elixar</td></tr>
   <tr><td>2026-10-26</td><td>1.2.57</td><td>Cure tested end to end on a real Windows PC. Fixed: Cure Agent and Cure Server wouldn't install (Elixar didn't recognise Windows' own installer account, so Program Files looked unprotected); the MSI's CUREAGENT=1 (Intune, Group Policy, SCCM) didn't make the agent; the server's own certificate wasn't picked up. An agent waiting for Group Policy settings looks again every 5 minutes</td></tr>
   <tr><td>2026-10-26</td><td>1.2.56</td><td>Two editions: Elixar for Private (every feature, for home PCs) and Elixar for Business (no Sysprep tools; the Domain PCs tab with Cure Agent and Cure Server: every company PC, the ones at risk first, and what to clean on each, reports only)</td></tr>

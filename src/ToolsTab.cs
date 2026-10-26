@@ -1,4 +1,4 @@
-// Tools tab: Disk health, Drivers, Startup, System space, Move off C:, Duplicates, Undo.
+// Tools tab: Disk health, Drivers, Startup, System space, Move off C:, Duplicates, Leftovers, Repair Windows, Secure wipe, Undo.
 
 using System;
 using System.Collections.Generic;
@@ -50,9 +50,9 @@ namespace CDriveCleaner
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
             pageLeft = new TabPage("Leftovers") { BackColor = pageTools.BackColor };
             pageSysprep = new TabPage("Sysprep") { BackColor = pageTools.BackColor };
-            BuildSpaceMap(); BuildTweaks();
+            BuildSpaceMap(); BuildTweaks(); BuildRepair(); BuildWipe();
             if (LinuxUi) toolsTabs.TabPages.AddRange(new[] { pageMap, pageDups });   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
+            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();
@@ -67,6 +67,7 @@ namespace CDriveCleaner
             else if (toolsTabs.SelectedTab == pageUndo) RefreshUndo();
             else if (toolsTabs.SelectedTab == pageTweaks) RefreshTweaks();
             else if (toolsTabs.SelectedTab == pageSysprep) OnSysprepTab();
+            else if (toolsTabs.SelectedTab == pageWipe) OnWipeTab();
         }
 
         public void ShowTools(int inner) { tabs.SelectedTab = pageTools; toolsTabs.SelectedIndex = inner; OnToolsTab(); }
@@ -74,6 +75,8 @@ namespace CDriveCleaner
         public void ShowUndo() { ShowTools(pageUndo); }
         public void ShowStartup() { ShowTools(pageStartup); }
         public void ShowMove() { ShowTools(pageMove); }
+        public void ShowRepair() { ShowTools(pageRepair); }
+        public void ShowWipe() { ShowTools(pageWipe); }
 
         // ================= Drivers =================
         Label drvHardware; Button btnDrvSelectFit;

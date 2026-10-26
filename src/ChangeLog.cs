@@ -56,8 +56,8 @@ namespace CDriveCleaner
         // ================= sections: which part of Elixar made each change =================
         public static readonly string[] Sections =
         {
-            "Cleaner", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
-            "System space", "Space map", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
+            "Cleaner", "Check & fix", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
+            "System space", "Space map", "Repair Windows", "Secure wipe", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
         };
 
         [ThreadStatic] static string scope;
@@ -323,6 +323,10 @@ namespace CDriveCleaner
                     if (Has(args, "/Cleanup-Mountpoints") != null) return "Removed leftover mounted images (DISM)";
                     if (Has(args, "/RestoreHealth") != null) return "Windows repair (DISM)";
                     return null;
+                case "sfc":
+                    return Has(args, "/scannow") != null ? "Windows repair (SFC)" : null;
+                case "defrag":
+                    return Has(args, "/L") != null ? "TRIM on an SSD (defrag /L)" : null;
                 case "powercfg":
                     if (Has(args, "/hibernate", "-h ") != null) return "Hibernation: " + args.Trim();
                     return Has(args, "/change", "/setactive", "/delete", "/import") != null ? "Power settings: " + args.Trim() : null;
