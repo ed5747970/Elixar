@@ -1560,12 +1560,12 @@ namespace CDriveCleaner
                                     RegLog.Set(k, "Shown", "light", Microsoft.Win32.RegistryValueKind.String, "ui");
                                     RegLog.Set(k, "Shown", "dark", Microsoft.Win32.RegistryValueKind.String, "ui");
                                 }
-                                ChangeLog.Command("vssadmin.exe", "resize shadowstorage /for=C: /on=C: /maxsize=10%", "", 0);
+                                ChangeLog.Add("Settings", "Deleted the restore points of C:", "System Protection", "", "", "Golden image cleanup", false);
                                 var lf = new MainForm(true);
                                 lf.LogsLoad();
                                 bool page = lf.NavRightItems.SequenceEqual(new[] { "Settings", "Logs", "Policy manager" }) && lf.LogsRowCount == 3;
                                 lf.LogsSetFilter(1, 2, ""); page &= lf.LogsRowCount == 2;          // Registry only
-                                lf.LogsSetFilter(0, 2, "vssadmin"); page &= lf.LogsRowCount == 1;   // search
+                                lf.LogsSetFilter(0, 2, "restore points of"); page &= lf.LogsRowCount == 1;   // search
                                 lf.LogsSetFilter(0, 2, ""); page &= lf.LogsSections.Contains("*:3") && lf.LogsSections.Contains("Restore points:1") && lf.LogsSections.Contains("#undo:2") && lf.LogsSections.Contains("#deleted:1");
                                 lf.LogsPickSection("Restore points"); page &= lf.LogsRowCount == 1;
                                 lf.LogsPickSection("*");
