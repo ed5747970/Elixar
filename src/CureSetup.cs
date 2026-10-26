@@ -156,11 +156,12 @@ namespace CDriveCleaner
             if (cert.Length == 0)
             {
                 string o;
-                string ps = "$c = New-SelfSignedCertificate -DnsName " + Sys.PsQuote(fqdn) + "," + Sys.PsQuote(host) + " -CertStoreLocation 'Cert:\\LocalMachine\\My' -NotAfter (Get-Date).AddYears(5) " +
+                string ps = "$ProgressPreference = 'SilentlyContinue'; $c = New-SelfSignedCertificate -DnsName " + Sys.PsQuote(fqdn) + "," + Sys.PsQuote(host) + " -CertStoreLocation 'Cert:\\LocalMachine\\My' -NotAfter (Get-Date).AddYears(5) " +
                             "-KeyAlgorithm RSA -KeyLength 3072 -KeyExportPolicy NonExportable -FriendlyName 'Cure Server (Elixar for Business)'; $c.Thumbprint";
                 if (RunOverride != null) { Ran.Add("powershell New-SelfSignedCertificate"); o = "0123456789abcdef0123456789abcdef01234567"; }
                 else o = StoreData.RunPs(ps, 120000);
-                cert = new string((o ?? "").Trim().Split('\n').Last().Trim().Where(Uri.IsHexDigit).ToArray()).ToLowerInvariant();
+                // the thumbprint is the one line of 40 hex digits (PowerShell can add progress records around it)
+                cert = ((o ?? "").Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.Length == 40 && l.All(Uri.IsHexDigit)) ?? "").ToLowerInvariant();
                 if (cert.Length != 40) { res.Error = "Windows didn't make a certificate: " + o; return res; }
                 ownCert = true;
             }
