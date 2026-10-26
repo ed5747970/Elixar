@@ -122,6 +122,21 @@ namespace CDriveCleaner
                 finally { srv.Stop(); CureServer.InGroupOverride = keepG; }
             });
 
+            Run(check, "Cure Agent: a report never waits for the slow measurements - it goes out at once with what's ready and says what is still being measured", () =>
+            {
+                int keep = CureAgent.SlowWaitMs; CureAgent.SlowWaitMs = 0;
+                try
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    var r = CureAgent.Collect();
+                    if (sw.ElapsedMilliseconds > 30000) return "took " + sw.ElapsedMilliseconds / 1000 + " s";
+                    if (r.Total <= 0 || string.IsNullOrEmpty(r.Computer)) return "no free space or name in the quick report";
+                    if (r.Items.Length == 0 && !r.Errors.Any(e => e.StartsWith("still measuring: "))) return "doesn't say what is still being measured";
+                    return null;
+                }
+                finally { CureAgent.SlowWaitMs = keep; }
+            });
+
             Run(check, "Cure advice: a PC is at risk when C: is under 10% (or 10 GB) free, getting full under 20% or within 30 days at its pace, and the tips say what to clean there and how much it frees", () =>
             {
                 const long G = 1L << 30;

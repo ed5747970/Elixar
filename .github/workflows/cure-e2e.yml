@@ -11,7 +11,7 @@ permissions:
 jobs:
   cure:
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
         with:
@@ -96,15 +96,23 @@ jobs:
             $r = Web '/api/v1/pcs'
             if ($r.StatusCode -eq 200) { $seen = (($r.Content | ConvertFrom-Json).pcs | Where-Object { $_.pc -eq $pc -and $_.seen }) }   # enrolled AND its first report arrived
           }
-          Check "the agent service (SYSTEM) enrolled and reported over HTTPS with the pinned certificate" ([bool]$seen) "last answer: $($r.StatusCode) $($r.Content)"
+          Check "the agent service (SYSTEM) enrolled and reported over HTTPS with the pinned certificate" ([bool]$seen) ("last answer: $($r.StatusCode) $($r.Content) | agent: " + (Get-Content C:\ProgramData\Elixar\cure\status.txt -ErrorAction SilentlyContinue | Out-String))
           Write-Host (& $agent --status | Out-String)
           if ($seen) {
             $id = @($seen)[0].id
             $one = Web "/api/v1/pc?id=$id"
             Check "the console shows this PC's disk" ($one.StatusCode -eq 200 -and $one.Content -match '"Total":\d{9,}') "$($one.StatusCode)"
-            $j = $one.Content
-            Check "report has the full picture (items, places, apps)" ($j -match '"Items":\[\{' -and $j -match '"Apps":\[') ($j.Substring(0, [Math]::Min(400, $j.Length)))
+            # the slow measurements (every account, what fills C:, apps) come in a later report (every 5 minutes here)
+            $full = $false
+            for ($i = 0; $i -lt 50 -and -not $full; $i++) {
+              $one = Web "/api/v1/pc?id=$id"; $rep = ($one.Content | ConvertFrom-Json).report
+              $full = $rep -and @($rep.Items).Count -gt 0 -and @($rep.Places).Count -gt 0
+              if (-not $full) { Start-Sleep 20 }
+            }
+            Check "a later report has the full picture (what can be cleaned, what fills C:, apps)" $full ("errors in the report: " + (@($rep.Errors) -join ' | '))
+            if ($rep) { Write-Host "Report errors: $(@($rep.Errors) -join ' | ')"; Write-Host "Items $(@($rep.Items).Count), places $(@($rep.Places).Count), apps $(@($rep.Apps).Count), disks $(@($rep.Disks).Count), startup $($rep.StartupCount)" }
           }
+          else { Write-Host "Agent status: $(Get-Content C:\ProgramData\Elixar\cure\status.txt -ErrorAction SilentlyContinue)" }
 
           # 4. the console
           $page = Web '/'

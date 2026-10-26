@@ -132,41 +132,38 @@ namespace CDriveCleaner
             tryIt("company", () => { r.Company = Policy.Company() ?? ""; r.Ou = Ou(); r.Model = Model(); });
             tryIt("drives", () => r.Drives = DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady)
                                                        .Select(d => new CureDrive { Letter = d.Name.Substring(0, 1), Total = d.TotalSize, Free = d.AvailableFreeSpace }).ToArray());
-            // the slow ones are measured now and then and sent every time
-            tryIt("clean", () =>
+            // the slow ones are measured in the background now and then; every report sends what is ready, so a busy PC
+            // (or a step that takes long as SYSTEM) never stops the reports - it says what is still being measured
+            var slow = StartSlow();
+            if (slow != null) slow.Join(SlowWaitMs);
+            lock (slowGate)
             {
-                if (measured == null || DateTime.Now - measuredAt > TimeSpan.FromHours(1)) { measured = MeasureAllAccounts(); measuredAt = DateTime.Now; }
-                Func<string, long> sum = t => measured.Where(i => i.Tier == t && i.Bytes > 0).Sum(i => i.Bytes);
-                r.CleanSafe = sum("safe"); r.CleanReview = sum("review"); r.CleanCaution = sum("caution");
-                r.Items = measured.Where(i => i.Bytes > 0).OrderByDescending(i => i.Bytes).Take(80).ToArray();
-                r.MeasuredAt = measuredAt.ToString("s", CultureInfo.InvariantCulture);
-            });
-            tryIt("what fills C:", () =>
-            {
-                if (places == null || DateTime.Now - placesAt > TimeSpan.FromHours(6)) { places = PlacesAllAccounts(); placesAt = DateTime.Now; }
-                Func<string, long> sum = t => places.Where(p => p.Tier == t && p.Bytes > 0).Sum(p => p.Bytes);
-                r.FillSafe = sum("safe"); r.FillReview = sum("review"); r.FillCaution = sum("caution"); r.FillCritical = sum("critical");
-                r.Places = places.Where(p => p.Bytes > 0).OrderByDescending(p => p.Bytes).Take(40).ToArray();
-                r.PlacesAt = placesAt.ToString("s", CultureInfo.InvariantCulture);
-            });
-            tryIt("apps", () =>
-            {
-                if (apps == null || DateTime.Now - appsAt > TimeSpan.FromHours(24)) { apps = BigApps(); appsAt = DateTime.Now; }
-                r.Apps = apps.ToArray();
-            });
+                if (measured != null)
+                {
+                    Func<string, long> sum = t => measured.Where(i => i.Tier == t && i.Bytes > 0).Sum(i => i.Bytes);
+                    r.CleanSafe = sum("safe"); r.CleanReview = sum("review"); r.CleanCaution = sum("caution");
+                    r.Items = measured.Where(i => i.Bytes > 0).OrderByDescending(i => i.Bytes).Take(80).ToArray();
+                    r.MeasuredAt = measuredAt.ToString("s", CultureInfo.InvariantCulture);
+                }
+                if (places != null)
+                {
+                    Func<string, long> sum = t => places.Where(x => x.Tier == t && x.Bytes > 0).Sum(x => x.Bytes);
+                    r.FillSafe = sum("safe"); r.FillReview = sum("review"); r.FillCaution = sum("caution"); r.FillCritical = sum("critical");
+                    r.Places = places.Where(x => x.Bytes > 0).OrderByDescending(x => x.Bytes).Take(40).ToArray();
+                    r.PlacesAt = placesAt.ToString("s", CultureInfo.InvariantCulture);
+                }
+                if (apps != null) r.Apps = apps.ToArray();
+                if (disks != null)
+                {
+                    r.DiskLevel = disks.Worst.ToString();
+                    r.Disks = disks.Disks.Select(d => new CureDisk { Name = d.Name, Kind = d.Kind, Level = d.Level.ToString(), Letters = d.Letters, Wear = d.Wear, Temp = d.Temp, Reasons = d.Reasons.ToArray() }).ToArray();
+                }
+                r.AppUpdates = appUpdates;
+                errors.AddRange(slowErrors);
+                if (slowNow != null) errors.Add("still measuring: " + slowNow + " (" + (int)(DateTime.Now - slowSince).TotalMinutes + " min)");
+            }
             tryIt("weekly clean", () => r.WeeklyClean = Policy.Get("sched.clean.day") != "off");
             r.Accounts = Profiles().Count;
-            tryIt("disks", () =>
-            {
-                if (disks == null || DateTime.Now - disksAt > TimeSpan.FromHours(6)) { disks = DiskHealth.Read(); disksAt = DateTime.Now; }
-                r.DiskLevel = disks.Worst.ToString();
-                r.Disks = disks.Disks.Select(d => new CureDisk { Name = d.Name, Kind = d.Kind, Level = d.Level.ToString(), Letters = d.Letters, Wear = d.Wear, Temp = d.Temp, Reasons = d.Reasons.ToArray() }).ToArray();
-            });
-            tryIt("app updates", () =>
-            {
-                if (DateTime.Now - updatesAt > TimeSpan.FromHours(24) && WinGet.Available) { string e; var l = WinGet.List(out e); if (e == null) { appUpdates = l.Count; updatesAt = DateTime.Now; } }
-                r.AppUpdates = appUpdates;
-            });
             tryIt("startup", () =>
             {
                 var on = StartupApps.Read(false).Where(e => e.Enabled && !e.Missing).ToList();
@@ -180,6 +177,56 @@ namespace CDriveCleaner
 
         static List<CurePlace> places; static DateTime placesAt = DateTime.MinValue;
         static List<CureApp> apps; static DateTime appsAt = DateTime.MinValue;
+
+        // ---------- the slow measurements (one background thread) ----------
+        public static int SlowWaitMs = 60000;   // a report waits this long for them; --show and --send wait longer
+        static readonly object slowGate = new object();
+        static Thread slowWorker;
+        static string slowNow; static DateTime slowSince;
+        static List<string> slowErrors = new List<string>();
+
+        static bool SlowDue()
+        {
+            var n = DateTime.Now;
+            return measured == null || n - measuredAt > TimeSpan.FromHours(1) || places == null || n - placesAt > TimeSpan.FromHours(6) ||
+                   apps == null || n - appsAt > TimeSpan.FromHours(24) || disks == null || n - disksAt > TimeSpan.FromHours(6) || n - updatesAt > TimeSpan.FromHours(24);
+        }
+
+        // starts the measuring when something is due and it isn't already running; returns the running thread (or null)
+        static Thread StartSlow()
+        {
+            lock (slowGate)
+            {
+                if (slowWorker != null && slowWorker.IsAlive) return slowWorker;
+                if (!SlowDue()) return null;
+                slowNow = "starting"; slowSince = DateTime.Now;   // set before the thread runs, so a report right now already says so
+                slowWorker = new Thread(MeasureSlow) { IsBackground = true, Name = "Cure Agent measuring", Priority = ThreadPriority.BelowNormal };
+                slowWorker.Start();
+                return slowWorker;
+            }
+        }
+
+        static void MeasureSlow()
+        {
+            var errs = new List<string>();
+            Action<string, Func<bool>, Action> step = (what, due, a) =>
+            {
+                if (!due()) return;
+                lock (slowGate) { slowNow = what; slowSince = DateTime.Now; }
+                try { a(); } catch (Exception e) { errs.Add(what + ": " + e.Message); }
+            };
+            var now = DateTime.Now;
+            step("disks", () => disks == null || now - disksAt > TimeSpan.FromHours(6), () => { var d = DiskHealth.Read(); lock (slowGate) { disks = d; disksAt = DateTime.Now; } });
+            step("what can be cleaned", () => measured == null || now - measuredAt > TimeSpan.FromHours(1), () => { var m = MeasureAllAccounts(); lock (slowGate) { measured = m; measuredAt = DateTime.Now; } });
+            step("apps", () => apps == null || now - appsAt > TimeSpan.FromHours(24), () => { var a = BigApps(); lock (slowGate) { apps = a; appsAt = DateTime.Now; } });
+            step("what fills C:", () => places == null || now - placesAt > TimeSpan.FromHours(6), () => { var p = PlacesAllAccounts(); lock (slowGate) { places = p; placesAt = DateTime.Now; } });
+            step("app updates", () => now - updatesAt > TimeSpan.FromHours(24), () =>
+            {
+                int n = -1; if (WinGet.Available) { string e; var l = WinGet.List(out e); if (e == null) n = l.Count; }
+                lock (slowGate) { appUpdates = n; updatesAt = DateTime.Now; }
+            });
+            lock (slowGate) { slowNow = null; slowErrors = errs; }
+        }
         public static Func<List<string>> ProfilesOverride;   // self-test
 
         // the real people's profiles on this PC (not the service accounts)

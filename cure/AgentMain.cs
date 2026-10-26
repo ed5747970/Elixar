@@ -32,6 +32,7 @@ static class CureAgentMain
                 return err == null ? 0 : 1;
             }
             if (args.Contains("--uninstall")) { CureSetup.UninstallAgent(); Console.WriteLine("Cure Agent is removed."); return 0; }
+            CureAgent.SlowWaitMs = 15 * 60000;   // by hand: wait for the full picture
             if (args.Contains("--show")) { Console.WriteLine(CureProtocol.Json().Serialize(CureAgent.Collect())); return 0; }
             if (args.Contains("--send")) { var r = CureAgent.SendOnce(); CureAgent.WriteStatus(r); Console.WriteLine(r.Sent ? "Sent. Next report in " + r.NextMinutes + " minutes." : "Not sent: " + r.Error); return r.Sent ? 0 : 1; }
             if (args.Contains("--status"))
