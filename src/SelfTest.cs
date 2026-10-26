@@ -575,6 +575,15 @@ namespace CDriveCleaner
                         bool admin = Sys.IsAdmin();
                         check(!Locked.IsLocked(root) && (!admin || (Locked.Lock(lk) && Locked.IsLocked(lk) && Locked.OwnedByAdmins(lk))),
                               "Security: Undo folders are locked to administrators" + (admin ? "" : " (not admin: lock not tried)"));
+                        {
+                            // Windows' installer account must count as trusted, or a folder in Program Files (where the MSI puts Elixar) looks unprotected
+                            string ti = ""; try { ti = new NTAccount("NT SERVICE", "TrustedInstaller").Translate(typeof(SecurityIdentifier)).Value; } catch (Exception e) { ti = e.Message; }
+                            string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+                            string pfWhy = Locked.LockProblem(pf);
+                            check(ti == Locked.TrustedInstaller.Value && pfWhy == null,
+                                  "Security: Windows' own installer account (TrustedInstaller) is trusted, so Program Files counts as protected" +
+                                  (ti != Locked.TrustedInstaller.Value ? " (Windows says " + ti + ")" : pfWhy != null ? " (Program Files: " + pfWhy + ")" : ""));
+                        }
                         // signatures: Windows' own check must agree with PowerShell's on a signed Microsoft file, and reject an unsigned one
                         // any program in Program Files that carries its own signature (most apps do)
                         string signedFile = StoreData.RunPs("$c = @(Get-ChildItem -Path \"$env:ProgramFiles\\*\\*.exe\", \"${env:ProgramFiles(x86)}\\*\\*.exe\" -ErrorAction SilentlyContinue | Select-Object -First 60 -ExpandProperty FullName); " +

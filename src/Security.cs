@@ -191,7 +191,8 @@ namespace CDriveCleaner
     {
         static readonly SecurityIdentifier Admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
         static readonly SecurityIdentifier SystemSid = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-        static readonly SecurityIdentifier TrustedInstaller = new SecurityIdentifier("S-1-5-80-956008885-3418522649-1031853339-3806323940-2287843442");
+        // NT SERVICE\TrustedInstaller (Windows' own installer; it owns Program Files and Windows). The self-test checks this against Windows.
+        internal static readonly SecurityIdentifier TrustedInstaller = new SecurityIdentifier("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
 
         static bool Trusted(IdentityReference id)
         {
