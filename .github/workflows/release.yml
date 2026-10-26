@@ -53,11 +53,9 @@ jobs:
             Copy-Item package\README.txt, "package\Run self-test (safe).bat", guide\UserGuide.html, LICENSE $pkg
             Copy-Item -Recurse src, guide, tools, package, cure, audit-reports, app.ico, app.manifest, brand.png, build.ps1, README.md, LICENSE, SECURITY.md, update-key.pub.xml "$pkg\source"
             $exe = Join-Path $pkg "Elixar.exe"
-            if ($edition -eq "business") {
-              # the Group Policy / Intune template, made by this build of Elixar for Business
-              $p = Start-Process $exe -ArgumentList '--admx', "`"$((Resolve-Path $pkg).Path)\PolicyDefinitions`"" -Wait -PassThru
-              if ($p.ExitCode -ne 0 -or -not (Test-Path "$pkg\PolicyDefinitions\en-US\Elixar.adml")) { throw "Could not make the Group Policy template" }
-            }
+            # the Group Policy / Intune template, made by this build (both editions have Policy manager)
+            $p = Start-Process $exe -ArgumentList '--admx', "`"$((Resolve-Path $pkg).Path)\PolicyDefinitions`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0 -or -not (Test-Path "$pkg\PolicyDefinitions\en-US\Elixar.adml")) { throw "Could not make the Group Policy template" }
             $exeHash = (Get-FileHash $exe -Algorithm SHA256).Hash
             $sums = Get-ChildItem $pkg -Filter *.exe | ForEach-Object { "$($_.Name)  $((Get-FileHash $_.FullName -Algorithm SHA256).Hash)" }
             [IO.File]::WriteAllText("$pkg\SHA256.txt", "Elixar for $(if ($edition -eq 'business') {'Business'} else {'Private'}) $v - made by Elisar`r`nSHA-256:`r`n" + ($sums -join "`r`n") + "`r`n")
