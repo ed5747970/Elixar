@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.59)
+ELIXAR  (version 1.2.60)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,15 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.60  (Elixar for Business)
+- Email alerts to IT: on the Cure Server PC, Domain PCs > Email alerts
+  checks every PC's report each hour and emails you when a disk is failing,
+  C: is almost full or a PC stopped reporting (getting full and disk worn
+  can be turned on too). One email lists every new problem, with what to do
+  on each PC; a problem that stays is reminded once a week, and you can be
+  told when it's fixed. It uses the email account connected in Settings and
+  only when the policy allows email. Reports only.
 
 NEW IN 1.2.59
 - Check & fix (Dashboard): one button checks what fills and slows the PC -

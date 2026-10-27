@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.59</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.60</p></div>
 </div></header>
 <main class="wrap">
 
@@ -389,6 +389,17 @@
 </ul>
 <p>The tab only reads the reports: nothing is started on another PC from here. To act, use Policy manager / Group Policy (for example turn on the weekly clean) or Elixar on that PC. <strong>Remove this PC from the list</strong> stops accepting its reports.</p>
 
+<h3>Email alerts</h3>
+<p>On the Cure Server PC, <strong>Email alerts&hellip;</strong> (next to Export) makes Elixar check every PC's report each hour and email you when one needs attention. You get <strong>one email</strong> listing every new problem - never one email per PC - with each PC's free space and what to do there, and a link to the Cure Console. A problem that stays is reminded once a week; you can also be told when it's fixed.</p>
+<table>
+  <tr><th>Alert</th><th>On at first?</th></tr>
+  <tr><td>A disk is failing (right away)</td><td>Yes</td></tr>
+  <tr><td>C: is almost full (under 10% or 10 GB free)</td><td>Yes</td></tr>
+  <tr><td>A PC stopped reporting (not seen for 7 days)</td><td>Yes</td></tr>
+  <tr><td>C: will be full soon (under 20%, or full within 30 days at its pace)</td><td>No</td></tr>
+  <tr><td>A disk is worn</td><td>No</td></tr>
+</table>
+<p>The email goes through the account connected in Settings &rsaquo; Email account (nothing new is connected), and only when the policy allows email - on a company PC, allow it for the server in Policy manager &rsaquo; Email. <strong>Send a test email</strong> checks it. The hourly check is a scheduled task (Elixar\Cure alerts) that runs as administrator through Elixar's launcher; turning alerts off removes it. Reports only: nothing is done on the PCs.</p>
 <h2 id="cure">Cure Agent and Cure Console (Business)</h2>
 <p>Cure shows every company PC in one web page: free space, what can be cleaned, disk health, the last clean, app updates and problems. <strong>Stage 1 is reports only</strong>: the PCs send their status to your own server, and nothing can be started on a PC from the console.</p>
 <ol>
@@ -519,6 +530,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-27</td><td>1.2.60</td><td>Elixar for Business: email alerts to IT from the Cure Server (a disk failing, C: almost full, a PC not reporting; one email for every new problem, a weekly reminder, and when it is fixed)</td></tr>
   <tr><td>2026-10-27</td><td>1.2.59</td><td>Check &amp; fix on the Dashboard (one button: Safe clean, startup programs you can open yourself, app updates, disk and Windows status; a restore point first). Tools &rsaquo; Repair Windows (DISM and SFC). Tools &rsaquo; Secure wipe (wipe free space, shred files; TRIM on SSDs). Release code signing through SSL.com eSigner</td></tr>
   <tr><td>2026-10-26</td><td>1.2.58</td><td>Fewer antivirus false alarms: PowerShell is started with its script as plain text (no encoded command, no execution-policy bypass), the golden-image cleanup clears event logs and restore points through Windows' own interfaces, and the program has none of the command lines ransomware uses. Troubleshooting: what to do when an antivirus blocks Elixar</td></tr>
   <tr><td>2026-10-26</td><td>1.2.57</td><td>Cure tested end to end on a real Windows PC. Fixed: Cure Agent and Cure Server wouldn't install (Elixar didn't recognise Windows' own installer account, so Program Files looked unprotected); the MSI's CUREAGENT=1 (Intune, Group Policy, SCCM) didn't make the agent; the server's own certificate wasn't picked up. An agent waiting for Group Policy settings looks again every 5 minutes</td></tr>

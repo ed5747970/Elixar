@@ -98,6 +98,8 @@ namespace CDriveCleaner
         public static string DomainDataOverride;
         static Color Mix(Color a, Color b, double t) { return Color.FromArgb((int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t)); }   // self-test and previews: a Cure Server data folder
 
+        Button domAlerts;
+        public bool AlertsButtonShown { get { return domAlerts != null; } }
         public class DomPc { public string Id, Name, Seen; public CureReport R; public CureRisk Risk; public List<long[]> History; }
         List<DomPc> domPcs = new List<DomPc>();
         string domPicked, domBannerText = "";
@@ -145,7 +147,8 @@ namespace CDriveCleaner
             domRefresh = MakeButton("Refresh"); domRefresh.Click += (o, e) => DomainLoad();
             domWeb = MakeButton("Open the web console"); domWeb.Click += (o, e) => { try { Shell.Open("https://localhost:" + DomainPort() + "/"); } catch { } };
             var exp = MakeButton("Export (CSV)..."); exp.Click += (o, e) => DomainExport();
-            head.Controls.AddRange(new Control[] { domStatus, domRefresh, domWeb, exp });
+            domAlerts = MakeButton("Email alerts..."); domAlerts.Click += (o, e) => OpenAlerts();
+            head.Controls.AddRange(new Control[] { domStatus, domRefresh, domWeb, exp, domAlerts });
             domKpis = new FlowLayoutPanel { Dock = DockStyle.Top, Height = S(98), WrapContents = false, Padding = new Padding(0, S(4), 0, S(4)) };
 
             var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, SplitterWidth = S(8), Orientation = Orientation.Vertical };

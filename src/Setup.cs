@@ -87,6 +87,9 @@ namespace CDriveCleaner
                                  "Elixar", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes;
             string o;
             foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask, Automation.TidyTask, Automation.PolicyCleanTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
+#if BUSINESS
+            Automation.RunSchtasks(Automation.DeleteArgs(CureAlerts.Task), out o);
+#endif
             try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
             try { MicrosoftAuth.SignOut(); OtherMail.Forget(); MailAccount.Disconnect(); } catch { }
             if (!msi) try { File.Delete(StartMenuLink); } catch { }

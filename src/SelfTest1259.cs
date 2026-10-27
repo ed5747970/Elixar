@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -236,6 +237,107 @@ namespace CDriveCleaner
                 finally { Lang.Hebrew = wasHe; }
                 return null;
             });
+#if BUSINESS
+            // ---------- Cure email alerts (Elixar for Business) ----------
+            Run(check, "Cure alerts: one email for every new problem, nothing again while it stays (a reminder after a week), an email when it's fixed, and only the kinds that are turned on", () =>
+            {
+                var t0 = new DateTime(2026, 10, 1, 9, 0, 0);
+                Func<string, CureRisk, AlertPc> pc = (n, r) => new AlertPc { Id = "id-" + n, Name = n, Risk = r, Seen = t0, R = new CureReport { Total = 200L << 30, Free = r == CureRisk.Full ? 6L << 30 : 80L << 30, DiskLevel = r == CureRisk.Disk ? "Failing" : "Healthy" } };
+                var p = new AlertPrefs { On = true };
+                var pcs = new List<AlertPc> { pc("PC-OK", CureRisk.Ok), pc("PC-FULL", CureRisk.Full), pc("PC-DISK", CureRisk.Disk), pc("PC-LOW", CureRisk.Low) };
+                Dictionary<string, AlertEntry> st;
+                var m = CureAlerts.Plan(pcs, p, new Dictionary<string, AlertEntry>(), t0, out st);
+                if (string.Join(",", m.New.Select(r => r.Pc.Name)) != "PC-DISK,PC-FULL" || m.Open.Count + m.Fixed.Count != 0 || st.Count != 2) return "first: " + string.Join(",", m.New.Select(r => r.Pc.Name));
+                Dictionary<string, AlertEntry> st2;
+                if (!CureAlerts.Plan(pcs, p, st, t0.AddHours(1), out st2).Empty) return "sent twice";
+                pcs[1] = pc("PC-FULL", CureRisk.Ok);
+                var m3 = CureAlerts.Plan(pcs, p, st2, t0.AddDays(3), out st);
+                if (m3.Fixed.Count != 1 || m3.Fixed[0].Pc.Name != "PC-FULL" || m3.New.Count != 0 || st.ContainsKey("id-PC-FULL")) return "fixed";
+                var m8 = CureAlerts.Plan(pcs, p, st, t0.AddDays(8), out st2);
+                if (m8.Open.Count != 1 || m8.Open[0].Pc.Name != "PC-DISK" || m8.New.Count != 0) return "weekly reminder";
+                p.Soon = true;
+                var ms = CureAlerts.Plan(pcs, p, st2, t0.AddDays(8).AddHours(1), out st);
+                if (ms.New.Count != 1 || ms.New[0].Pc.Name != "PC-LOW") return "getting full (turned on)";
+                pcs[2] = pc("PC-DISK", CureRisk.Full);
+                var mk = CureAlerts.Plan(pcs, p, st, t0.AddDays(9), out st2);
+                if (mk.New.Count != 1 || mk.New[0].Kind != "full") return "a new kind of problem is new";
+                p.Fixed = false; pcs[3] = pc("PC-LOW", CureRisk.Ok);
+                if (CureAlerts.Plan(pcs, p, st2, t0.AddDays(10), out st).Fixed.Count != 0) return "fixed emails turned off";
+                // the email: names, what to do, and a PC's text never becomes HTML
+                var mail = new AlertMail();
+                var weird = pc("PC-X", CureRisk.Full); mail.New.Add(new AlertRow { Pc = weird, Kind = "full", Problem = "Almost full", Free = "6.0 GB (3%)", ToDo = "<script>alert(1)</script> Windows.old" });
+                CureAlerts.Compose(mail, "https://srv:8443/", "SRV");
+                if (mail.Subject != "Elixar: 1 PC needs attention \u2014 PC-X") return "subject: " + mail.Subject;
+                if (mail.Html.Contains("<script>") || !mail.Html.Contains("&lt;script&gt;") || !mail.Text.Contains("PC-X - Almost full - C: 6.0 GB (3%)") || !mail.Html.Contains("https://srv:8443/")) return "body";
+                return null;
+            });
+
+            Run(check, "Cure alerts (hourly run): reads the Cure Server's reports, sends one email through the connected account, never twice, tries again when sending fails, and sends nothing when email is off or alerts are off", () =>
+            {
+                string dir = Path.Combine(R, "alerts"); if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                var srv = new CureServer { Https = false, DataDir = dir, TokenHash = CureServer.HashToken("t") };
+                var js = CureProtocol.Json();
+                Action<string, long, string> add = (name, free, disk) =>
+                {
+                    var en = srv.Enroll(Encoding.UTF8.GetBytes("{\"token\":\"t\",\"computer\":\"" + name + "\"}"), "");
+                    var o = js.Deserialize<Dictionary<string, object>>(en.Body); string id = (string)o["id"]; var key = Convert.FromBase64String((string)o["key"]);
+                    var body = Encoding.UTF8.GetBytes(js.Serialize(new CureReport { Elixar = "1.2.59", Total = 200L << 30, Free = free, DiskLevel = disk })); string t = CureProtocol.UnixNow(), n = CureProtocol.Nonce();
+                    srv.Report(body, id, t, n, CureProtocol.Sign(key, t, n, body), "");
+                };
+                add("PC-OK", 120L << 30, "Healthy"); add("PC-FULL", 6L << 30, "Healthy"); add("PC-DISK", 90L << 30, "Failing");
+                AlertPrefs.OverrideFile = Path.Combine(R, "alert-prefs.txt"); CureAlerts.StateOverride = Path.Combine(R, "alert-state.txt");
+                var sent = new List<string>(); string fail = null;
+                CureAlerts.SendOverride = (subj, text, html) => { if (fail != null) return fail; sent.Add(subj); return null; };
+                CureAlerts.AccountOverride = () => "it@example.com";
+                try
+                {
+                    new AlertPrefs { On = false }.Save();
+                    CureAlerts.RunScheduled(dir, DateTime.Now);
+                    if (sent.Count != 0) return "sent while off";
+                    new AlertPrefs { On = true }.Save();
+                    if (!Policy.Allowed("email")) { CureAlerts.RunScheduled(dir, DateTime.Now); return sent.Count == 0 ? null : "sent while email is off by policy"; }
+                    fail = "no network";
+                    if (CureAlerts.RunScheduled(dir, DateTime.Now) != 1 || CureAlerts.LoadState().Count != 0) return "a failed send was marked as sent";
+                    fail = null;
+                    CureAlerts.RunScheduled(dir, DateTime.Now);
+                    if (sent.Count != 1 || !sent[0].StartsWith("Elixar: 2 PCs need attention") || !sent[0].Contains("PC-DISK") || !sent[0].Contains("PC-FULL")) return "sent: " + string.Join(" | ", sent);
+                    CureAlerts.RunScheduled(dir, DateTime.Now.AddMinutes(60));
+                    if (sent.Count != 1) return "sent again";
+                    CureAlerts.AccountOverride = () => null;
+                    if (CureAlerts.SendTest(dir) == null) return "a test with no account";
+                    CureAlerts.AccountOverride = () => "it@example.com";
+                    if (CureAlerts.SendTest(dir) != null || !sent.Last().StartsWith("Elixar: test of email alerts")) return "test email";
+                    string a = Automation.CreateCureAlertArgs(@"C:\Program Files\Elixar\Elixar.exe");
+                    if (!a.Contains("/TN \"Elixar\\Cure alerts\"") || !a.Contains("--cure-alerts") || !a.Contains("/SC HOURLY") || !a.Contains("/RL HIGHEST")) return "schedule: " + a;
+                    return null;
+                }
+                finally { CureAlerts.SendOverride = null; CureAlerts.AccountOverride = null; }
+            });
+
+            Run(check, "Domain PCs > Email alerts: the button opens the choices, and Save keeps them", () =>
+            {
+                bool keep = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
+                CureAlerts.AccountOverride = () => "it@example.com";
+                try
+                {
+                    using (var f = new MainForm(true))
+                    {
+                        if (!f.AlertsButtonShown) return "no button";
+                        f.OpenAlerts();
+                        var af = f.LastAlertsForm; if (af == null) return "no window";
+                    }
+                    using (var af = new CureAlertsForm(true, s => s, Path.Combine(R, "alerts")))
+                    {
+                        af.SetChoices(true, true);
+                        if (af.SaveNow() != null) return "save";
+                        var p = AlertPrefs.Load();
+                        if (!p.On || !p.Soon || !p.Disk) return "saved choices";
+                    }
+                    return null;
+                }
+                finally { MainForm.ForceWindowsUi = keep; CureAlerts.AccountOverride = null; AlertPrefs.OverrideFile = null; CureAlerts.StateOverride = null; }
+            });
+#endif
         }
     }
 }

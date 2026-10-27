@@ -95,6 +95,14 @@ namespace CDriveCleaner
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
 
+#if BUSINESS
+        // Elixar for Business on the Cure Server: every hour, as administrator, through the launcher - email alerts to IT
+        public static string CreateCureAlertArgs(string exe)
+        {
+            return "/Create /F /TN " + Quote(CureAlerts.Task) + " /TR " + Quote(ElevatedAction(exe, "--cure-alerts")) + " /SC HOURLY /RL HIGHEST";
+        }
+#endif
+
         // every half hour, as administrator, through the launcher: it cleans only the items whose time has come (the policy decides)
         public static string CreatePolicyCleanArgs(string exe)
         {

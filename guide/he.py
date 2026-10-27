@@ -1641,6 +1641,18 @@ HE = {
 "Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were.":"קבצים שהסרת, פריטי זהירות ומנהלי התקן שהוסרו נשמרים כאן לזמן מה לפני שהם נמחקים לצמיתות. שחזור מחזיר אותם בדיוק למקום שבו היו.",
 "empty.":"ריק.",
 "Daily tidy":"סידור יומי",
+# 1.2.60: Cure email alerts
+"Email alerts":"התראות במייל","Email alerts...":"התראות במייל...",
+"Elixar checks every PC's report each hour and emails you when one needs attention. Reports only: nothing is done on the PCs.":"Elixar בודק את הדיווח של כל מחשב כל שעה ושולח לך מייל כשמחשב דורש טיפול. דיווח בלבד: שום דבר לא נעשה במחשבים.",
+"Email me when a PC needs attention":"שלח לי מייל כשמחשב דורש טיפול","Send to: ":"שליחה אל: ","  (Settings > Email account)":"  (הגדרות > חשבון מייל)",
+"No email account is connected yet: connect one in Settings > Email account first.":"עדיין לא מחובר חשבון מייל: חבר קודם חשבון ב-הגדרות > חשבון מייל.",
+"Alert me when":"התרע לי כש","A disk is failing (right away)":"דיסק כושל (מיד)","C: is almost full (under 10% or 10 GB free)":"C: כמעט מלא (פחות מ-10% או 10 GB פנויים)",
+"A PC stopped reporting (not seen for 7 days)":"מחשב הפסיק לדווח (לא נראה 7 ימים)","C: will be full soon (under 20%, or full within 30 days at its pace)":"C: יתמלא בקרוב (פחות מ-20%, או מלא תוך 30 יום בקצב הנוכחי)",
+"A disk is worn (plan to replace it)":"דיסק שחוק (כדאי לתכנן החלפה)","How often":"באיזו תדירות",
+"One email lists every new problem (never one email per PC). A problem that is still there is reminded once a week.":"מייל אחד מפרט כל בעיה חדשה (אף פעם לא מייל לכל מחשב). על בעיה שנשארת נשלחת תזכורת פעם בשבוע.",
+"Also email me when a problem is fixed":"שלח לי מייל גם כשבעיה נפתרת",
+"This is a company PC: email is off on company PCs. To use alerts, allow email for this server in Policy manager > Email (allow).":"זה מחשב של חברה: המייל כבוי במחשבי חברה. כדי להשתמש בהתראות, אפשר מייל לשרת הזה ב-מנהל המדיניות > מייל (לאפשר).",
+"Send a test email":"שליחת מייל בדיקה","Sending...":"שולח...","Sent. Check your inbox.":"נשלח. בדוק את תיבת הדואר.",
 # 1.2.59: Check & fix, Repair Windows, Secure wipe
 "Check & fix":"בדיקה ותיקון","✓  Check & fix":"✓  בדיקה ותיקון",
 "One button: checks what fills and slows this PC, then fixes the safe parts when you say so":"כפתור אחד: בודק מה ממלא ומאט את המחשב, ומתקן את החלקים הבטוחים כשתאשר",
@@ -2052,6 +2064,7 @@ out += ['            // texts with numbers in them',
  '            Pat(@"Shred (\\d+) files?\\.\\.\\.", m => "גריסת " + m.Groups[1].Value + " קבצים...");',
  '            Pat(@"Pass (\\d+) of (\\d+): (.+) of (.+)", m => "סבב " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ": " + m.Groups[3].Value + " מתוך " + m.Groups[4].Value);',
  '            Pat(@"refused: (.+)", m => "נדחה: " + m.Groups[1].Value);',
+  '            Pat(@"Not sent: (.+)", m => "לא נשלח: " + m.Groups[1].Value);',
  '            return d;','        }','    }','}']
 open(sys.argv[1],'w',encoding='utf-8').write('\n'.join(out)+'\n')
 print(len(HE))

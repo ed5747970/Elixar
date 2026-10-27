@@ -1893,6 +1893,25 @@ namespace CDriveCleaner
             d["Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were."] = "קבצים שהסרת, פריטי זהירות ומנהלי התקן שהוסרו נשמרים כאן לזמן מה לפני שהם נמחקים לצמיתות. שחזור מחזיר אותם בדיוק למקום שבו היו.";
             d["empty."] = "ריק.";
             d["Daily tidy"] = "סידור יומי";
+            d["Email alerts"] = "התראות במייל";
+            d["Email alerts..."] = "התראות במייל...";
+            d["Elixar checks every PC's report each hour and emails you when one needs attention. Reports only: nothing is done on the PCs."] = "Elixar בודק את הדיווח של כל מחשב כל שעה ושולח לך מייל כשמחשב דורש טיפול. דיווח בלבד: שום דבר לא נעשה במחשבים.";
+            d["Email me when a PC needs attention"] = "שלח לי מייל כשמחשב דורש טיפול";
+            d["Send to: "] = "שליחה אל: ";
+            d["  (Settings > Email account)"] = "  (הגדרות > חשבון מייל)";
+            d["No email account is connected yet: connect one in Settings > Email account first."] = "עדיין לא מחובר חשבון מייל: חבר קודם חשבון ב-הגדרות > חשבון מייל.";
+            d["Alert me when"] = "התרע לי כש";
+            d["A disk is failing (right away)"] = "דיסק כושל (מיד)";
+            d["C: is almost full (under 10% or 10 GB free)"] = "C: כמעט מלא (פחות מ-10% או 10 GB פנויים)";
+            d["A PC stopped reporting (not seen for 7 days)"] = "מחשב הפסיק לדווח (לא נראה 7 ימים)";
+            d["C: will be full soon (under 20%, or full within 30 days at its pace)"] = "C: יתמלא בקרוב (פחות מ-20%, או מלא תוך 30 יום בקצב הנוכחי)";
+            d["A disk is worn (plan to replace it)"] = "דיסק שחוק (כדאי לתכנן החלפה)";
+            d["How often"] = "באיזו תדירות";
+            d["One email lists every new problem (never one email per PC). A problem that is still there is reminded once a week."] = "מייל אחד מפרט כל בעיה חדשה (אף פעם לא מייל לכל מחשב). על בעיה שנשארת נשלחת תזכורת פעם בשבוע.";
+            d["Also email me when a problem is fixed"] = "שלח לי מייל גם כשבעיה נפתרת";
+            d["This is a company PC: email is off on company PCs. To use alerts, allow email for this server in Policy manager > Email (allow)."] = "זה מחשב של חברה: המייל כבוי במחשבי חברה. כדי להשתמש בהתראות, אפשר מייל לשרת הזה ב-מנהל המדיניות > מייל (לאפשר).";
+            d["Sending..."] = "שולח...";
+            d["Sent. Check your inbox."] = "נשלח. בדוק את תיבת הדואר.";
             d["Check & fix"] = "בדיקה ותיקון";
             d["✓  Check & fix"] = "✓  בדיקה ותיקון";
             d["One button: checks what fills and slows this PC, then fixes the safe parts when you say so"] = "כפתור אחד: בודק מה ממלא ומאט את המחשב, ומתקן את החלקים הבטוחים כשתאשר";
@@ -2323,6 +2342,7 @@ namespace CDriveCleaner
             Pat(@"Shred (\d+) files?\.\.\.", m => "גריסת " + m.Groups[1].Value + " קבצים...");
             Pat(@"Pass (\d+) of (\d+): (.+) of (.+)", m => "סבב " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ": " + m.Groups[3].Value + " מתוך " + m.Groups[4].Value);
             Pat(@"refused: (.+)", m => "נדחה: " + m.Groups[1].Value);
+            Pat(@"Not sent: (.+)", m => "לא נשלח: " + m.Groups[1].Value);
             return d;
         }
     }
