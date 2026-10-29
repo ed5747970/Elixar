@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Linq;
@@ -312,7 +313,14 @@ namespace CDriveCleaner
                     if (FolderGrowth.Measure(TimeSpan.FromMinutes(1)) == null) return "a full reading";
                     string od = Path.Combine(R, "growdata4"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
                     string outside = Win.IsWindows ? @"C:\Program Files\Something\logs" : "/usr/share/something";
-                    File.WriteAllText(Path.Combine(od, "growing-now.txt"), (5L << 30) + "\t" + (6L << 30) + "\t7\tSafe\t" + outside + "\n" + (5L << 30) + "\t" + (6L << 30) + "\t7\tSafe\t" + zl + "\n");
+                    // a planted file and a link inside the measured places are refused too (only real folders are shown)
+                    string planted = Path.Combine(gb, "setup-helper.exe"); File.WriteAllText(planted, "x");
+                    string link = Path.Combine(gb, "linked"), linkTo = Path.Combine(R, "growlinktarget"); Directory.CreateDirectory(linkTo);
+                    if (Win.IsWindows) Process.Start(new ProcessStartInfo("cmd.exe", "/c mklink /J \"" + link + "\" \"" + linkTo + "\"") { UseShellExecute = false, CreateNoWindow = true }).WaitForExit();
+                    else Process.Start(new ProcessStartInfo("ln", "-s \"" + linkTo + "\" \"" + link + "\"") { UseShellExecute = false }).WaitForExit();
+                    if (!Directory.Exists(link)) return "the test link wasn't made";
+                    Func<string, string> row = p => (5L << 30) + "\t" + (6L << 30) + "\t7\tSafe\t" + p + "\n";
+                    File.WriteAllText(Path.Combine(od, "growing-now.txt"), row(outside) + row(planted) + row(link) + row(Path.Combine(gb, "gone")) + row(zl));
                     var cur = FolderGrowth.Current();
                     if (cur.Count != 1 || cur[0].Item1.Path != zl) return "the findings file pointed outside: " + string.Join(", ", cur.Select(x => x.Item1.Path));
                     string a = Automation.CreateKeepArgs(@"C:\Program Files\Elixar\Elixar.exe");

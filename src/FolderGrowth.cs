@@ -595,7 +595,9 @@ namespace CDriveCleaner
             try
             {
                 var roots = Roots().Select(r => r[0].TrimEnd('\\', '/')).ToList();
-                Func<string, bool> inside = path => roots.Any(r => path.StartsWith(r + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) && path.IndexOf("..", StringComparison.Ordinal) < 0;
+                // only real folders inside the measured places: never a file, a link or a path that climbs out
+                Func<string, bool> inside = path => roots.Any(r => path.StartsWith(r + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) && path.IndexOf("..", StringComparison.Ordinal) < 0
+                    && Directory.Exists(path) && RealFolder(path);
                 if (File.Exists(NowFile) && (DateTime.Now - File.GetLastWriteTime(NowFile)).TotalDays < 3)
                     foreach (var line in File.ReadAllLines(NowFile))
                     {
@@ -606,6 +608,11 @@ namespace CDriveCleaner
             }
             catch { }
             return l;
+        }
+
+        static bool RealFolder(string path)
+        {
+            try { return (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0 && SafeDelete.NoLinks(path); } catch { return false; }
         }
 
         public static string GrewText(FastFolder f) { return "+" + Fs.Fmt(f.Grew) + (f.Days <= 3 ? " in " + f.Days + " day" + (f.Days == 1 ? "" : "s") : " this week"); }
