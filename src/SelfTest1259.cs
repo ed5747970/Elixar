@@ -237,6 +237,132 @@ namespace CDriveCleaner
                 finally { Lang.Hebrew = wasHe; }
                 return null;
             });
+            // ---------- folders growing fast ----------
+            const long GB = 1L << 30;
+            Run(check, "Growing fast: a folder that grew 1 GB in a week (or in 2 days), doubled, or is new and big is found; the folder that really grows is shown, not every folder above it; ignored ones stay quiet", () =>
+            {
+                string od = Path.Combine(R, "growdata"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
+                try
+                {
+                    var today = new DateTime(2026, 10, 29);
+                    string a = Path.Combine(R, "A"), al = Path.Combine(a, "logs"), b = Path.Combine(R, "B"), c = Path.Combine(R, "C"), d = Path.Combine(R, "D");
+                    Func<object[], Dictionary<string, long>> m = kv => { var x = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase); for (int i = 0; i < kv.Length; i += 2) x[(string)kv[i]] = (long)kv[i + 1]; return x; };
+                    var snaps = new Dictionary<DateTime, Dictionary<string, long>>
+                    {
+                        { today.AddDays(-7), m(new object[] { a, 2 * GB, al, (long)(1.9 * GB), b, 5 * GB, c, 300L << 20 }) },
+                        { today.AddDays(-2), m(new object[] { a, 5 * GB, al, (long)(4.9 * GB), b, (long)(5.1 * GB), c, 400L << 20 }) },
+                        { today, m(new object[] { a, (long)(8.2 * GB), al, (long)(8.1 * GB), b, (long)(5.2 * GB), c, 900L << 20, d, (long)(1.5 * GB) }) },
+                    };
+                    var f = FolderGrowth.Detect(snaps, today);
+                    string got = string.Join(",", f.Select(x => Path.GetFileName(x.Path)).OrderBy(x => x));
+                    if (got != "C,D,logs") return "found: " + got;
+                    var lg = f.First(x => x.Path == al);
+                    if (lg.Days != 2 || FolderGrowth.GrewText(lg) != "+3.2 GB in 2 days") return "logs: " + FolderGrowth.GrewText(lg);
+                    if (FolderGrowth.GrewText(f.First(x => x.Path == c)) != "+600 MB this week") return "doubled: " + FolderGrowth.GrewText(f.First(x => x.Path == c));
+                    if (!f.First(x => x.Path == d).New) return "new folder";
+                    FolderGrowth.Ignore(d);
+                    if (FolderGrowth.Detect(snaps, today).Any(x => x.Path == d)) return "ignored";
+                    if (!FolderGrowth.RandomName("x7f3k9q") || FolderGrowth.RandomName("office365") || FolderGrowth.RandomName("Win32") || FolderGrowth.RandomName("logs")) return "random names";
+                    return null;
+                }
+                finally { FolderGrowth.OverrideDir = null; }
+            });
+
+            string gb = Path.Combine(R, "grow");
+            Action<string, string, int, int> make = (dir, ext, count, daysOld) =>
+            {
+                Directory.CreateDirectory(dir);
+                for (int i = 0; i < count; i++) { string fp = Path.Combine(dir, "f" + daysOld + "_" + i + ext); File.WriteAllBytes(fp, new byte[2048]); var t = DateTime.Now.AddDays(-daysOld); File.SetLastWriteTime(fp, t); }
+            };
+            string zl = Path.Combine(gb, "AppData", "Local", "Zoom", "logs"), vid = Path.Combine(gb, "Videos", "Captures"), cbs = Path.Combine(gb, "Windows", "Logs", "CBS"),
+                   odd = Path.Combine(gb, "ProgramData", "x7f3k9q"), ransom = Path.Combine(gb, "Work", "Projects"), myst = Path.Combine(gb, "AppData", "Local", "Mystery");
+            make(zl, ".log", 20, 40); make(zl, ".log", 5, 0); make(zl, ".docx", 1, 40); make(zl, ".exe", 0, 0);
+            make(vid, ".mp4", 3, 1); make(cbs, ".log", 4, 1); make(odd, ".exe", 3, 0); make(odd, ".dat", 30, 0);
+            make(ransom, ".k1ll3d", 150, 0); make(myst, ".dat", 20, 3);
+            FolderGrowth.KindRootOverride = path => path.Contains(Path.DirectorySeparatorChar + "Videos") ? "yours" : path.Contains(Path.DirectorySeparatorChar + "Windows" + Path.DirectorySeparatorChar) ? "windows" : null;
+            FolderGrowth.SignedOverride = path => false;
+            var names = new List<string> { "Zoom Workplace", "Zoom Video Communications", "Spotify" };
+            try
+            {
+                Run(check, "Growing fast: each folder is studied - an app's logs are safe to keep in check, your files and Windows' are never deleted, unsigned programs no app owns or many files turned into an unknown type (ransomware) look unusual", () =>
+                {
+                    var now = DateTime.Now;
+                    var z = FolderGrowth.Study(zl, names, now);
+                    if (z.Kind != GrowKind.Safe || z.Owner != "Zoom Workplace" || !z.Inside.Contains("old ones never removed")) return "Zoom logs: " + z.Kind + " / " + z.Owner + " / " + z.Inside;
+                    var v = FolderGrowth.Study(vid, names, now); if (v.Kind != GrowKind.Yours) return "videos: " + v.Kind;
+                    var w = FolderGrowth.Study(cbs, names, now); if (w.Kind != GrowKind.Windows || !w.Verdict.Contains("Repair Windows")) return "CBS: " + w.Kind;
+                    var o = FolderGrowth.Study(odd, names, now); if (o.Kind != GrowKind.Unusual || o.OwnerKnown || o.Unsigned != 3 || !o.Verdict.Contains("Defender")) return "unknown programs: " + o.Kind + " " + o.Unsigned;
+                    var r = FolderGrowth.Study(ransom, names, now); if (r.Kind != GrowKind.Unusual || !r.RansomLike || !r.Reason.Contains("ransomware")) return "ransomware look: " + r.Kind;
+                    var y = FolderGrowth.Study(myst, names, now); if (y.Kind != GrowKind.Look) return "unknown data: " + y.Kind;
+                    return null;
+                });
+
+                Run(check, "Keep in check: only for a folder studied as safe, after you allow it; it deletes only old log, cache and temp files (never programs or documents), the first two times to Undo", () =>
+                {
+                    string od = Path.Combine(R, "growdata2"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
+                    string undo = Path.Combine(R, "growundo"); Directory.CreateDirectory(undo); Quarantine.OverrideRoot = undo;
+                    try
+                    {
+                        var now = DateTime.Now;
+                        if (FolderGrowth.AddRule(FolderGrowth.Study(vid, names, now), 14) == null || FolderGrowth.AddRule(FolderGrowth.Study(odd, names, now), 14) == null || FolderGrowth.AddRule(FolderGrowth.Study(cbs, names, now), 14) == null) return "a rule for a folder that isn't safe";
+                        var z = FolderGrowth.Study(zl, names, now);
+                        if (FolderGrowth.AddRule(z, 14) != null || FolderGrowth.Rules().Count != 1) return "rule";
+                        File.WriteAllBytes(Path.Combine(zl, "old.exe"), new byte[10]); File.SetLastWriteTime(Path.Combine(zl, "old.exe"), DateTime.Now.AddDays(-60));
+                        var files = FolderGrowth.RuleFiles(FolderGrowth.Rules()[0], now);
+                        if (files.Count != 20 || files.Any(x => !x.EndsWith(".log"))) return "would delete " + files.Count + ": " + string.Join(",", files.Where(x => !x.EndsWith(".log")).Select(Path.GetFileName));
+                        FolderGrowth.RunRules(now, null);
+                        int logsLeft = Directory.GetFiles(zl, "*.log").Length;
+                        if (logsLeft != 5 || !File.Exists(Path.Combine(zl, "f40_0.docx")) || !File.Exists(Path.Combine(zl, "old.exe"))) return "after the first run: " + logsLeft + " logs";
+                        if (!Quarantine.List().Any(q => (q.Label ?? "").StartsWith("Keep in check"))) return "the first run didn't go to Undo";
+                        make(zl, ".log", 4, 40); FolderGrowth.RunRules(now, null); make(zl, ".log", 4, 40); FolderGrowth.RunRules(now, null);
+                        if (Directory.GetFiles(zl, "*.log").Length != 5 || FolderGrowth.Rules()[0].Runs != 3) return "third run: " + Directory.GetFiles(zl, "*.log").Length;
+                        if (!ChangeLog.Read().Any(e => e.Action == "Kept a folder in check")) return "not in Logs";
+                        FolderGrowth.RemoveRule(zl); if (FolderGrowth.Rules().Count != 0) return "stop";
+                        return null;
+                    }
+                    finally { FolderGrowth.OverrideDir = null; Quarantine.OverrideRoot = null; }
+                });
+
+                Run(check, "Growing fast, the daily check: one reading a day, the fast folders studied and announced once a week (at once when one starts to look unusual), shown on the Dashboard tile and in its window", () =>
+                {
+                    string od = Path.Combine(R, "growdata3"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
+                    var keepNames = Leftovers.NamesOverride; Leftovers.NamesOverride = () => names;
+                    try
+                    {
+                        var d0 = DateTime.Now.Date.AddDays(-7);
+                        var r0 = FolderGrowth.DailyRun(d0, null, () => new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase) { { zl, 1 * GB }, { odd, 200L << 20 } });
+                        if (r0.Fast.Count != 0) return "first reading";
+                        var r1 = FolderGrowth.DailyRun(DateTime.Now, null, () => new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase) { { zl, 4 * GB }, { odd, (long)(2.5 * GB) } });
+                        if (r1.Fast.Count != 2 || r1.Alert.Count != 2) return "found " + r1.Fast.Count + ", alerts " + r1.Alert.Count;
+                        var r2 = FolderGrowth.DailyRun(DateTime.Now, null, null);   // the same day: no new reading, no second alert
+                        if (r2.Alert.Count != 0 || r2.Fast.Count != 2) return "second alert the same day";
+                        var cur = FolderGrowth.Current();
+                        if (cur.Count != 2 || !cur.Any(x => x.Item2 == GrowKind.Unusual)) return "for the Dashboard: " + cur.Count;
+                        using (var gf = new GrowingForm(true, s => s, null, null, null))
+                        {
+                            gf.ShowStudies(r1.Fast.Select((x, i) => Tuple.Create(x, r1.Studies[i])).ToList());
+                            if (gf.Studies.Count != 2) return "window";
+                            var safe = gf.Studies.First(x => x.Kind == GrowKind.Safe);
+                            if (!gf.KeepInCheck(safe) || FolderGrowth.Rules().Count != 1) return "allow from the window";
+                        }
+                        bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
+                        try { using (var f = new MainForm(true)) { f.OpenGrowing(); if (f.LastGrowing == null) return "the window didn't open"; } }
+                        finally { MainForm.ForceWindowsUi = keepUi; }
+                        bool wasHe = Lang.Hebrew;
+                        try
+                        {
+                            Lang.Hebrew = true;
+                            foreach (var t in new[] { "Growing fast", "Folders growing fast", "Safe to keep in check", "Looks unusual", "Your files", "Scan with Microsoft Defender", "Belongs to", "What's inside", "Clean once now" })
+                                if (Lang.T(t) == t) return "not in Hebrew: " + t;
+                        }
+                        finally { Lang.Hebrew = wasHe; }
+                        return null;
+                    }
+                    finally { FolderGrowth.OverrideDir = null; Leftovers.NamesOverride = keepNames; }
+                });
+            }
+            finally { FolderGrowth.KindRootOverride = null; FolderGrowth.SignedOverride = null; }
+
 #if BUSINESS
             // ---------- Cure email alerts (Elixar for Business) ----------
             Run(check, "Cure alerts: one email for every new problem, nothing again while it stays (a reminder after a week), an email when it's fixed, and only the kinds that are turned on", () =>

@@ -1641,6 +1641,18 @@ HE = {
 "Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were.":"קבצים שהסרת, פריטי זהירות ומנהלי התקן שהוסרו נשמרים כאן לזמן מה לפני שהם נמחקים לצמיתות. שחזור מחזיר אותם בדיוק למקום שבו היו.",
 "empty.":"ריק.",
 "Daily tidy":"סידור יומי",
+# 1.2.61: folders growing fast
+"Growing fast":"גדל מהר","Folders growing fast":"תיקיות שגדלות מהר","Safe to keep in check":"בטוח לשמור בשליטה","Looks unusual":"נראה חריג","Your files":"הקבצים שלך","Look at it":"כדאי להציץ",
+"Scan with Microsoft Defender":"סריקה ב-Microsoft Defender","Belongs to":"שייך ל","What's inside":"מה יש בפנים","Clean once now":"ניקוי חד-פעמי עכשיו","Check now":"בדיקה עכשיו",
+"Keep it in check...  (delete old ones daily)":"שמירה בשליטה...  (מחיקת ישנים כל יום)","Move off C:...":"העברה מ-C:...","It's mine, ignore":"זה שלי, להתעלם","Ignore":"להתעלם","Open":"פתיחה",
+"Kept in check (allowed by you)":"נשמר בשליטה (באישורך)","Your own files":"הקבצים שלך","No installed app, service or known program":"שום אפליקציה מותקנת, שירות או תוכנה מוכרת","Not sure who writes here":"לא ברור מי כותב כאן",
+"Elixar measures the folders on C: once a day and studies the ones that grow fast: who writes there, what kind of files, and whether old files are ever removed. Nothing is deleted unless you allow it.":"Elixar מודד את התיקיות ב-C: פעם ביום ובודק את אלה שגדלות מהר: מי כותב שם, איזה סוג קבצים, והאם קבצים ישנים נמחקים אי פעם. שום דבר לא נמחק בלי אישורך.",
+"No folder on C: is growing fast right now.":"אף תיקייה ב-C: לא גדלה מהר כרגע.","Measuring the folders on C: (a few minutes)...":"מודד את התיקיות ב-C: (כמה דקות)...","Cleaning...":"מנקה...",
+"This doesn't look like a normal app. Elixar won't delete it (that could hide what happened): scan it with Microsoft Defender first.":"זה לא נראה כמו אפליקציה רגילה. Elixar לא ימחק את זה (זה עלול להסתיר מה קרה): סרוק קודם ב-Microsoft Defender.",
+"These are your own files: Elixar never deletes them by itself. Move them to another drive or to OneDrive if C: is getting full.":"אלה הקבצים שלך: Elixar אף פעם לא מוחק אותם בעצמו. העבר אותם לכונן אחר או ל-OneDrive אם C: מתמלא.",
+"Elixar can't tell for sure what this is, so it won't offer to delete anything here. Open it and look.":"Elixar לא יכול לדעת בוודאות מה זה, ולכן לא יציע למחוק כאן דבר. פתח והסתכל.",
+"Microsoft Defender found no threats there.":"Microsoft Defender לא מצא שם איומים.",
+"1 looks unusual":"1 נראה חריג","click to see":"לחץ לצפייה",
 # 1.2.60: Cure email alerts
 "Email alerts":"התראות במייל","Email alerts...":"התראות במייל...",
 "Elixar checks every PC's report each hour and emails you when one needs attention. Reports only: nothing is done on the PCs.":"Elixar בודק את הדיווח של כל מחשב כל שעה ושולח לך מייל כשמחשב דורש טיפול. דיווח בלבד: שום דבר לא נעשה במחשבים.",
@@ -2065,6 +2077,12 @@ out += ['            // texts with numbers in them',
  '            Pat(@"Pass (\\d+) of (\\d+): (.+) of (.+)", m => "סבב " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ": " + m.Groups[3].Value + " מתוך " + m.Groups[4].Value);',
  '            Pat(@"refused: (.+)", m => "נדחה: " + m.Groups[1].Value);',
   '            Pat(@"Not sent: (.+)", m => "לא נשלח: " + m.Groups[1].Value);',
+  '            Pat(@"(\\d+) folders?", m => m.Groups[1].Value + " תיקיות");',
+ '            Pat(@"\\+(.+) in (\\d+) days?", m => "+" + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים");',
+ '            Pat(@"\\+(.+) this week", m => "+" + m.Groups[1].Value + " השבוע");',
+ '            Pat(@"(\\d+) look unusual", m => m.Groups[1].Value + " נראים חריגים");',
+ '            Pat(@"Kept in check: older than (\\d+) days, daily", m => "נשמר בשליטה: ישנים מ-" + m.Groups[1].Value + " ימים, כל יום");',
+ '            Pat(@"older than (\\d+) days, daily", m => "ישנים מ-" + m.Groups[1].Value + " ימים, כל יום");',
  '            return d;','        }','    }','}']
 open(sys.argv[1],'w',encoding='utf-8').write('\n'.join(out)+'\n')
 print(len(HE))

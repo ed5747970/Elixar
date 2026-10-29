@@ -281,6 +281,9 @@ namespace CDriveCleaner
             long total = Sys.Total(), free = Sys.Free();
             SpaceHistory.Record(free, total);   // one reading a day for the space trend
             if (Win.IsWindows) { CheckDisks(); CheckOtherDrives(percent); SmartReminder(DateTime.Today); } else CheckSnaps(total);
+            if (Win.IsWindows)
+                try { var g = FolderGrowth.DailyRun(DateTime.Now, Log, null); FolderGrowth.Notify(g); if (g.Fast.Count > 0) Log("Growing fast: " + g.Fast.Count + " folder(s)."); }
+                catch (Exception e) { Log("Growing folders: " + e.Message); }
             if (!ShouldWarn(free, total, percent))
             {
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");

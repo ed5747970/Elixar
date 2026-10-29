@@ -93,6 +93,7 @@ namespace CDriveCleaner
         public long TrashBytes = -1, AptBytes = -1, SnapBytes = -1, OneDriveFree = -1;
         public List<Growth.Watch> Watch = new List<Growth.Watch>();   // folders that keep growing
         public bool WatchHistory;                                       // two weeks of readings so far
+        public List<Tuple<FastFolder, GrowKind>> Fast = new List<Tuple<FastFolder, GrowKind>>();   // folders growing fast (the daily check)
         public List<Growth.Change> Grew = new List<Growth.Change>();   // what grew this week   // Linux tiles and the Snap warning
         public List<DriveRow> Drives = new List<DriveRow>();
         public List<Activity.Entry> Recent = new List<Activity.Entry>();
@@ -875,6 +876,7 @@ namespace CDriveCleaner
                 case 4: ShowSettings(); break;
                 case 5: ShowUndo(); break;
                 case 6:
+                    if (dashSum != null && dashSum.Fast != null && dashSum.Fast.Count > 0) { OpenGrowing(); break; }
                     WatchForm.ShowFor(this, testMode, dashLocs, p => { if (System.IO.Directory.Exists(p)) OpenDrill(p); else ShowInFolder(p); }, RefreshOverview);
                     break;
             }
@@ -921,6 +923,7 @@ namespace CDriveCleaner
                 {
                     try { sum.Grew = Growth.Grew(DateTime.Today, 7, 256L << 20); } catch { }
                     try { sum.Watch = Growth.Watchlist(DateTime.Today); sum.WatchHistory = Growth.HasHistory(DateTime.Today); } catch { }
+                    try { sum.Fast = FolderGrowth.Current(); } catch { }
                 }
                 if (odAccounts.Count > 0 && !LinuxUi) try { sum.OneDriveFree = OneDrive.QuickFreeable(); } catch { }
                 if (Lx.On)
@@ -1102,7 +1105,16 @@ namespace CDriveCleaner
             {
                 var w = m.Watch ?? new List<Growth.Watch>();
                 var top = w.FirstOrDefault();
-                if (!m.WatchHistory) tile(6, "Collecting data", "Folders that keep growing show up after two weeks", Theme.Accent);
+                var fast = m.Fast ?? new List<Tuple<FastFolder, GrowKind>>();
+                tiles[6].Caption = Lang.On ? Lang.T(fast.Count > 0 ? "Growing fast" : "Watch") : Lang.T(fast.Count > 0 ? "Growing fast" : "Watch").ToUpperInvariant();
+                if (fast.Count > 0)
+                {
+                    int odd = fast.Count(x => x.Item2 == GrowKind.Unusual);
+                    tile(6, fast.Count == 1 ? "1 folder" : fast.Count + " folders", "", odd > 0 ? CriticalColor : CautionColor);
+                    tiles[6].Sub = Lang.T("+" + Fs.Fmt(fast.Sum(x => Math.Max(0, x.Item1.Grew))) + " this week") + (odd > 0 ? " · " + Lang.T(odd == 1 ? "1 looks unusual" : odd + " look unusual") : "") + " · " + Lang.T("click to see");
+                    tiles[6].Invalidate();
+                }
+                else if (!m.WatchHistory) tile(6, "Collecting data", "Folders that keep growing show up after two weeks", Theme.Accent);
                 else if (top == null) tile(6, "All steady", "No folder keeps growing", SafeColor);
                 else
                 {

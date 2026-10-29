@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.60</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.61</p></div>
 </div></header>
 <main class="wrap">
 
@@ -96,6 +96,17 @@
   <tr><td>Disk failing or worn, restart waiting</td><td>&ndash;</td><td>Information only, with what to do</td></tr>
 </table>
 <p>Click <strong>Fix selected</strong>: a restore point is made first (when startup programs or apps change), then each fix runs and is written to Logs.</p>
+<h3>Growing fast</h3>
+<p>Once a day (with the low-space check) Elixar writes down the size of the bigger folders on C: - your profile and AppData, ProgramData, Windows' temp and log folders - and finds the ones growing fast: 1 GB or more in a week (or in 2 days), or doubling. Each one is studied: who writes there (an installed app, Windows, or nobody known), what kind of files, and whether old ones are ever removed. You get a Windows notification, and the <strong>Watch</strong> tile on the Dashboard becomes <strong>Growing fast</strong>; click it to see each folder:</p>
+<table>
+  <tr><th>What it is</th><th>What Elixar offers</th></tr>
+  <tr><td><strong>Safe to keep in check</strong>: an app's logs, caches, crash dumps</td><td><em>Keep it in check</em>: after you allow it, old log, cache and temp files there (older than 14 days) are deleted daily - never programs, documents, pictures, videos or archives. The first two runs go to Undo. <em>Clean once now</em> moves them to Undo once. Stop a rule in the same window</td></tr>
+  <tr><td><strong>Your files</strong> (Videos, Downloads, Documents&hellip;)</td><td>Move off C:. Never deleted by Elixar</td></tr>
+  <tr><td><strong>Windows</strong></td><td>The right tool (a log that keeps growing in Windows\Logs\CBS means a stuck update: Repair Windows)</td></tr>
+  <tr><td><strong>Looks unusual</strong>: no app owns it and new unsigned programs appear, a hidden random-named folder, or many files turned into an unknown file type in a day (how ransomware looks)</td><td><em>Scan with Microsoft Defender</em>. Never deleted - that could hide what happened</td></tr>
+  <tr><td><strong>Look at it</strong></td><td>Open, Ignore</td></tr>
+</table>
+<p>Only folder sizes are kept (never file names). <em>Ignore</em> keeps a folder quiet; <em>Check now</em> measures at once.</p>
 <h3>Choosing a drive</h3>
 <p>The switch at the top left lists <strong>C: Windows</strong>, every other drive in the PC (and USB drives), and <strong>All drives</strong>. Refresh (F5), Explore and Folder map work on the drive you picked.</p>
 <p>Under the switch, Elixar shows which physical disk the drive is on and this PC's name, for example <strong>Disk 0 of ELISAR-PC</strong>. The number is the one Windows' Disk Management shows (it starts at 0); two drives on the same disk show the same number. In All drives, every card has its own line.</p>
@@ -530,6 +541,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-29</td><td>1.2.61</td><td>Growing fast: the folders on C: that grow fast are found once a day and studied (an app&rsquo;s logs or caches, your files, Windows, or something unusual), with a notification; an app&rsquo;s old logs and caches can be kept in check with a daily rule you allow; unusual ones get a Microsoft Defender scan, never a delete</td></tr>
   <tr><td>2026-10-27</td><td>1.2.60</td><td>Elixar for Business: email alerts to IT from the Cure Server (a disk failing, C: almost full, a PC not reporting; one email for every new problem, a weekly reminder, and when it is fixed)</td></tr>
   <tr><td>2026-10-27</td><td>1.2.59</td><td>Check &amp; fix on the Dashboard (one button: Safe clean, startup programs you can open yourself, app updates, disk and Windows status; a restore point first). Tools &rsaquo; Repair Windows (DISM and SFC). Tools &rsaquo; Secure wipe (wipe free space, shred files; TRIM on SSDs). Release code signing through SSL.com eSigner</td></tr>
   <tr><td>2026-10-26</td><td>1.2.58</td><td>Fewer antivirus false alarms: PowerShell is started with its script as plain text (no encoded command, no execution-policy bypass), the golden-image cleanup clears event logs and restore points through Windows' own interfaces, and the program has none of the command lines ransomware uses. Troubleshooting: what to do when an antivirus blocks Elixar</td></tr>

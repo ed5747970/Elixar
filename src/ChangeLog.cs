@@ -57,7 +57,7 @@ namespace CDriveCleaner
         public static readonly string[] Sections =
         {
             "Cleaner", "Check & fix", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
-            "System space", "Space map", "Repair Windows", "Secure wipe", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
+            "System space", "Space map", "Repair Windows", "Secure wipe", "Keep in check", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
         };
 
         [ThreadStatic] static string scope;

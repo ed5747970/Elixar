@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.60)
+ELIXAR  (version 1.2.61)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,20 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.61
+- Growing fast: once a day Elixar finds the folders on C: that grow fast
+  (1 GB a week, or doubling) and studies each: who writes there, what kind
+  of files, whether old ones are ever removed. A notification tells you,
+  and the Dashboard's Watch tile shows them.
+  - An app's logs, caches and crash dumps: "Keep it in check" deletes the
+    old ones daily - only after you allow it, only those kinds of files
+    (never programs, documents, pictures, videos or archives), the first
+    two times to Undo.
+  - Your files and Windows' folders: never deleted; the right step shown.
+  - Looks unusual (no owner and new unsigned programs, a hidden random-
+    named folder, or many files turned into an unknown type - how
+    ransomware looks): scan with Microsoft Defender; never deleted.
 
 NEW IN 1.2.60  (Elixar for Business)
 - Email alerts to IT: on the Cure Server PC, Domain PCs > Email alerts

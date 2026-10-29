@@ -146,7 +146,7 @@ namespace CDriveCleaner
             d["Turn off"] = "כיבוי";
             d["Turn on"] = "הפעלה";
             d["Remove leftover entries..."] = "הסרת רשומות שנשארו...";
-            d["Scan with Microsoft Defender"] = "סריקה עם Microsoft Defender";
+            d["Scan with Microsoft Defender"] = "סריקה ב-Microsoft Defender";
             d["Open file location"] = "פתיחת מיקום הקובץ";
             d["Check again"] = "בדיקה חוזרת";
             d["Needs a look"] = "כדאי לבדוק";
@@ -863,7 +863,7 @@ namespace CDriveCleaner
             d["No"] = "לא";
             d["Retry"] = "נסה שוב";
             d["Abort"] = "עצירה";
-            d["Ignore"] = "התעלמות";
+            d["Ignore"] = "להתעלם";
             d["This cannot be undone."] = "אי אפשר לבטל את זה.";
             d["varies"] = "משתנה";
             d["Get this PC ready for Sysprep"] = "הכנת המחשב ל-Sysprep";
@@ -1893,6 +1893,31 @@ namespace CDriveCleaner
             d["Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were."] = "קבצים שהסרת, פריטי זהירות ומנהלי התקן שהוסרו נשמרים כאן לזמן מה לפני שהם נמחקים לצמיתות. שחזור מחזיר אותם בדיוק למקום שבו היו.";
             d["empty."] = "ריק.";
             d["Daily tidy"] = "סידור יומי";
+            d["Growing fast"] = "גדל מהר";
+            d["Folders growing fast"] = "תיקיות שגדלות מהר";
+            d["Safe to keep in check"] = "בטוח לשמור בשליטה";
+            d["Looks unusual"] = "נראה חריג";
+            d["Look at it"] = "כדאי להציץ";
+            d["Belongs to"] = "שייך ל";
+            d["What's inside"] = "מה יש בפנים";
+            d["Clean once now"] = "ניקוי חד-פעמי עכשיו";
+            d["Check now"] = "בדיקה עכשיו";
+            d["Keep it in check...  (delete old ones daily)"] = "שמירה בשליטה...  (מחיקת ישנים כל יום)";
+            d["Move off C:..."] = "העברה מ-C:...";
+            d["It's mine, ignore"] = "זה שלי, להתעלם";
+            d["Kept in check (allowed by you)"] = "נשמר בשליטה (באישורך)";
+            d["Your own files"] = "הקבצים שלך";
+            d["No installed app, service or known program"] = "שום אפליקציה מותקנת, שירות או תוכנה מוכרת";
+            d["Not sure who writes here"] = "לא ברור מי כותב כאן";
+            d["Elixar measures the folders on C: once a day and studies the ones that grow fast: who writes there, what kind of files, and whether old files are ever removed. Nothing is deleted unless you allow it."] = "Elixar מודד את התיקיות ב-C: פעם ביום ובודק את אלה שגדלות מהר: מי כותב שם, איזה סוג קבצים, והאם קבצים ישנים נמחקים אי פעם. שום דבר לא נמחק בלי אישורך.";
+            d["No folder on C: is growing fast right now."] = "אף תיקייה ב-C: לא גדלה מהר כרגע.";
+            d["Measuring the folders on C: (a few minutes)..."] = "מודד את התיקיות ב-C: (כמה דקות)...";
+            d["This doesn't look like a normal app. Elixar won't delete it (that could hide what happened): scan it with Microsoft Defender first."] = "זה לא נראה כמו אפליקציה רגילה. Elixar לא ימחק את זה (זה עלול להסתיר מה קרה): סרוק קודם ב-Microsoft Defender.";
+            d["These are your own files: Elixar never deletes them by itself. Move them to another drive or to OneDrive if C: is getting full."] = "אלה הקבצים שלך: Elixar אף פעם לא מוחק אותם בעצמו. העבר אותם לכונן אחר או ל-OneDrive אם C: מתמלא.";
+            d["Elixar can't tell for sure what this is, so it won't offer to delete anything here. Open it and look."] = "Elixar לא יכול לדעת בוודאות מה זה, ולכן לא יציע למחוק כאן דבר. פתח והסתכל.";
+            d["Microsoft Defender found no threats there."] = "Microsoft Defender לא מצא שם איומים.";
+            d["1 looks unusual"] = "1 נראה חריג";
+            d["click to see"] = "לחץ לצפייה";
             d["Email alerts"] = "התראות במייל";
             d["Email alerts..."] = "התראות במייל...";
             d["Elixar checks every PC's report each hour and emails you when one needs attention. Reports only: nothing is done on the PCs."] = "Elixar בודק את הדיווח של כל מחשב כל שעה ושולח לך מייל כשמחשב דורש טיפול. דיווח בלבד: שום דבר לא נעשה במחשבים.";
@@ -2343,6 +2368,12 @@ namespace CDriveCleaner
             Pat(@"Pass (\d+) of (\d+): (.+) of (.+)", m => "סבב " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ": " + m.Groups[3].Value + " מתוך " + m.Groups[4].Value);
             Pat(@"refused: (.+)", m => "נדחה: " + m.Groups[1].Value);
             Pat(@"Not sent: (.+)", m => "לא נשלח: " + m.Groups[1].Value);
+            Pat(@"(\d+) folders?", m => m.Groups[1].Value + " תיקיות");
+            Pat(@"\+(.+) in (\d+) days?", m => "+" + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים");
+            Pat(@"\+(.+) this week", m => "+" + m.Groups[1].Value + " השבוע");
+            Pat(@"(\d+) look unusual", m => m.Groups[1].Value + " נראים חריגים");
+            Pat(@"Kept in check: older than (\d+) days, daily", m => "נשמר בשליטה: ישנים מ-" + m.Groups[1].Value + " ימים, כל יום");
+            Pat(@"older than (\d+) days, daily", m => "ישנים מ-" + m.Groups[1].Value + " ימים, כל יום");
             return d;
         }
     }
