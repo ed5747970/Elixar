@@ -1918,6 +1918,8 @@ namespace CDriveCleaner
             d["Microsoft Defender found no threats there."] = "Microsoft Defender לא מצא שם איומים.";
             d["1 looks unusual"] = "1 נראה חריג";
             d["click to see"] = "לחץ לצפייה";
+            d["No installed app owns it"] = "שום אפליקציה מותקנת לא שייכת לזה";
+            d["Temporary files (apps and installers)"] = "קבצים זמניים (אפליקציות ותוכנות התקנה)";
             d["Email alerts"] = "התראות במייל";
             d["Email alerts..."] = "התראות במייל...";
             d["Elixar checks every PC's report each hour and emails you when one needs attention. Reports only: nothing is done on the PCs."] = "Elixar בודק את הדיווח של כל מחשב כל שעה ושולח לך מייל כשמחשב דורש טיפול. דיווח בלבד: שום דבר לא נעשה במחשבים.";

@@ -26,7 +26,7 @@ namespace CDriveCleaner
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
-            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean") || args.Contains("--cure-alerts") || Cli.IsCli(args) || args.Contains("--msi");
+            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean") || args.Contains("--cure-alerts") || args.Contains("--keep-in-check") || Cli.IsCli(args) || args.Contains("--msi");
             if (Win.IsWindows)
             {
                 // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
@@ -68,7 +68,13 @@ namespace CDriveCleaner
                     "This is how the low-space alert looks. " + Fs.Fmt(Sys.Free()) + " is free on C: right now.", ToolTipIcon.Info, false);
                 return 0;
             }
-            if (args.Contains("--mail-daily") || args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--policy-clean") || args.Contains("--cure-alerts")) Install.HideLauncherWindow();
+            if (args.Contains("--mail-daily") || args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--policy-clean") || args.Contains("--cure-alerts") || args.Contains("--keep-in-check")) Install.HideLauncherWindow();
+            if (args.Contains("--keep-in-check"))
+            {
+                Application.EnableVisualStyles();
+                FolderGrowth.RunRules(DateTime.Now, m => Automation.Log(m));
+                return 0;
+            }
 #if BUSINESS
             if (args.Contains("--cure-alerts"))
             {

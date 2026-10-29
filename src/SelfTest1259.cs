@@ -297,6 +297,29 @@ namespace CDriveCleaner
                     return null;
                 });
 
+                Run(check, "Growing fast, the safety review: only installed apps vouch for a folder (not a running program or a generic name), temp folders aren't flagged for installers' helpers, a half reading is never kept, and a tampered findings file can't point outside the measured folders", () =>
+                {
+                    var now = DateTime.Now;
+                    string svc = Path.Combine(gb, "ProgramData", "SystemUpdateSvc"); make(svc, ".exe", 2, 0); make(svc, ".dat", 10, 0);
+                    var generic = new List<string> { "System", "Update Service", "svchost", "Microsoft Corporation" };
+                    var sv = FolderGrowth.Study(svc, generic, now);
+                    if (sv.Kind != GrowKind.Unusual || sv.OwnerKnown) return "a generic name vouched for a folder: " + sv.Kind + " / " + sv.Owner;
+                    string tmp = Path.Combine(gb, "AppData", "Local", "Temp"); make(tmp, ".exe", 2, 0); make(tmp, ".tmp", 20, 30);
+                    var tp = FolderGrowth.Study(tmp, names, now);
+                    if (tp.Kind != GrowKind.Safe || !tp.Owner.StartsWith("Temporary files")) return "temp folder: " + tp.Kind;
+                    FolderGrowth.RootsOverride = () => new List<string[]> { new[] { gb, "6" } };
+                    if (FolderGrowth.Measure(TimeSpan.Zero) != null) return "a half reading was kept";
+                    if (FolderGrowth.Measure(TimeSpan.FromMinutes(1)) == null) return "a full reading";
+                    string od = Path.Combine(R, "growdata4"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
+                    string outside = Win.IsWindows ? @"C:\Program Files\Something\logs" : "/usr/share/something";
+                    File.WriteAllText(Path.Combine(od, "growing-now.txt"), (5L << 30) + "\t" + (6L << 30) + "\t7\tSafe\t" + outside + "\n" + (5L << 30) + "\t" + (6L << 30) + "\t7\tSafe\t" + zl + "\n");
+                    var cur = FolderGrowth.Current();
+                    if (cur.Count != 1 || cur[0].Item1.Path != zl) return "the findings file pointed outside: " + string.Join(", ", cur.Select(x => x.Item1.Path));
+                    string a = Automation.CreateKeepArgs(@"C:\Program Files\Elixar\Elixar.exe");
+                    if (!a.Contains("/TN \"Elixar\\Keep in check\"") || !a.Contains("--keep-in-check") || !a.Contains("/SC DAILY") || !a.Contains("/RL HIGHEST")) return "schedule: " + a;
+                    return null;
+                });
+
                 Run(check, "Keep in check: only for a folder studied as safe, after you allow it; it deletes only old log, cache and temp files (never programs or documents), the first two times to Undo", () =>
                 {
                     string od = Path.Combine(R, "growdata2"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
@@ -326,7 +349,8 @@ namespace CDriveCleaner
                 Run(check, "Growing fast, the daily check: one reading a day, the fast folders studied and announced once a week (at once when one starts to look unusual), shown on the Dashboard tile and in its window", () =>
                 {
                     string od = Path.Combine(R, "growdata3"); Directory.CreateDirectory(od); FolderGrowth.OverrideDir = od;
-                    var keepNames = Leftovers.NamesOverride; Leftovers.NamesOverride = () => names;
+                    FolderGrowth.NamesOverride = () => names;
+                    FolderGrowth.RootsOverride = () => new List<string[]> { new[] { gb, "6" } };
                     try
                     {
                         var d0 = DateTime.Now.Date.AddDays(-7);
@@ -358,10 +382,10 @@ namespace CDriveCleaner
                         finally { Lang.Hebrew = wasHe; }
                         return null;
                     }
-                    finally { FolderGrowth.OverrideDir = null; Leftovers.NamesOverride = keepNames; }
+                    finally { FolderGrowth.OverrideDir = null; FolderGrowth.NamesOverride = null; FolderGrowth.RootsOverride = null; }
                 });
             }
-            finally { FolderGrowth.KindRootOverride = null; FolderGrowth.SignedOverride = null; }
+            finally { FolderGrowth.KindRootOverride = null; FolderGrowth.SignedOverride = null; FolderGrowth.RootsOverride = null; FolderGrowth.OverrideDir = null; }
 
 #if BUSINESS
             // ---------- Cure email alerts (Elixar for Business) ----------

@@ -95,6 +95,12 @@ namespace CDriveCleaner
 
         public static string DeleteArgs(string task) { return "/Delete /F /TN " + Quote(task); }
 
+        // the folders you allowed Elixar to keep in check: daily, as administrator, through the launcher
+        public static string CreateKeepArgs(string exe)
+        {
+            return "/Create /F /TN " + Quote(FolderGrowth.Task) + " /TR " + Quote(ElevatedAction(exe, "--keep-in-check")) + " /SC DAILY /ST 12:40 /RL HIGHEST";
+        }
+
 #if BUSINESS
         // Elixar for Business on the Cure Server: every hour, as administrator, through the launcher - email alerts to IT
         public static string CreateCureAlertArgs(string exe)

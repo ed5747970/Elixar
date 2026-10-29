@@ -1653,6 +1653,7 @@ HE = {
 "Elixar can't tell for sure what this is, so it won't offer to delete anything here. Open it and look.":"Elixar לא יכול לדעת בוודאות מה זה, ולכן לא יציע למחוק כאן דבר. פתח והסתכל.",
 "Microsoft Defender found no threats there.":"Microsoft Defender לא מצא שם איומים.",
 "1 looks unusual":"1 נראה חריג","click to see":"לחץ לצפייה",
+"No installed app owns it":"שום אפליקציה מותקנת לא שייכת לזה","Temporary files (apps and installers)":"קבצים זמניים (אפליקציות ותוכנות התקנה)",
 # 1.2.60: Cure email alerts
 "Email alerts":"התראות במייל","Email alerts...":"התראות במייל...",
 "Elixar checks every PC's report each hour and emails you when one needs attention. Reports only: nothing is done on the PCs.":"Elixar בודק את הדיווח של כל מחשב כל שעה ושולח לך מייל כשמחשב דורש טיפול. דיווח בלבד: שום דבר לא נעשה במחשבים.",

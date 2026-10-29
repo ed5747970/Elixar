@@ -87,6 +87,7 @@ namespace CDriveCleaner
                                  "Elixar", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes;
             string o;
             foreach (var t in new[] { Automation.CheckTask, Automation.LogonTask, Automation.CleanTask, Automation.MailTask, Automation.TidyTask, Automation.PolicyCleanTask }) Automation.RunSchtasks(Automation.DeleteArgs(t), out o);
+            Automation.RunSchtasks(Automation.DeleteArgs(FolderGrowth.Task), out o);
 #if BUSINESS
             Automation.RunSchtasks(Automation.DeleteArgs(CureAlerts.Task), out o);
 #endif

@@ -57,7 +57,7 @@ namespace CDriveCleaner
             status.Text = Lang.T("Studying " + cur.Count + " folder" + (cur.Count == 1 ? "" : "s") + "...");
             Task.Factory.StartNew(() =>
             {
-                var names = Leftovers.InUseNames();
+                var names = FolderGrowth.OwnerNames();
                 return cur.Select(c => Tuple.Create(c.Item1, FolderGrowth.Study(c.Item1.Path, names, DateTime.Now))).ToList();
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() => ShowStudies(t.IsFaulted ? new List<Tuple<FastFolder, FolderStudy>>() : t.Result)));
         }
@@ -94,7 +94,7 @@ namespace CDriveCleaner
                     var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(S(4), S(2), 0, 0) };
                     row.Controls.Add(new Label { AutoSize = true, Text = r.Path + "  -  " + Lang.T("older than " + r.Days + " days, daily"), Margin = new Padding(0, S(6), S(8), 0) });
                     var stop = new Button { Text = Lang.T("Stop"), AutoSize = true, Tag = r.Path };
-                    stop.Click += (o, e) => { FolderGrowth.RemoveRule((string)((Button)o).Tag); ShowStudies(items); };
+                    stop.Click += (o, e) => { FolderGrowth.RemoveRule((string)((Button)o).Tag); if (!testMode) FolderGrowth.Schedule(Install.Exe); ShowStudies(items); };
                     row.Controls.Add(stop); rp.Controls.Add(row);
                 }
                 list.Controls.Add(rp);
@@ -160,6 +160,7 @@ namespace CDriveCleaner
                                             "Only files of those kinds, never programs, your files or Windows' files. The first two times they go to Undo (Tools > Undo puts them back). Stop it here any time.",
                                             "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return false;
             string err = FolderGrowth.AddRule(s, 14);
+            if (err == null && !testMode) err = FolderGrowth.Schedule(Install.Exe);
             status.Text = Lang.T(err == null ? "Allowed: " + Path.GetFileName(s.Path.TrimEnd('\\', '/')) + " is kept in check from now on." : "Not allowed: " + err);
             if (err == null) ShowStudies(Studies.Select(x => Tuple.Create(new FastFolder { Path = x.Path, Now = x.Bytes }, x)).ToList());
             return err == null;
@@ -176,7 +177,7 @@ namespace CDriveCleaner
         void Scan(FolderStudy s)
         {
             status.Text = Lang.T("Microsoft Defender is scanning " + s.Path + "...");
-            Task.Factory.StartNew(() => { string o; int c = StartupApps.DefenderScan(s.Path, out o); return Tuple.Create(c, o); }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            Task.Factory.StartNew(() => { string o; int c = StartupApps.DefenderScan(s.Path.TrimEnd('\\', '/'), out o); return Tuple.Create(c, o); }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 if (t.IsFaulted) { status.Text = Lang.T("Couldn't scan: " + t.Exception.GetBaseException().Message); return; }
                 int c = t.Result.Item1;

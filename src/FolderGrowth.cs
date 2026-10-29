@@ -41,9 +41,21 @@ namespace CDriveCleaner
         public static Func<List<string[]>> RootsOverride;          // self-test: { root, depth }
         public static Func<string, bool> SignedOverride;           // self-test: is this program signed?
         public static Func<string, string> KindRootOverride;       // self-test: "windows" / "yours" / null for a path
-        static string F(string n) { return OverrideDir != null ? System.IO.Path.Combine(OverrideDir, n) : Paths.FileIn(n); }
-        static string SnapFile { get { return F("growing-folders.txt"); } }
-        static string RulesFile { get { return F("keep-in-check.txt"); } }
+        // the findings are kept in your own profile: the daily check runs with your normal rights. They only ever lead to
+        // a fresh look (every folder is studied again before anything is offered), never to a deletion by themselves.
+        static string F(string n)
+        {
+            if (OverrideDir != null) return System.IO.Path.Combine(OverrideDir, n);
+            string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string d = System.IO.Path.Combine(System.IO.Path.Combine(string.IsNullOrEmpty(la) ? System.IO.Path.GetTempPath() : la, "Elixar"), "growing");
+            try { Directory.CreateDirectory(d); } catch { }
+            return System.IO.Path.Combine(d, n);
+        }
+        // the rules that delete are kept where only administrators can write, and run only as administrator
+        static string A(string n) { return OverrideDir != null ? System.IO.Path.Combine(OverrideDir, n) : Paths.FileIn(n); }
+        static string Ctx { get { return Win.IsWindows && Sys.IsAdmin() ? "admin" : "user"; } }   // admins see more folders: readings are only compared with readings made the same way
+        static string SnapFile { get { return F("readings-" + Ctx + ".txt"); } }
+        static string RulesFile { get { return A("keep-in-check.txt"); } }
         static string IgnoreFile { get { return F("growing-ignored.txt"); } }
         static string AlertedFile { get { return F("growing-alerted.txt"); } }
         static string NowFile { get { return F("growing-now.txt"); } }
@@ -71,6 +83,7 @@ namespace CDriveCleaner
         }
 
         // the size of every folder (with what's under it), down to a depth; links are never followed
+        // null when it ran out of time: half a reading would make folders look new or shrunk the next day
         public static Dictionary<string, long> Measure(TimeSpan budget)
         {
             var sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
@@ -80,12 +93,13 @@ namespace CDriveCleaner
                 int depth; int.TryParse(r[1], out depth);
                 Walk(r[0], 0, Math.Max(1, depth), sizes, sw, budget);
             }
+            if (sw.Elapsed > budget) return null;
             return sizes.Where(kv => kv.Value >= MinTracked).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
         }
 
         static long Walk(string dir, int level, int depth, Dictionary<string, long> sizes, Stopwatch sw, TimeSpan budget)
         {
-            if (sw.Elapsed > budget || Skip(dir)) return 0;
+            if (sw.Elapsed > budget || level > 64 || Skip(dir)) return 0;   // 64 levels: a planted endless tree can't stop the check
             long total = 0;
             try
             {
@@ -135,12 +149,12 @@ namespace CDriveCleaner
         {
             var res = new List<FastFolder>();
             Dictionary<string, long> now; if (!snaps.TryGetValue(today.Date, out now)) return res;
-            Func<int, int, KeyValuePair<DateTime, Dictionary<string, long>>?> pick = (min, max) =>
+            Func<int, int, int, KeyValuePair<DateTime, Dictionary<string, long>>?> pick = (min, max, target) =>
             {
-                var c = snaps.Where(kv => (today.Date - kv.Key).TotalDays >= min && (today.Date - kv.Key).TotalDays <= max).OrderBy(kv => Math.Abs((today.Date - kv.Key).TotalDays - max)).ToList();
+                var c = snaps.Where(kv => (today.Date - kv.Key).TotalDays >= min && (today.Date - kv.Key).TotalDays <= max).OrderBy(kv => Math.Abs((today.Date - kv.Key).TotalDays - target)).ToList();
                 return c.Count > 0 ? c[0] : (KeyValuePair<DateTime, Dictionary<string, long>>?)null;
             };
-            var week = pick(5, 9); var two = pick(1, 3);
+            var week = pick(5, 9, 7); var two = pick(1, 3, 2);
             if (week == null && two == null) return res;
             var ign = Ignored();
             foreach (var kv in now)
@@ -218,17 +232,44 @@ namespace CDriveCleaner
             return null;
         }
 
-        // the owner: an installed app, its publisher, a service or a running program whose name is in the path
+        // who may own a folder: installed apps only (Windows' list of installed programs: names, publishers, install folders).
+        // Not running programs, services or startup entries - malware has those too, so they never vouch for a folder.
+        public static Func<List<string>> NamesOverride;   // self-test
+        public static List<string> OwnerNames()
+        {
+            if (NamesOverride != null) return NamesOverride();
+            var names = new List<string>();
+            if (!Win.IsWindows) return names;
+            try
+            {
+                foreach (var a in AppsData.ReadInstalled())
+                {
+                    names.Add(a.Name); names.Add(a.Publisher);
+                    foreach (Match m in Regex.Matches(a.Location ?? "", @"\\([^\\""]+)")) names.Add(m.Groups[1].Value);
+                }
+            }
+            catch { }
+            return names.Where(x => !string.IsNullOrEmpty(x)).Distinct().ToList();
+        }
+
+        static readonly HashSet<string> Generic = new HashSet<string>
+        {
+            "system", "systems", "windows", "microsoft", "update", "updater", "updates", "service", "services", "host", "runtime", "common", "shared", "data", "local", "program", "programs",
+            "app", "apps", "application", "applications", "temp", "cache", "logs", "log", "user", "users", "software", "files", "tools", "driver", "drivers", "client", "helper", "setup", "install", "installer"
+        };
+
         static string OwnerOf(string path, List<string> names)
         {
             var segs = path.Split('\\', '/').Where(s => s.Length > 0).ToList();
             string[] skip = { "users", "appdata", "local", "roaming", "locallow", "programdata", "windows", "temp", "packages", "c:" };
+            var cands = names.Select(n => Tuple.Create(n, Leftovers.N(n))).Where(t => t.Item2.Length >= 3 && !Generic.Contains(t.Item2)).ToList();
             foreach (var seg in segs.Skip(1))
             {
                 if (skip.Contains(seg.ToLowerInvariant()) || string.Equals(seg, Environment.UserName, StringComparison.OrdinalIgnoreCase)) continue;
-                string f = Leftovers.N(seg); if (f.Length < 3) continue;
-                var hit = names.FirstOrDefault(n => Leftovers.N(n) == f) ?? names.FirstOrDefault(n => { string x = Leftovers.N(n); return x.Length >= 4 && (x.Contains(f) || f.Contains(x)); });
-                if (hit != null) return hit;
+                string f = Leftovers.N(seg); if (f.Length < 3 || Generic.Contains(f)) continue;
+                // the same name, a longer name that starts with it ("Zoom" - "Zoom Workplace"), or a folder that starts with a long app name
+                var hit = cands.FirstOrDefault(t => t.Item2 == f) ?? cands.FirstOrDefault(t => f.Length >= 4 && t.Item2.StartsWith(f)) ?? cands.FirstOrDefault(t => t.Item2.Length >= 6 && f.StartsWith(t.Item2));
+                if (hit != null) return hit.Item1;
             }
             return null;
         }
@@ -240,7 +281,7 @@ namespace CDriveCleaner
             var s = new FolderStudy { Path = path };
             string name = System.IO.Path.GetFileName(path.TrimEnd('\\', '/'));
             try { s.Hidden = (new DirectoryInfo(path).Attributes & FileAttributes.Hidden) != 0; } catch { }
-            s.RandomName = RandomName(name) || path.Split('\\', '/').Skip(2).Any(RandomName);
+            s.RandomName = RandomName(name);
             string root = RootKind(path);
             string owner = root == null ? OwnerOf(path, names ?? new List<string>()) : null;
             s.OwnerKnown = owner != null;
@@ -279,14 +320,17 @@ namespace CDriveCleaner
             }
             s.Files = seen; s.Bytes = all; s.TidyShare = all > 0 ? (double)tidy / all : 0; s.NewPrograms = newPrograms.Count;
             if (newPrograms.Count > 0)
-                foreach (var p in newPrograms.Take(20))
-                {
-                    bool signed = SignedOverride != null ? SignedOverride(p) : Signed(p);
-                    if (!signed) s.Unsigned++;
-                }
+            {
+                var check = newPrograms.Take(20).ToList();
+                if (SignedOverride != null) s.Unsigned = check.Count(p => !SignedOverride(p));
+                else if (Win.IsWindows)
+                    try { var r = Trust.CheckMany(check); s.Unsigned = check.Count(p => { string[] v; return !r.TryGetValue(p, out v) || v[0] != "Valid"; }); } catch { }
+            }
             // many files changed to one file type nobody knows: how ransomware looks
             var topRecent = recentExt.OrderByDescending(kv => kv.Value).FirstOrDefault();
-            s.RansomLike = recent >= 100 && topRecent.Key != null && topRecent.Value * 10 >= recent * 6 && !Known.Contains(topRecent.Key) && topRecent.Key.Length > 1;
+            // (apps write odd file types into their own AppData/ProgramData folders all the time: those aren't judged this way)
+            bool appData = Regex.IsMatch(path, @"[\\/](AppData|ProgramData)[\\/]", RegexOptions.IgnoreCase) && s.OwnerKnown;
+            s.RansomLike = !appData && recent >= 100 && topRecent.Key != null && topRecent.Value * 10 >= recent * 6 && !Known.Contains(topRecent.Key) && topRecent.Key.Length > 1;
 
             // in plain words
             var top = byExt.OrderByDescending(kv => kv.Value).FirstOrDefault();
@@ -299,15 +343,23 @@ namespace CDriveCleaner
                        (s.Hidden ? " · hidden folder" : "");
 
             // the verdict
-            bool odd = s.RansomLike || (s.Unsigned > 0 && !s.OwnerKnown) || (!s.OwnerKnown && root == null && s.Hidden && s.RandomName);
+            // unsigned new programs are judged outside your own folders, Windows' folders and the temp folders (installers
+            // unpack unsigned helpers in Temp all the time); the ransomware and hidden-random-folder signs are judged everywhere
+            bool temp = Regex.IsMatch(path, @"[\\/](AppData[\\/]Local|Windows)[\\/]Temp([\\/][^\\/]+)?$", RegexOptions.IgnoreCase);
+            bool odd = s.RansomLike || (root == null && !temp && s.Unsigned > 0 && !s.OwnerKnown) || (!s.OwnerKnown && root == null && s.Hidden && s.RandomName);
             if (odd)
             {
                 s.Kind = GrowKind.Unusual;
-                s.Owner = s.OwnerKnown ? owner : "No installed app, service or known program";
+                s.Owner = s.OwnerKnown ? owner : "No installed app owns it";
                 s.Reason = s.RansomLike ? "Lots of files were changed to an unknown file type (" + topRecent.Key + ") in a day - this is how ransomware looks."
                          : s.Unsigned > 0 ? "New programs that aren't signed are being written here."
                          : "A hidden folder with a random name that no app owns.";
                 s.Verdict = "This doesn't look like a normal app. Elixar won't delete it (that could hide what happened): scan it with Microsoft Defender first.";
+            }
+            else if (temp && root == null)
+            {
+                s.Kind = GrowKind.Safe; s.Owner = "Temporary files (apps and installers)";
+                s.Verdict = "Temporary files that apps and installers leave behind. Old ones can be deleted safely - the Cleaner's Safe items clean them too.";
             }
             else if (root == "windows")
             {
@@ -332,12 +384,6 @@ namespace CDriveCleaner
                 s.Verdict = "Elixar can't tell for sure what this is, so it won't offer to delete anything here. Open it and look.";
             }
             return s;
-        }
-
-        static bool Signed(string file)
-        {
-            if (!Win.IsWindows) return true;
-            try { var r = Trust.CheckMany(new[] { file }); string[] v; return r.TryGetValue(file, out v) && v[0] == "Valid"; } catch { return true; }
         }
 
         // ---------- "keep it in check" rules ----------
@@ -379,6 +425,21 @@ namespace CDriveCleaner
         {
             var l = Rules(); int n = l.RemoveAll(r => string.Equals(r.Path, path, StringComparison.OrdinalIgnoreCase));
             if (n > 0) { SaveRules(l); ChangeLog.Add("Settings", "Stopped keeping a folder in check", path, "", "", "", false); }
+        }
+
+        // the daily task that runs the rules (as administrator, through Elixar's launcher): there while a rule exists
+        public const string Task = Automation.Folder + "Keep in check";
+        public static string Schedule(string exe)
+        {
+            string o; bool any = Rules().Count > 0;
+            if (any)
+            {
+                // like every Elixar schedule: it starts the protected copy in Program Files, which only administrators can change
+                string ierr = Install.Ensure();
+                if (ierr != null) return "Elixar could not put its protected copy in " + Install.Dir + ": " + ierr;
+            }
+            int code = Automation.RunSchtasks(any ? Automation.CreateKeepArgs(exe) : Automation.DeleteArgs(Task), out o);
+            return any && code != 0 ? "Windows didn't make the daily task: " + o : null;
         }
 
         static string RuleProblem(string path)
@@ -428,6 +489,7 @@ namespace CDriveCleaner
         public static long RunRules(DateTime now, Action<string> log)
         {
             long freed = 0;
+            if (Win.IsWindows && !Sys.IsAdmin()) { if (log != null) log("Keep in check: needs administrator rights, nothing done."); return 0; }
             var rules = Rules();
             using (ChangeLog.In("Keep in check"))
                 foreach (var r in rules)
@@ -442,6 +504,8 @@ namespace CDriveCleaner
 
         public static long RunRule(KeepRule r, DateTime now, Action<string> log)
         {
+            string why = RuleProblem(r.Path);   // checked again on every run, whoever asks for it
+            if (why != null) { if (log != null) log("Keep in check: skipped " + r.Path + " (" + why + ")"); return 0; }
             var files = RuleFiles(r, now);
             if (files.Count == 0) { r.Runs++; return 0; }
             long bytes = files.Sum(f => { try { return new FileInfo(f).Length; } catch { return 0L; } });
@@ -481,12 +545,13 @@ namespace CDriveCleaner
             var snaps = ReadSnaps();
             if (!snaps.ContainsKey(now.Date))
             {
-                var sizes = measureOverride != null ? measureOverride() : Measure(TimeSpan.FromMinutes(4));
+                var sizes = measureOverride != null ? measureOverride() : Measure(TimeSpan.FromMinutes(8));
+                if (sizes == null) { if (log != null) log("Growing folders: the reading took too long and wasn't kept."); return res; }
                 SaveSnap(now, sizes);
                 snaps = ReadSnaps();
             }
             res.Fast = Detect(snaps, now);
-            var names = res.Fast.Count > 0 ? Leftovers.InUseNames() : new List<string>();
+            var names = res.Fast.Count > 0 ? OwnerNames() : new List<string>();
             foreach (var f in res.Fast) res.Studies.Add(Study(f.Path, names, now));
             SaveNow(res.Fast, res.Studies);
             // a notification once a week per folder (at once again if it now looks unusual)
@@ -498,7 +563,6 @@ namespace CDriveCleaner
                 if (due) { res.Alert.Add(s); alerted[s.Path] = Tuple.Create(now.Date, s.Kind); }
             }
             SafeFile.Save(AlertedFile, string.Join("\n", alerted.Where(kv => (now - kv.Value.Item1).TotalDays < 60).Select(kv => kv.Value.Item1.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\t" + kv.Value.Item2 + "\t" + kv.Key)) + "\n");
-            res.Freed = RunRules(now, log);
             return res;
         }
 
@@ -530,11 +594,13 @@ namespace CDriveCleaner
             var l = new List<Tuple<FastFolder, GrowKind>>();
             try
             {
+                var roots = Roots().Select(r => r[0].TrimEnd('\\', '/')).ToList();
+                Func<string, bool> inside = path => roots.Any(r => path.StartsWith(r + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) && path.IndexOf("..", StringComparison.Ordinal) < 0;
                 if (File.Exists(NowFile) && (DateTime.Now - File.GetLastWriteTime(NowFile)).TotalDays < 3)
                     foreach (var line in File.ReadAllLines(NowFile))
                     {
                         var p = line.Split('\t'); long g, n; int d; GrowKind k;
-                        if (p.Length == 5 && long.TryParse(p[0], out g) && long.TryParse(p[1], out n) && int.TryParse(p[2], out d) && Enum.TryParse(p[3], out k) && !Ignored().Contains(p[4]))
+                        if (p.Length == 5 && long.TryParse(p[0], out g) && long.TryParse(p[1], out n) && int.TryParse(p[2], out d) && Enum.TryParse(p[3], out k) && inside(p[4]) && !Ignored().Contains(p[4]))
                             l.Add(Tuple.Create(new FastFolder { Grew = g, Now = n, Days = d, Path = p[4] }, k));
                     }
             }

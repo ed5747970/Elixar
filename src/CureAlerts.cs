@@ -278,6 +278,12 @@ namespace CDriveCleaner
         public static string Apply(bool on, string exe)
         {
             string o;
+            if (on)
+            {
+                // like every Elixar schedule: it starts the protected copy in Program Files, which only administrators can change
+                string ierr = Install.Ensure();
+                if (ierr != null) return "Elixar could not put its protected copy in " + Install.Dir + ": " + ierr;
+            }
             int code = Automation.RunSchtasks(on ? Automation.CreateCureAlertArgs(exe) : Automation.DeleteArgs(Task), out o);
             return on && code != 0 ? "Windows didn't make the hourly check: " + o : null;
         }
