@@ -339,6 +339,8 @@ namespace CDriveCleaner
                         var z = FolderGrowth.Study(zl, names, now);
                         if (FolderGrowth.AddRule(z, 14) != null || FolderGrowth.Rules().Count != 1) return "rule";
                         File.WriteAllBytes(Path.Combine(zl, "old.exe"), new byte[10]); File.SetLastWriteTime(Path.Combine(zl, "old.exe"), DateTime.Now.AddDays(-60));
+                        // Windows keeps when a file was made: an old program is old there too (a new one makes the folder "look at it")
+                        try { File.SetCreationTime(Path.Combine(zl, "old.exe"), DateTime.Now.AddDays(-60)); } catch { }
                         var files = FolderGrowth.RuleFiles(FolderGrowth.Rules()[0], now);
                         if (files.Count != 20 || files.Any(x => !x.EndsWith(".log"))) return "would delete " + files.Count + ": " + string.Join(",", files.Where(x => !x.EndsWith(".log")).Select(Path.GetFileName));
                         FolderGrowth.RunRules(now, null);
