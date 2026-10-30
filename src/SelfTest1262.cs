@@ -288,7 +288,9 @@ namespace CDriveCleaner
             Run(check, "Audit fixes (1.2.62): Secure wipe can be turned off by policy (and is off on company PCs), checked in the wipe itself, not only in the window", () =>
             {
                 if (!Policy.CompanyBlocks.Contains("wipe") || Policy.Rules.All(r => r.Key != "wipe")) return "rule";
-                string f = Path.Combine(root, "t1262-shred.txt"); File.WriteAllText(f, "secret");
+                // in your profile, like the Secure wipe test (Temp and AppData are never shredded)
+                string sd = Path.Combine(UserDirs.Home, "ElixarShredTest-" + Guid.NewGuid().ToString("N").Substring(0, 6)); Directory.CreateDirectory(sd);
+                string f = Path.Combine(sd, "t1262-shred.txt"); File.WriteAllText(f, "secret");
                 if (SecureWipe.CanShred(f) != null) return "allowed: " + SecureWipe.CanShred(f);
                 Policy.OrgOverride = () => new Dictionary<string, string> { { "wipe", "block" } };
                 try
@@ -298,7 +300,9 @@ namespace CDriveCleaner
                     if (w.Error == null || w.Written != 0) return "wiped while blocked";
                 }
                 finally { Policy.OrgOverride = null; }
-                string err; if (!SecureWipe.Shred(f, 1, out err) || File.Exists(f)) return "shred after allowing: " + err;
+                string err; bool done = SecureWipe.Shred(f, 1, out err);
+                try { Directory.Delete(sd, true); } catch { }
+                if (!done || File.Exists(f)) return "shred after allowing: " + err;
                 return null;
             });
 
