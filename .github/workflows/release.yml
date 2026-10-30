@@ -147,9 +147,9 @@ jobs:
                      "business_manifest=$(Sha256Of release\elixar-business-manifest.txt)", "programs=$progs")
           [IO.File]::AppendAllText($env:GITHUB_OUTPUT, ($lines -join "`n") + "`n", (New-Object Text.UTF8Encoding $false))
           $lines | ForEach-Object { Write-Host $_ }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v4.6.2, pinned to its commit
         with: { name: release-files, path: release, if-no-files-found: error }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v4.6.2, pinned to its commit
         with: { name: programs, path: programs, if-no-files-found: error }
 
   msi:
@@ -179,7 +179,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Elixar.msi wasn't built" }
           wix build -arch x64 -d Version=$v3 -d Exe=out\business\Elixar.exe -d Agent=out\business\CureAgent.exe -d Server=out\business\CureServer.exe -o msi\Elixar-Business.msi ElixarBiz4.wxs
           if ($LASTEXITCODE -ne 0) { throw "Elixar-Business.msi wasn't built" }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v4.6.2, pinned to its commit
         with: { name: msi-unsigned, path: msi, if-no-files-found: error }
 
   sign-msi:
@@ -234,7 +234,7 @@ jobs:
               if ($s.Status -ne 'Valid') { throw "$m is not signed correctly: $($s.Status)" }
             } else { Copy-Item "sign\msi\$m" "msi\$m" }
           }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v4.6.2, pinned to its commit
         with: { name: msi, path: msi, if-no-files-found: error }
 
   sign-manifests:
@@ -283,7 +283,7 @@ jobs:
             if (-not $rsa.VerifyData($data, $sig, [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)) { throw "The signature didn't check" }
             [IO.File]::WriteAllText((Join-Path (Resolve-Path sigs).Path "$m.sig"), [Convert]::ToBase64String($sig))
           }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v4.6.2, pinned to its commit
         with: { name: signatures, path: sigs, if-no-files-found: ignore }
 
   publish:
