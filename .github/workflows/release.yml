@@ -141,10 +141,10 @@ jobs:
         id: hashes
         run: |
           $ErrorActionPreference = 'Stop'
-          function H($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
-          $progs = (Get-ChildItem programs -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName.Substring((Resolve-Path programs).Path.Length + 1).Replace('\', '/') + '=' + (H $_.FullName) }) -join ';'
-          $lines = @("private_zip=$(H release\Elixar.zip)", "private_manifest=$(H release\elixar-manifest.txt)", "business_zip=$(H release\Elixar-Business.zip)",
-                     "business_manifest=$(H release\elixar-business-manifest.txt)", "programs=$progs")
+          function Sha256Of($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
+          $progs = (Get-ChildItem programs -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName.Substring((Resolve-Path programs).Path.Length + 1).Replace('\', '/') + '=' + (Sha256Of $_.FullName) }) -join ';'
+          $lines = @("private_zip=$(Sha256Of release\Elixar.zip)", "private_manifest=$(Sha256Of release\elixar-manifest.txt)", "business_zip=$(Sha256Of release\Elixar-Business.zip)",
+                     "business_manifest=$(Sha256Of release\elixar-business-manifest.txt)", "programs=$progs")
           [IO.File]::AppendAllText($env:GITHUB_OUTPUT, ($lines -join "`n") + "`n", (New-Object Text.UTF8Encoding $false))
           $lines | ForEach-Object { Write-Host $_ }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
@@ -172,6 +172,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Couldn't install the WiX tool" }
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
           $v3 = ($v.Split('.')[0..2]) -join '.'
+          New-Item -ItemType Directory -Force msi | Out-Null
           Copy-Item package\Elixar.wxs Elixar4.wxs; Copy-Item package\Elixar-Business.wxs ElixarBiz4.wxs
           wix convert Elixar4.wxs; wix convert ElixarBiz4.wxs; $global:LASTEXITCODE = 0
           wix build -arch x64 -d Version=$v3 -d Exe=out\Elixar.exe -o msi\Elixar.msi Elixar4.wxs
@@ -252,17 +253,17 @@ jobs:
       - name: Check every file against the SHA-256 the package job recorded, and each manifest against its zip
         run: |
           $ErrorActionPreference = 'Stop'
-          function H($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
+          function Sha256Of($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
           $files = @{ "Elixar.zip" = $env:WANT_PRIVATE_ZIP; "elixar-manifest.txt" = $env:WANT_PRIVATE_MANIFEST; "Elixar-Business.zip" = $env:WANT_BUSINESS_ZIP; "elixar-business-manifest.txt" = $env:WANT_BUSINESS_MANIFEST }
-          foreach ($f in $files.Keys) { if (-not $files[$f] -or (H "release\$f") -ne $files[$f]) { throw "release\$f was changed after the package job" } }
+          foreach ($f in $files.Keys) { if (-not $files[$f] -or (Sha256Of "release\$f") -ne $files[$f]) { throw "release\$f was changed after the package job" } }
           if ((Get-ChildItem release -File).Count -ne 4) { throw "Unexpected files in the release" }
           foreach ($pair in @(@("Elixar.zip", "elixar-manifest.txt", "private"), @("Elixar-Business.zip", "elixar-business-manifest.txt", "business"))) {
             $m = @{}; foreach ($l in [IO.File]::ReadAllLines((Resolve-Path "release\$($pair[1])").Path)) { $k, $v = $l.Split('=', 2); if ($k) { $m[$k] = $v } }
             if ($m['edition'] -ne $pair[2]) { throw "$($pair[1]): wrong edition" }
-            if ($m['zip-sha256'].ToLowerInvariant() -ne (H "release\$($pair[0])")) { throw "$($pair[1]) doesn't match $($pair[0])" }
+            if ($m['zip-sha256'].ToLowerInvariant() -ne (Sha256Of "release\$($pair[0])")) { throw "$($pair[1]) doesn't match $($pair[0])" }
             $x = Join-Path $env:RUNNER_TEMP ("x-" + $pair[2]); Expand-Archive "release\$($pair[0])" $x -Force
             $exe = Get-ChildItem $x -Recurse -Filter Elixar.exe | Select-Object -First 1
-            if (-not $exe -or $m['exe-sha256'].ToLowerInvariant() -ne (H $exe.FullName)) { throw "$($pair[1]) doesn't match the Elixar.exe inside $($pair[0])" }
+            if (-not $exe -or $m['exe-sha256'].ToLowerInvariant() -ne (Sha256Of $exe.FullName)) { throw "$($pair[1]) doesn't match the Elixar.exe inside $($pair[0])" }
             Write-Host "$($pair[1]): $($m['version']) ok"
           }
       - name: Sign the update manifests
@@ -312,12 +313,12 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           $ErrorActionPreference = 'Stop'
-          function H($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
+          function Sha256Of($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
           $files = @{ "Elixar.zip" = $env:WANT_PRIVATE_ZIP; "elixar-manifest.txt" = $env:WANT_PRIVATE_MANIFEST; "Elixar-Business.zip" = $env:WANT_BUSINESS_ZIP; "elixar-business-manifest.txt" = $env:WANT_BUSINESS_MANIFEST }
-          foreach ($f in $files.Keys) { if ((H "release\$f") -ne $files[$f]) { throw "release\$f was changed after the package job" } }
+          foreach ($f in $files.Keys) { if ((Sha256Of "release\$f") -ne $files[$f]) { throw "release\$f was changed after the package job" } }
           $up = @($files.Keys | ForEach-Object { "release\$_" })
           foreach ($f in "elixar-manifest.sig", "elixar-business-manifest.sig", "Elixar.msi", "Elixar-Business.msi") { if (Test-Path "release\$f") { $up += "release\$f" } }
-          Get-ChildItem release | ForEach-Object { Write-Host "$($_.Name)  $((H $_.FullName))" }
+          Get-ChildItem release | ForEach-Object { Write-Host "$($_.Name)  $((Sha256Of $_.FullName))" }
           if ($env:DRY -eq 'true') { Write-Host "Dry run: everything checked; nothing is published."; exit 0 }
           gh release create "$env:TAG" @up --repo "$env:GITHUB_REPOSITORY" --title "Elixar $env:TAG" --target "$env:SHA" --generate-notes
           if ($LASTEXITCODE -ne 0) { throw "gh couldn't publish the release" }
