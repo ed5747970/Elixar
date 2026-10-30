@@ -1641,6 +1641,10 @@ HE = {
 "Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were.":"קבצים שהסרת, פריטי זהירות ומנהלי התקן שהוסרו נשמרים כאן לזמן מה לפני שהם נמחקים לצמיתות. שחזור מחזיר אותם בדיוק למקום שבו היו.",
 "empty.":"ריק.",
 "Daily tidy":"סידור יומי",
+# 1.2.62: audit fixes
+"Tools > Secure wipe: wipe free space and shred files (can't be undone).":"כלים > מחיקה מאובטחת: מחיקת השטח הפנוי וגריסת קבצים (לא ניתן לבטל).",
+"Secure wipe is turned off on company PCs. Ask your IT department.":"המחיקה המאובטחת כבויה במחשבי חברה. פנה למחלקת ה-IT.",
+"Secure wipe is turned off by the policy (Policy manager).":"המחיקה המאובטחת כבויה על ידי המדיניות (מנהל המדיניות).",
 # 1.2.62: PC health
 "PC health":"בריאות המחשב","Security":"אבטחה","Stability":"יציבות","Speed":"מהירות","Space":"שטח","Drives":"כוננים","Safety net":"רשת ביטחון","Battery":"סוללה",
 "Check again":"בדיקה חוזרת","Watch it again":"לעקוב שוב","Use Balanced":"מעבר למאוזן","Make one now":"ליצור עכשיו","Repair Windows Update...":"תיקון Windows Update...",

@@ -62,7 +62,9 @@ namespace CDriveCleaner
         List<CureDevice> devices;
         readonly Dictionary<string, Dictionary<string, DateTime>> nonces = new Dictionary<string, Dictionary<string, DateTime>>();
         readonly Dictionary<string, DateTime> lastReport = new Dictionary<string, DateTime>();
-        readonly Queue<DateTime> enrolls = new Queue<DateTime>();
+        readonly Queue<DateTime> enrolls = new Queue<DateTime>();                                       // successful enrollments
+        readonly Dictionary<string, Queue<DateTime>> badEnrolls = new Dictionary<string, Queue<DateTime>>();   // wrong tokens, per address
+        public const int MaxBadEnrollPerHour = 20;
         static readonly byte[] Entropy = Encoding.UTF8.GetBytes("Elixar Cure Server device keys v1");
 
         string DevicesFile { get { return Path.Combine(DataDir, "devices.json"); } }
@@ -101,17 +103,26 @@ namespace CDriveCleaner
         public Answer Enroll(byte[] body, string ip)
         {
             if (TokenHash.Length != 64) return Err(503, "This Cure Server has no enrollment token yet.");
+            // wrong tokens are limited per address, so guessing (or flooding) from one place can't stop real PCs from enrolling
+            string from = ip ?? "";
             lock (gate)
             {
+                Queue<DateTime> bad;
+                if (badEnrolls.TryGetValue(from, out bad)) { while (bad.Count > 0 && DateTime.UtcNow - bad.Peek() > TimeSpan.FromHours(1)) bad.Dequeue(); if (bad.Count >= MaxBadEnrollPerHour) return Err(429, "Too many wrong enrollment tokens from this address."); }
                 while (enrolls.Count > 0 && DateTime.UtcNow - enrolls.Peek() > TimeSpan.FromHours(1)) enrolls.Dequeue();
                 if (enrolls.Count >= MaxEnrollPerHour) return Err(429, "Too many new PCs this hour.");
-                enrolls.Enqueue(DateTime.UtcNow);
+                if (badEnrolls.Count > 10000) badEnrolls.Clear();   // memory stays bounded
             }
             Dictionary<string, object> o;
             try { o = CureProtocol.Json().Deserialize<Dictionary<string, object>>(Encoding.UTF8.GetString(body)); } catch { return Err(400, "Not JSON."); }
             string token = o != null && o.ContainsKey("token") ? o["token"] as string : null, computer = o != null && o.ContainsKey("computer") ? o["computer"] as string : null;
-            if (!CureProtocol.Same(HashToken(token), TokenHash)) return Err(403, "Wrong enrollment token.");
+            if (!CureProtocol.Same(HashToken(token), TokenHash))
+            {
+                lock (gate) { Queue<DateTime> bad; if (!badEnrolls.TryGetValue(from, out bad)) badEnrolls[from] = bad = new Queue<DateTime>(); bad.Enqueue(DateTime.UtcNow); }
+                return Err(403, "Wrong enrollment token.");
+            }
             if (!CureProtocol.GoodName(computer)) return Err(400, "Not a computer name.");
+            lock (gate) enrolls.Enqueue(DateTime.UtcNow);   // only real enrollments count toward the hourly limit
             byte[] key = CureProtocol.NewKey();
             var d = new CureDevice { Id = CureProtocol.Hex(CureProtocol.NewKey()).Substring(0, 32), Computer = computer.ToUpperInvariant(), Key = Convert.ToBase64String(Protect(key)),
                                      Enrolled = DateTime.Now.ToString("s", CultureInfo.InvariantCulture), Ip = ip ?? "" };
@@ -195,6 +206,8 @@ namespace CDriveCleaner
         {
             var list = new List<Dictionary<string, object>>();
             var reps = Devices().Where(d => !d.Revoked).Select(d => Tuple.Create(d, Latest(d.Id))).ToList();
+            // two live enrollments with one name: one of them may not be that PC (a copied enrollment token) - shown, never merged
+            var twice = new HashSet<string>(reps.GroupBy(x => x.Item1.Computer, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key), StringComparer.OrdinalIgnoreCase);
             string newest = reps.Where(x => x.Item2 != null).Select(x => { Version v; return Version.TryParse(x.Item2.Elixar, out v) ? v : null; }).Where(v => v != null).DefaultIfEmpty(new Version(0, 0)).Max().ToString();
             foreach (var x in reps)
             {
@@ -204,7 +217,7 @@ namespace CDriveCleaner
                     { "id", d.Id }, { "pc", d.Computer }, { "state", State(r, seen == default(DateTime) ? DateTime.MinValue : seen, newest) }, { "seen", d.LastSeen },
                     { "free", r != null ? r.Free : -1 }, { "total", r != null ? r.Total : -1 }, { "clean", r != null ? r.CleanSafe : -1 }, { "disk", r != null ? r.DiskLevel : "" },
                     { "lastClean", r != null ? r.LastClean : "" }, { "updates", r != null ? r.AppUpdates : -1 }, { "elixar", r != null ? r.Elixar : "" }, { "saved", r != null ? r.Saved : -1 },
-                    { "month", r != null ? r.SavedThisMonth : -1 } });
+                    { "month", r != null ? r.SavedThisMonth : -1 }, { "twice", twice.Contains(d.Computer) }, { "enrolled", d.Enrolled }, { "ip", d.Ip } });
             }
             return list;
         }
@@ -215,7 +228,8 @@ namespace CDriveCleaner
             if (d == null) return null;
             var hist = File.Exists(HistoryFile(id)) ? File.ReadAllLines(HistoryFile(id)).Select(l => l.Split(',')).Where(p => p.Length >= 4)
                           .Select(p => new object[] { p[0], Long(p[1]), Long(p[2]), Long(p[3]) }).ToList() : new List<object[]>();
-            return new Dictionary<string, object> { { "id", d.Id }, { "pc", d.Computer }, { "seen", d.LastSeen }, { "enrolled", d.Enrolled }, { "report", Latest(id) }, { "history", hist } };
+            bool twice = Devices().Count(x => !x.Revoked && x.Computer.Equals(d.Computer, StringComparison.OrdinalIgnoreCase)) > 1;
+            return new Dictionary<string, object> { { "id", d.Id }, { "pc", d.Computer }, { "seen", d.LastSeen }, { "enrolled", d.Enrolled }, { "ip", d.Ip }, { "twice", twice }, { "report", Latest(id) }, { "history", hist } };
         }
         // one point a day: { 0, free, total, safe to clean }
         public List<long[]> History(string id)

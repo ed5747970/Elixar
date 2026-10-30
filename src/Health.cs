@@ -567,7 +567,8 @@ namespace CDriveCleaner
             f.FileHistory = FileHistoryOn();
             f.OneDriveBackup = OneDriveBacksUp();
 
-            if (withAppUpdates)
+            if (withAppUpdates && !Policy.Allowed("apps.update")) f.AppsManaged = true;   // the company manages app updates: winget isn't asked at all
+            else if (withAppUpdates)
             {
                 lock (appGate)
                 {

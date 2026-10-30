@@ -10,7 +10,11 @@
 //      a report more than 5 minutes off, a nonce it has seen, or a wrong signature.
 // How the PC knows it's the company's server
 //   HTTPS (TLS 1.2+), and when a certificate fingerprint is set (Group Policy), only that certificate is accepted.
-// What is never sent: file names, file contents, emails, browsing, who is signed in, passwords or keys.
+// What is sent: computer name, Windows version, model, the PC's AD OU (distinguished name), free/total space per drive,
+// cleanable bytes per Elixar item and per place on C:, the 30 biggest installed apps (name, publisher, install and
+// last-used dates, size), up to 60 startup program names, disk health, last clean and savings, the number of accounts,
+// policy fingerprint and company locks, and short error texts (paths replaced by "<path>").
+// What is never sent: file names or paths, file contents, emails, browsing, who is signed in, passwords or keys.
 
 #if BUSINESS
 using System;
@@ -107,7 +111,7 @@ namespace CDriveCleaner
                                                                                                            Wear = Math.Max(-1, Math.Min(d.Wear, 1000)), Temp = Math.Max(-1, Math.Min(d.Temp, 200)),
                                                                                                            Reasons = (d.Reasons ?? new string[0]).Take(8).Select(x => c(x, 200)).ToArray() }).ToArray(),
                 Locks = (r.Locks ?? new string[0]).Take(10).Select(x => c(x, 20)).ToArray(),
-                Errors = (r.Errors ?? new string[0]).Take(10).Select(x => c(x, 200)).ToArray(),
+                Errors = (r.Errors ?? new string[0]).Take(10).Select(x => c(NoPaths(x), 200)).ToArray(),
                 FillSafe = nn(r.FillSafe), FillReview = nn(r.FillReview), FillCaution = nn(r.FillCaution), FillCritical = nn(r.FillCritical),
                 Items = (r.Items ?? new CureItem[0]).Where(x => x != null).Take(80).Select(x => new CureItem { Name = c(x.Name, 80), Tier = Tier(c(x.Tier, 10)), Bytes = nn(x.Bytes), Auto = x.Auto }).ToArray(),
                 Places = (r.Places ?? new CurePlace[0]).Where(x => x != null).Take(40).Select(x => new CurePlace { Name = c(x.Name, 80), Tier = Tier(c(x.Tier, 10)), Action = c(x.Action, 200), Bytes = nn(x.Bytes) }).ToArray(),
@@ -117,6 +121,15 @@ namespace CDriveCleaner
             };
             if (o.Total >= 0 && o.Free > o.Total) o.Free = o.Total;
             return o;
+        }
+
+        // a folder or file path (which can hold a user name) becomes "<path>"; used for the error texts a PC reports
+        public static string NoPaths(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s ?? "";
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\\\\[^\s'""]+", "<path>");   // \\server\share\...
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?i)[a-z]:\\[^'""\r\n]*?(?=['""]|\s*$|\s+\(|[,;]\s)", "<path>");
+            return System.Text.RegularExpressions.Regex.Replace(s, @"(?i)\b(?:users|home)[\\/][^\\/\s'""]+", "<path>");
         }
 
         static string Tier(string t) { return t == "safe" || t == "review" || t == "caution" || t == "critical" ? t : ""; }

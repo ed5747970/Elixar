@@ -24,7 +24,8 @@ namespace CDriveCleaner
         readonly Dictionary<string, Label> polMarks = new Dictionary<string, Label>();
         Dictionary<string, string> polEdit = Policy.Defaults();
         bool polCustom, polFilling;
-        Label sysprepBlocked;
+        Label sysprepBlocked, wipeBlocked;
+        public string WipeOffText { get { return pageWipe != null && wipeBlocked != null && wipeBlocked.Visible ? wipeBlocked.Text : null; } }
         List<string> polSchedDiff = new List<string>();   // where Task Scheduler differs from the policy's times
         public static Func<string, DialogResult> PolicyConfirmHook;   // self-test: answers the questions
 
@@ -415,6 +416,20 @@ namespace CDriveCleaner
                     sysprepBlocked.Text = Policy.ByCompany("sysprep") ? string.Format(Lang.T("Sysprep and golden image tools are turned off on company PCs (this PC is joined to {0}). Ask your IT department."), Policy.Company())
                                                                       : Lang.T("Sysprep and golden image tools are turned off by the policy (Policy manager).");
                 }
+            }
+            // Tools > Secure wipe
+            if (pageWipe != null)
+            {
+                bool ok = Policy.Allowed("wipe");
+                foreach (Control c in pageWipe.Controls) if (c != wipeBlocked) c.Enabled = ok;
+                if (!ok && wipeBlocked == null)
+                {
+                    wipeBlocked = new Label { Dock = DockStyle.Top, AutoSize = false, Height = S(34), TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(S(12), 0, 0, 0),
+                                              Font = new Font("Segoe UI Semibold", 9.5f),
+                                              BackColor = Theme.Dark ? Color.FromArgb(70, 55, 20) : Color.FromArgb(255, 243, 205), ForeColor = Theme.Dark ? Color.FromArgb(255, 220, 150) : Color.FromArgb(110, 75, 0) };
+                    pageWipe.Controls.Add(wipeBlocked);
+                }
+                if (wipeBlocked != null) { wipeBlocked.Visible = !ok; wipeBlocked.Text = Lang.T(SecureWipe.OffText); }
             }
             // Automation: the rules the policy fixes can't be changed there
             if (cmbUndoDays != null)

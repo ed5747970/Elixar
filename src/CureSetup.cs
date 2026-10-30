@@ -39,6 +39,7 @@ namespace CDriveCleaner
             }
         }
         static int Run(string exe, string args) { string o; return Run(exe, args, out o); }
+        public static bool ServiceExists(string name) { string o; return Run("sc.exe", "query " + name, out o) == 0; }
 
         // a settings key only administrators and SYSTEM (and the service that needs it) can read: it can hold the enrollment token
         static void LockKey(RegistryKey hklm, string path, string reader)

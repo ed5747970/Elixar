@@ -1893,6 +1893,9 @@ namespace CDriveCleaner
             d["Files you remove, Caution items and removed drivers are kept here for a while before they are deleted for good. Restore puts them back exactly where they were."] = "קבצים שהסרת, פריטי זהירות ומנהלי התקן שהוסרו נשמרים כאן לזמן מה לפני שהם נמחקים לצמיתות. שחזור מחזיר אותם בדיוק למקום שבו היו.";
             d["empty."] = "ריק.";
             d["Daily tidy"] = "סידור יומי";
+            d["Tools > Secure wipe: wipe free space and shred files (can't be undone)."] = "כלים > מחיקה מאובטחת: מחיקת השטח הפנוי וגריסת קבצים (לא ניתן לבטל).";
+            d["Secure wipe is turned off on company PCs. Ask your IT department."] = "המחיקה המאובטחת כבויה במחשבי חברה. פנה למחלקת ה-IT.";
+            d["Secure wipe is turned off by the policy (Policy manager)."] = "המחיקה המאובטחת כבויה על ידי המדיניות (מנהל המדיניות).";
             d["PC health"] = "בריאות המחשב";
             d["Stability"] = "יציבות";
             d["Speed"] = "מהירות";

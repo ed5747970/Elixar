@@ -20,6 +20,8 @@
     <Media Id="1" Cabinet="elixar.cab" EmbedCab="yes" />
     <Property Id="ARPCOMMENTS" Value="The cure for a cluttered PC" />
     <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- the enrollment token is never written to Windows Installer's logs (msiexec /l*v, Intune, SCCM) -->
+    <Property Id="MsiHiddenProperties" Value="CURETOKEN" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
@@ -53,7 +55,7 @@
     <!-- on uninstall: Elixar removes its own schedules first (the files themselves are removed by Windows Installer) -->
     <CustomAction Id="RemoveSchedules" FileKey="ElixarExeFile" ExeCommand="--uninstall --quiet --msi" Execute="deferred" Impersonate="no" Return="ignore" />
     <!-- Cure: the agent service only when asked (CUREAGENT=1 or CURESERVER=...); on removal both services go before their files -->
-    <CustomAction Id="InstallCureAgent" FileKey="CureAgentFile" ExeCommand="--install --server &quot;[CURESERVER]&quot; --token &quot;[CURETOKEN]&quot; --thumbprint &quot;[CURETHUMBPRINT]&quot;" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="InstallCureAgent" HideTarget="yes" FileKey="CureAgentFile" ExeCommand="--install --server &quot;[CURESERVER]&quot; --token &quot;[CURETOKEN]&quot; --thumbprint &quot;[CURETHUMBPRINT]&quot;" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RemoveCureAgent" FileKey="CureAgentFile" ExeCommand="--uninstall" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RemoveCureServer" FileKey="CureServerFile" ExeCommand="--uninstall" Execute="deferred" Impersonate="no" Return="ignore" />
     <InstallExecuteSequence>

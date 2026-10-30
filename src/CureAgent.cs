@@ -171,7 +171,7 @@ namespace CDriveCleaner
             });
             r.Locks = Policy.CompanyBlocks.Where(Policy.ByCompany).ToArray();
             r.EventLog = Policy.Get("eventlog") != "off";
-            r.Errors = errors.Take(10).ToArray();
+            r.Errors = errors.Take(10).Select(CureProtocol.NoPaths).ToArray();
             return r;
         }
 
@@ -222,7 +222,7 @@ namespace CDriveCleaner
             step("what fills C:", () => places == null || now - placesAt > TimeSpan.FromHours(6), () => { var p = PlacesAllAccounts(); lock (slowGate) { places = p; placesAt = DateTime.Now; } });
             step("app updates", () => now - updatesAt > TimeSpan.FromHours(24), () =>
             {
-                int n = -1; if (WinGet.Available) { string e; var l = WinGet.List(out e); if (e == null) n = l.Count; }
+                int n = -1; if (Policy.Allowed("apps.update") && WinGet.Available) { string e; var l = WinGet.List(out e); if (e == null) n = l.Count; }
                 lock (slowGate) { appUpdates = n; updatesAt = DateTime.Now; }
             });
             lock (slowGate) { slowNow = null; slowErrors = errs; }

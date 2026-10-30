@@ -285,6 +285,47 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "Audit fixes (1.2.62): Secure wipe can be turned off by policy (and is off on company PCs), checked in the wipe itself, not only in the window", () =>
+            {
+                if (!Policy.CompanyBlocks.Contains("wipe") || Policy.Rules.All(r => r.Key != "wipe")) return "rule";
+                string f = Path.Combine(root, "t1262-shred.txt"); File.WriteAllText(f, "secret");
+                if (SecureWipe.CanShred(f) != null) return "allowed: " + SecureWipe.CanShred(f);
+                Policy.OrgOverride = () => new Dictionary<string, string> { { "wipe", "block" } };
+                try
+                {
+                    string why; if (SecureWipe.CanShred(f) == null || SecureWipe.Shred(f, 1, out why) || !File.Exists(f) || File.ReadAllText(f) != "secret") return "shredded while blocked";
+                    var w = SecureWipe.WipeFree(new WipeDrive { Root = root, Media = "HDD" }, 1, null, CancellationToken.None);
+                    if (w.Error == null || w.Written != 0) return "wiped while blocked";
+                }
+                finally { Policy.OrgOverride = null; }
+                string err; if (!SecureWipe.Shred(f, 1, out err) || File.Exists(f)) return "shred after allowing: " + err;
+                return null;
+            });
+
+#if BUSINESS
+            Run(check, "Audit fixes (1.2.62, Cure): wrong enrollment tokens are limited per address (real PCs still enroll), a name enrolled twice is shown, and error texts lose their paths", () =>
+            {
+                string dir = Path.Combine(root, "t1262-cure"); Directory.CreateDirectory(dir);
+                var srv = new CureServer { Https = false, DataDir = dir, TokenHash = CureServer.HashToken("t") };
+                Func<string, string, string, int> enroll = (tok, name, ip) => srv.Enroll(System.Text.Encoding.UTF8.GetBytes("{\"token\":\"" + tok + "\",\"computer\":\"" + name + "\"}"), ip).Status;
+                for (int i = 0; i < CureServer.MaxBadEnrollPerHour; i++) if (enroll("wrong", "X", "10.0.0.9") != 403) return "wrong token " + i;
+                if (enroll("t", "PC1", "10.0.0.9") != 429) return "the flooding address is stopped";
+                if (enroll("t", "PC1", "10.0.0.5") != 200) return "a real PC elsewhere still enrolls";
+                if (enroll("t", "PC1", "10.0.0.6") != 200) return "second enrollment";
+                var pcs = srv.Pcs();
+                if (pcs.Count != 2 || pcs.Any(p => !(bool)p["twice"]) || !pcs.All(p => (string)p["ip"] != "")) return "enrolled twice isn't shown";
+                if (!(bool)srv.Pc((string)pcs[0]["id"])["twice"]) return "pc page";
+                string a = CureProtocol.NoPaths("disks: Access to the path 'C:\\Users\\bob\\AppData\\x.log' is denied.");
+                string b = CureProtocol.NoPaths("places: Could not find a part of the path C:\\Users\\alice\\Documents");
+                string c2 = CureProtocol.NoPaths("apps: \\\\fs01\\home$\\carol\\x failed, retry");
+                if (a.Contains("bob") || !a.Contains("'<path>' is denied") || b.Contains("alice") || c2.Contains("carol") || CureProtocol.NoPaths("still measuring: disks (3 min)") != "still measuring: disks (3 min)") return "paths: " + a + " | " + b + " | " + c2;
+                var cleaned = CureProtocol.Clean(new CureReport { Errors = new[] { "x: C:\\Users\\dave\\y" } });
+                if (cleaned.Errors[0].Contains("dave")) return "server side";
+                if (!CureSetup.Q("x").StartsWith("\"")) return "q";
+                return null;
+            });
+#endif
+
             Run(check, "PC health in Hebrew: the window, the tabs, the buttons and every finding", () =>
             {
                 Lang.Hebrew = true;

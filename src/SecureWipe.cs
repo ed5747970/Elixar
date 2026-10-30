@@ -102,6 +102,7 @@ namespace CDriveCleaner
         public static WipeResult WipeFree(WipeDrive d, int passes, Action<long, long, int> progress, CancellationToken tok)
         {
             var r = new WipeResult { Passes = passes };
+            if (!Policy.Allowed("wipe")) { r.Error = OffText; return r; }   // checked here too, whoever asks
             if (d.Ssd)
             {
                 r.Trimmed = Trim(d.Root);
@@ -199,8 +200,11 @@ namespace CDriveCleaner
         }
 
         // null when the file may be shredded, otherwise why not
+        public static string OffText { get { return Policy.ByCompany("wipe") ? "Secure wipe is turned off on company PCs. Ask your IT department." : "Secure wipe is turned off by the policy (Policy manager)."; } }
+
         public static string CanShred(string path)
         {
+            if (!Policy.Allowed("wipe")) return OffText;
             try
             {
                 string full = Path.GetFullPath(path);
@@ -242,8 +246,9 @@ namespace CDriveCleaner
                     fs.SetLength(0); fs.Flush(true);
                 }
                 // a new name, so not even the name is left behind, then deleted the link-safe way
-                string hidden = Path.Combine(dir, Guid.NewGuid().ToString("N").Substring(0, 12) + ".tmp");
-                File.Move(full, hidden);
+                string hiddenName = Guid.NewGuid().ToString("N").Substring(0, 12) + ".tmp", hidden = Path.Combine(dir, hiddenName);
+                // renamed through a handle that is checked for where the file really is (a link put in the way meanwhile is refused)
+                if (Win.IsWindows) SafeFile.MoveInto(full, dir, hiddenName); else File.Move(full, hidden);
                 bool gone = Win.IsWindows ? SafeDelete.Delete(hidden) : TryDelete(hidden);
                 if (!gone) { error = "overwritten, but Windows didn't delete it: " + Path.GetFileName(hidden); return false; }
                 using (ChangeLog.In("Secure wipe"))
@@ -359,7 +364,7 @@ namespace CDriveCleaner
 
         public void StartWipe()
         {
-            var d = CurWipe; if (d == null || wipeCts != null) return;
+            var d = CurWipe; if (d == null || wipeCts != null || Policy.Blocked(this, "wipe")) return;
             int passes = wipeThree.Checked ? 3 : 1;
             if (!testMode && !d.Ssd && Lang.Box(this, "Overwrite all free space on " + d.Root.TrimEnd('\\') + " " + (passes == 1 ? "once" : "3 times") + "?\n\nYour files are not touched. " +
                          "The drive looks full while it runs; the wipe files delete themselves when it ends (also if it's stopped).", "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
@@ -411,6 +416,7 @@ namespace CDriveCleaner
 
         public void StartShred()
         {
+            if (Policy.Blocked(this, "wipe")) return;
             var files = shredList.Items.Cast<ListViewItem>().Select(i => (string)i.Tag).Where(f => SecureWipe.CanShred(f) == null).ToList();
             if (files.Count == 0) return;
             int passes = wipeThree.Checked ? 3 : 1;

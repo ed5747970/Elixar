@@ -1,35 +1,62 @@
-# Push a tag like v1.8.0 -> build, self-test, (optionally) code-sign, package, sign the update manifest and publish a GitHub release.
-# Elixar's "Check for updates" installs a release only when its manifest is signed with the ELIXAR_SIGNING_KEY secret.
+# Push a tag like v1.8.0 (or Actions > Release > Run workflow) -> build, self-test, code-sign, package, sign the update
+# manifests and publish a GitHub release. Elixar's "Check for updates" installs a release only when its manifest is signed
+# with the ELIXAR_SIGNING_KEY secret.
+#
+# Five jobs, so the update-signing key never shares a machine with code from outside this repository (audit finding B-19):
+#   package         build + self-test, code-sign the programs (SSL.com / .pfx), make the zips and manifests; records their
+#                   SHA-256 as job outputs (later jobs can't change those)
+#   msi             builds the MSIs with the WiX tool from nuget.org - no secrets, read-only token
+#   sign-msi        checks the programs inside each MSI are exactly the signed ones, then code-signs the MSIs
+#   sign-manifests  only Elixar's own files: checks every file against the recorded SHA-256, then signs the manifests
+#   publish         checks again and publishes (the only job with a write token)
+# Dry run: push a tag like dryrun-v1.2.62 (or tick "dry run" when running by hand): everything runs and is checked,
+# but nothing is code-signed, the manifests are signed with a throwaway key, and nothing is published.
 name: Release
 on:
   push:
-    tags: [ 'v*' ]
-  # or by hand: Actions > Release > Run workflow, with the version (for example 1.2.52); the tag is made from main
+    tags: [ 'v*', 'dryrun-v*' ]
   workflow_dispatch:
     inputs:
       version:
         description: "Version to release, for example 1.2.52 (with or without v) (must match AssemblyVersion in src/CDriveCleaner.cs)"
         required: true
+      dry_run:
+        description: "Dry run: check everything, sign nothing for real, publish nothing"
+        type: boolean
+        default: false
 permissions:
-  contents: write
+  contents: read
 env:
-  # typed as 1.2.52 or v1.2.52: the tag is always v1.2.52
+  # typed as 1.2.52 or v1.2.52: the tag is always v1.2.52 (a dry-run tag dryrun-v1.2.52 means v1.2.52)
   TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || github.ref_name }}
+  DRY: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') || startsWith(github.ref_name, 'dryrun-') }}
+defaults:
+  run:
+    # no PowerShell profile is loaded, so an earlier step can't plant code that runs in a later one
+    shell: powershell -NoProfile -NonInteractive -Command ". '{0}'"
+
 jobs:
-  release:
-    # the "release" environment: in Settings > Environments it can require your approval before the signing key is used
+  package:
+    # the "release" environment: in Settings > Environments it can require your approval before its secrets are used
     environment: release
     runs-on: windows-latest
     env:
       HAS_PFX: ${{ secrets.CODESIGN_PFX != '' }}
       HAS_ESIGNER: ${{ secrets.ES_USERNAME != '' }}
+    outputs:
+      private_zip: ${{ steps.hashes.outputs.private_zip }}
+      private_manifest: ${{ steps.hashes.outputs.private_manifest }}
+      business_zip: ${{ steps.hashes.outputs.business_zip }}
+      business_manifest: ${{ steps.hashes.outputs.business_manifest }}
+      programs: ${{ steps.hashes.outputs.programs }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
         with:
           persist-credentials: false   # the job's token isn't left in .git/config for later steps
       - name: Build and run the self-test (both editions)
-        shell: powershell
-        run: .\build.ps1 -SelfTest
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\build.ps1 -SelfTest
         env:
           ELIXAR_GOOGLE_ID: ${{ secrets.ELIXAR_GOOGLE_ID }}
           ELIXAR_GOOGLE_SECRET: ${{ secrets.ELIXAR_GOOGLE_SECRET }}
@@ -40,23 +67,23 @@ jobs:
       #     secrets ES_USERNAME, ES_PASSWORD, ES_CREDENTIAL_ID, ES_TOTP_SECRET
       #  b) a .pfx file: secrets CODESIGN_PFX (base64) and CODESIGN_PASSWORD
       - name: Code-sign the programs with a .pfx (only when one is set up)
-        if: env.HAS_PFX == 'true'
+        if: env.HAS_PFX == 'true' && env.DRY != 'true'
         env:
           CODESIGN_PFX: ${{ secrets.CODESIGN_PFX }}
           CODESIGN_PASSWORD: ${{ secrets.CODESIGN_PASSWORD }}
-        shell: powershell
         run: |
+          $ErrorActionPreference = 'Stop'
           foreach ($e in "out\Elixar.exe", "out\business\Elixar.exe", "out\business\CureAgent.exe", "out\business\CureServer.exe") { .\tools\sign-exe.ps1 -Exe $e }
       - name: Gather the programs for SSL.com eSigner
-        if: env.HAS_ESIGNER == 'true'
-        shell: powershell
+        if: env.HAS_ESIGNER == 'true' && env.DRY != 'true'
         run: |
+          $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force sign\exe, sign\exe-signed | Out-Null
           Copy-Item out\Elixar.exe sign\exe\Private-Elixar.exe
           Copy-Item out\business\Elixar.exe sign\exe\Business-Elixar.exe
           Copy-Item out\business\CureAgent.exe, out\business\CureServer.exe sign\exe
       - name: Code-sign the programs with SSL.com eSigner
-        if: env.HAS_ESIGNER == 'true'
+        if: env.HAS_ESIGNER == 'true' && env.DRY != 'true'
         uses: SSLcom/esigner-codesign@cf5f6c1d38ad10f47e3ed9aca873f429b1a8d85b   # v1.3.2, pinned to its commit
         with:
           command: batch_sign
@@ -69,9 +96,9 @@ jobs:
           malware_block: true
           environment_name: PROD
       - name: Put the signed programs back (and check every signature)
-        if: env.HAS_ESIGNER == 'true'
-        shell: powershell
+        if: env.HAS_ESIGNER == 'true' && env.DRY != 'true'
         run: |
+          $ErrorActionPreference = 'Stop'
           Copy-Item sign\exe-signed\Private-Elixar.exe out\Elixar.exe -Force
           Copy-Item sign\exe-signed\Business-Elixar.exe out\business\Elixar.exe -Force
           Copy-Item sign\exe-signed\CureAgent.exe, sign\exe-signed\CureServer.exe out\business -Force
@@ -81,11 +108,11 @@ jobs:
             Write-Host "$e signed by $($s.SignerCertificate.Subject)"
           }
       - name: Package (Elixar for Private and Elixar for Business)
-        shell: powershell
         run: |
+          $ErrorActionPreference = 'Stop'
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
-          $tag = "$env:TAG".TrimStart('v')
-          if (-not $v.StartsWith($tag)) { throw "Tag $tag does not match the version in the code ($v). Change AssemblyVersion in src\CDriveCleaner.cs." }
+          $tag = ("$env:TAG" -replace '^dryrun-', '').TrimStart('v')
+          if ($tag -notmatch '^\d+\.\d+\.\d+$' -or -not $v.StartsWith("$tag.")) { throw "Tag $tag does not match the version in the code ($v). Change AssemblyVersion in src\CDriveCleaner.cs." }
           function Pack($name, $edition, $files, $zip, $manifest) {
             $pkg = "pkg\$name"
             New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
@@ -105,25 +132,83 @@ jobs:
           }
           Pack "Elixar" "private" @("out\Elixar.exe") "Elixar.zip" "elixar-manifest.txt"
           Pack "Elixar-Business" "business" @("out\business\Elixar.exe", "out\business\CureAgent.exe", "out\business\CureServer.exe") "Elixar-Business.zip" "elixar-business-manifest.txt"
-      - name: Build the MSIs for IT (Intune, Group Policy, SCCM)
-        continue-on-error: true
-        shell: pwsh
+          New-Item -ItemType Directory -Force release, programs, programs\business | Out-Null
+          Copy-Item Elixar.zip, elixar-manifest.txt, Elixar-Business.zip, elixar-business-manifest.txt release
+          Copy-Item out\Elixar.exe programs; Copy-Item out\business\Elixar.exe, out\business\CureAgent.exe, out\business\CureServer.exe programs\business
+      - name: Record the SHA-256 of everything that leaves this job
+        id: hashes
         run: |
+          $ErrorActionPreference = 'Stop'
+          function H($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
+          $progs = (Get-ChildItem programs -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName.Substring((Resolve-Path programs).Path.Length + 1).Replace('\', '/') + '=' + (H $_.FullName) }) -join ';'
+          $lines = @("private_zip=$(H release\Elixar.zip)", "private_manifest=$(H release\elixar-manifest.txt)", "business_zip=$(H release\Elixar-Business.zip)",
+                     "business_manifest=$(H release\elixar-business-manifest.txt)", "programs=$progs")
+          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, ($lines -join "`n") + "`n", (New-Object Text.UTF8Encoding $false))
+          $lines | ForEach-Object { Write-Host $_ }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        with: { name: release-files, path: release, if-no-files-found: error }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        with: { name: programs, path: programs, if-no-files-found: error }
+
+  msi:
+    # the WiX tool comes from nuget.org: it runs here, with no secrets and a read-only token, never next to a signing key
+    needs: package
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
+        with:
+          persist-credentials: false
+          sparse-checkout: package
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+        with: { name: programs, path: out }
+      - name: Build the MSIs for IT (Intune, Group Policy, SCCM)
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        run: |
+          $ErrorActionPreference = 'Stop'
           dotnet tool install --global wix --version 4.0.5
+          if ($LASTEXITCODE -ne 0) { throw "Couldn't install the WiX tool" }
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
           $v3 = ($v.Split('.')[0..2]) -join '.'
           Copy-Item package\Elixar.wxs Elixar4.wxs; Copy-Item package\Elixar-Business.wxs ElixarBiz4.wxs
           wix convert Elixar4.wxs; wix convert ElixarBiz4.wxs; $global:LASTEXITCODE = 0
-          wix build -arch x64 -d Version=$v3 -d Exe=out\Elixar.exe -o Elixar.msi Elixar4.wxs
-          wix build -arch x64 -d Version=$v3 -d Exe=out\business\Elixar.exe -d Agent=out\business\CureAgent.exe -d Server=out\business\CureServer.exe -o Elixar-Business.msi ElixarBiz4.wxs
-      - name: Gather the MSIs for SSL.com eSigner
-        if: env.HAS_ESIGNER == 'true' && hashFiles('Elixar.msi', 'Elixar-Business.msi') != ''
-        shell: powershell
+          wix build -arch x64 -d Version=$v3 -d Exe=out\Elixar.exe -o msi\Elixar.msi Elixar4.wxs
+          if ($LASTEXITCODE -ne 0) { throw "Elixar.msi wasn't built" }
+          wix build -arch x64 -d Version=$v3 -d Exe=out\business\Elixar.exe -d Agent=out\business\CureAgent.exe -d Server=out\business\CureServer.exe -o msi\Elixar-Business.msi ElixarBiz4.wxs
+          if ($LASTEXITCODE -ne 0) { throw "Elixar-Business.msi wasn't built" }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        with: { name: msi-unsigned, path: msi, if-no-files-found: error }
+
+  sign-msi:
+    needs: [package, msi]
+    if: needs.msi.result == 'success'
+    environment: release
+    runs-on: windows-latest
+    continue-on-error: true
+    env:
+      HAS_ESIGNER: ${{ secrets.ES_USERNAME != '' }}
+      PROGRAMS: ${{ needs.package.outputs.programs }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+        with: { name: msi-unsigned, path: sign\msi }
+      - name: Check that each MSI holds exactly the programs the package job made
         run: |
-          New-Item -ItemType Directory -Force sign\msi, sign\msi-signed | Out-Null
-          foreach ($m in "Elixar.msi", "Elixar-Business.msi") { if (Test-Path $m) { Copy-Item $m sign\msi } }
+          $ErrorActionPreference = 'Stop'
+          $want = @{}; foreach ($p in "$env:PROGRAMS".Split(';')) { $k, $h = $p.Split('='); $want[$k] = $h }
+          foreach ($m in @(@{ Msi = "Elixar.msi"; Pre = "" }, @{ Msi = "Elixar-Business.msi"; Pre = "business/" })) {
+            $dir = Join-Path $env:RUNNER_TEMP ("x-" + $m.Msi)
+            $p = Start-Process msiexec.exe -ArgumentList "/a `"$((Resolve-Path "sign\msi\$($m.Msi)").Path)`" /qn TARGETDIR=`"$dir`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Couldn't open $($m.Msi) (msiexec $($p.ExitCode))" }
+            $exes = Get-ChildItem $dir -Recurse -Filter *.exe
+            if ($exes.Count -eq 0) { throw "No programs in $($m.Msi)" }
+            foreach ($e in $exes) {
+              $key = $m.Pre + $e.Name; $h = (Get-FileHash $e.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              if (-not $want.ContainsKey($key) -or $want[$key] -ne $h) { throw "$($m.Msi): $($e.Name) isn't the program the package job made" }
+              Write-Host "$($m.Msi): $($e.Name) ok"
+            }
+          }
       - name: Code-sign the MSIs with SSL.com eSigner
-        if: env.HAS_ESIGNER == 'true' && hashFiles('Elixar.msi', 'Elixar-Business.msi') != ''
+        if: env.HAS_ESIGNER == 'true' && env.DRY != 'true'
         uses: SSLcom/esigner-codesign@cf5f6c1d38ad10f47e3ed9aca873f429b1a8d85b   # v1.3.2, pinned to its commit
         with:
           command: batch_sign
@@ -135,34 +220,102 @@ jobs:
           output_path: ${{ github.workspace }}\sign\msi-signed
           malware_block: true
           environment_name: PROD
-      - name: Put the signed MSIs back
-        if: env.HAS_ESIGNER == 'true' && hashFiles('Elixar.msi', 'Elixar-Business.msi') != ''
-        shell: powershell
+      - name: Put the signed MSIs together (unsigned when no certificate is set up)
         run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force msi | Out-Null
           foreach ($m in "Elixar.msi", "Elixar-Business.msi") {
             if (Test-Path "sign\msi-signed\$m") {
-              Copy-Item "sign\msi-signed\$m" $m -Force
-              $s = Get-AuthenticodeSignature $m
+              Copy-Item "sign\msi-signed\$m" "msi\$m"
+              $s = Get-AuthenticodeSignature "msi\$m"
               if ($s.Status -ne 'Valid') { throw "$m is not signed correctly: $($s.Status)" }
-            }
+            } else { Copy-Item "sign\msi\$m" "msi\$m" }
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        with: { name: msi, path: msi, if-no-files-found: error }
+
+  sign-manifests:
+    # only Elixar's own files are on this machine: nothing from outside the repository runs before the key is used
+    needs: package
+    environment: release
+    runs-on: windows-latest
+    env:
+      WANT_PRIVATE_ZIP: ${{ needs.package.outputs.private_zip }}
+      WANT_PRIVATE_MANIFEST: ${{ needs.package.outputs.private_manifest }}
+      WANT_BUSINESS_ZIP: ${{ needs.package.outputs.business_zip }}
+      WANT_BUSINESS_MANIFEST: ${{ needs.package.outputs.business_manifest }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+        with: { name: release-files, path: release }
+      - name: Check every file against the SHA-256 the package job recorded, and each manifest against its zip
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function H($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
+          $files = @{ "Elixar.zip" = $env:WANT_PRIVATE_ZIP; "elixar-manifest.txt" = $env:WANT_PRIVATE_MANIFEST; "Elixar-Business.zip" = $env:WANT_BUSINESS_ZIP; "elixar-business-manifest.txt" = $env:WANT_BUSINESS_MANIFEST }
+          foreach ($f in $files.Keys) { if (-not $files[$f] -or (H "release\$f") -ne $files[$f]) { throw "release\$f was changed after the package job" } }
+          if ((Get-ChildItem release -File).Count -ne 4) { throw "Unexpected files in the release" }
+          foreach ($pair in @(@("Elixar.zip", "elixar-manifest.txt", "private"), @("Elixar-Business.zip", "elixar-business-manifest.txt", "business"))) {
+            $m = @{}; foreach ($l in [IO.File]::ReadAllLines((Resolve-Path "release\$($pair[1])").Path)) { $k, $v = $l.Split('=', 2); if ($k) { $m[$k] = $v } }
+            if ($m['edition'] -ne $pair[2]) { throw "$($pair[1]): wrong edition" }
+            if ($m['zip-sha256'].ToLowerInvariant() -ne (H "release\$($pair[0])")) { throw "$($pair[1]) doesn't match $($pair[0])" }
+            $x = Join-Path $env:RUNNER_TEMP ("x-" + $pair[2]); Expand-Archive "release\$($pair[0])" $x -Force
+            $exe = Get-ChildItem $x -Recurse -Filter Elixar.exe | Select-Object -First 1
+            if (-not $exe -or $m['exe-sha256'].ToLowerInvariant() -ne (H $exe.FullName)) { throw "$($pair[1]) doesn't match the Elixar.exe inside $($pair[0])" }
+            Write-Host "$($pair[1]): $($m['version']) ok"
           }
       - name: Sign the update manifests
         env:
           ELIXAR_SIGNING_KEY: ${{ secrets.ELIXAR_SIGNING_KEY }}
-        shell: pwsh
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
         run: |
-          if (-not $env:ELIXAR_SIGNING_KEY) { Write-Warning "No ELIXAR_SIGNING_KEY secret: this release can't be installed by Elixar's updater (people download it by hand)."; exit 0 }
+          $ErrorActionPreference = 'Stop'
           $rsa = [System.Security.Cryptography.RSA]::Create()
-          $rsa.FromXmlString($env:ELIXAR_SIGNING_KEY)
+          if ($env:DRY -eq 'true') { $rsa.KeySize = 3072; Write-Host "Dry run: signed with a throwaway key (Elixar won't install these)" }
+          elseif (-not $env:ELIXAR_SIGNING_KEY) { Write-Warning "No ELIXAR_SIGNING_KEY secret: this release can't be installed by Elixar's updater (people download it by hand)."; exit 0 }
+          else { $rsa.FromXmlString($env:ELIXAR_SIGNING_KEY) }
+          New-Item -ItemType Directory -Force sigs | Out-Null
           foreach ($m in "elixar-manifest", "elixar-business-manifest") {
-            $sig = $rsa.SignData([IO.File]::ReadAllBytes("$m.txt"), [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
-            [IO.File]::WriteAllText("$m.sig", [Convert]::ToBase64String($sig))
+            $data = [IO.File]::ReadAllBytes((Resolve-Path "release\$m.txt").Path)
+            $sig = $rsa.SignData($data, [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            if (-not $rsa.VerifyData($data, $sig, [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)) { throw "The signature didn't check" }
+            [IO.File]::WriteAllText((Join-Path (Resolve-Path sigs).Path "$m.sig"), [Convert]::ToBase64String($sig))
           }
-      - name: Publish the release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        with: { name: signatures, path: sigs, if-no-files-found: ignore }
+
+  publish:
+    needs: [package, msi, sign-msi, sign-manifests]
+    if: always() && needs.package.result == 'success' && needs.sign-manifests.result == 'success'
+    runs-on: windows-latest
+    permissions:
+      contents: write   # the only job that can write: it runs nothing but GitHub's own download action and gh
+    env:
+      WANT_PRIVATE_ZIP: ${{ needs.package.outputs.private_zip }}
+      WANT_PRIVATE_MANIFEST: ${{ needs.package.outputs.private_manifest }}
+      WANT_BUSINESS_ZIP: ${{ needs.package.outputs.business_zip }}
+      WANT_BUSINESS_MANIFEST: ${{ needs.package.outputs.business_manifest }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+        with: { name: release-files, path: release }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+        continue-on-error: true
+        with: { name: signatures, path: release }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+        if: needs.sign-msi.result == 'success'
+        continue-on-error: true
+        with: { name: msi, path: release }
+      - name: Check again and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
+          SHA: ${{ github.sha }}
         run: |
-          $files = @("Elixar.zip", "elixar-manifest.txt", "Elixar-Business.zip", "elixar-business-manifest.txt")
-          foreach ($f in "elixar-manifest.sig", "elixar-business-manifest.sig", "Elixar.msi", "Elixar-Business.msi") { if (Test-Path $f) { $files += $f } }
-          gh release create "$env:TAG" @files --title "Elixar $env:TAG" --target "${{ github.sha }}" --generate-notes
+          $ErrorActionPreference = 'Stop'
+          function H($f) { (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant() }
+          $files = @{ "Elixar.zip" = $env:WANT_PRIVATE_ZIP; "elixar-manifest.txt" = $env:WANT_PRIVATE_MANIFEST; "Elixar-Business.zip" = $env:WANT_BUSINESS_ZIP; "elixar-business-manifest.txt" = $env:WANT_BUSINESS_MANIFEST }
+          foreach ($f in $files.Keys) { if ((H "release\$f") -ne $files[$f]) { throw "release\$f was changed after the package job" } }
+          $up = @($files.Keys | ForEach-Object { "release\$_" })
+          foreach ($f in "elixar-manifest.sig", "elixar-business-manifest.sig", "Elixar.msi", "Elixar-Business.msi") { if (Test-Path "release\$f") { $up += "release\$f" } }
+          Get-ChildItem release | ForEach-Object { Write-Host "$($_.Name)  $((H $_.FullName))" }
+          if ($env:DRY -eq 'true') { Write-Host "Dry run: everything checked; nothing is published."; exit 0 }
+          gh release create "$env:TAG" @up --repo "$env:GITHUB_REPOSITORY" --title "Elixar $env:TAG" --target "$env:SHA" --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw "gh couldn't publish the release" }

@@ -52,7 +52,9 @@
     if (!rows.length) { var tr0 = el("tr"), td0 = el("td", "empty", all.length ? "No PC matches." : "No PC has reported yet. Install Cure Agent on the PCs (see the guide)."); td0.colSpan = 9; tr0.appendChild(td0); tb.appendChild(tr0); }
     rows.forEach(function (p) {
       var tr = el("tr"), s = st(p.state), fp = pct(p);
-      tr.appendChild(el("td")).appendChild(el("b", null, p.pc));
+      var cell = tr.appendChild(el("td")); cell.appendChild(el("b", null, p.pc));
+      // two PCs enrolled with this name: one may be a copy made with the enrollment token (remove it with CureServer.exe --remove-pc <id>)
+      if (p.twice) { var w = el("span", "twice", " enrolled twice"); w.title = "Enrolled " + String(p.enrolled || "") + " from " + String(p.ip || "") + " · id " + String(p.id || ""); cell.appendChild(w); }
       var c2 = el("td"), sp = el("span", "st"), dot = el("span", "dot"); dot.style.background = s[1]; sp.appendChild(dot); sp.appendChild(document.createTextNode(s[0])); c2.appendChild(sp); tr.appendChild(c2);
       var c3 = el("td"), bar = el("span", "bar"), fill = el("i"); fill.style.width = Math.max(0, fp) + "%"; fill.style.background = fp < 10 ? "var(--critical)" : fp < 20 ? "var(--caution)" : "var(--safe)";
       bar.appendChild(fill); c3.appendChild(bar); c3.appendChild(document.createTextNode((fp < 0 ? "?" : fp + "%") + " · " + gb(p.free) + " / " + gb(p.total))); tr.appendChild(c3);
@@ -80,7 +82,7 @@
     $("overview").className = "view"; $("pc").className = "view on";
     get("api/v1/pc?id=" + encodeURIComponent(id)).then(function (d) {
       var r = d.report || {};
-      $("pcName").textContent = d.pc;
+      $("pcName").textContent = d.pc + (d.twice ? " (enrolled twice: this one " + String(d.enrolled || "") + " from " + String(d.ip || "") + ", id " + String(d.id || "") + ")" : "");
       var k = $("pcKpis"); clear(k);
       var fp = r.Total > 0 ? Math.round(r.Free * 100 / r.Total) : -1;
       kpi(k, "C: free", gb(r.Free), (fp < 0 ? "?" : fp + "%") + " of " + gb(r.Total), fp >= 0 && fp < 10 ? "bad" : "");

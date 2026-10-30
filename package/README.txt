@@ -25,6 +25,15 @@ NEW IN 1.2.62
   Every fix is a button: Elixar's own tools, Windows' own settings page,
   or one logged step after asking (update apps, make a restore point, use
   the Balanced power plan). The weekly summary email shows the score.
+- Security review (backdoor and compromise assessment, audit-reports/):
+  Check & fix follows the company policy for app updates and startup
+  changes; Secure wipe can be turned off by policy (off on company PCs);
+  shredding renames through a checked handle; Cure Server limits wrong
+  enrollment tokens per address and marks a PC name enrolled twice; the
+  MSI keeps the enrollment token out of installer logs; Cure reports never
+  carry paths; a non-MSI uninstall also removes the Cure services; winget
+  isn't asked when the policy blocks app updates; the release pipeline
+  signs updates on a machine where only Elixar's own files run.
 
 NEW IN 1.2.61
 - Growing fast: once a day Elixar finds the folders on C: that grow fast

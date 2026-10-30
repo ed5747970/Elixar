@@ -90,6 +90,12 @@ namespace CDriveCleaner
             Automation.RunSchtasks(Automation.DeleteArgs(FolderGrowth.Task), out o);
 #if BUSINESS
             Automation.RunSchtasks(Automation.DeleteArgs(CureAlerts.Task), out o);
+            // without the MSI, nothing else would remove the Cure services (and the server's port, certificate binding and firewall rule)
+            if (!msi)
+            {
+                try { if (CureSetup.ServiceExists(CureAgent.ServiceName)) CureSetup.UninstallAgent(); } catch { }
+                try { if (CureSetup.ServiceExists(CureServer.ServiceName)) CureSetup.UninstallServer(purge); } catch { }
+            }
 #endif
             try { GoogleAuth.SignOut(); } catch { }   // the Google sign-in is removed from this PC and cancelled at Google
             try { MicrosoftAuth.SignOut(); OtherMail.Forget(); MailAccount.Disconnect(); } catch { }

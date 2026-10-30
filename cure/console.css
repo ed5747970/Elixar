@@ -56,3 +56,4 @@ dt{color:var(--quiet)} dd{margin:0}
 .lock{font-size:12px;color:var(--quiet)}
 .view{display:none}.view.on{display:block}
 .gap{margin-top:12px}
+.twice { color: #c62828; font-weight: 600; font-size: 12px; margin-left: 6px; }
