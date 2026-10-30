@@ -17,13 +17,16 @@ namespace CDriveCleaner
     {
         public int Score = -1; public string Small = "of 100"; public Font BigFont;
         public static Color ColorFor(int s) { return s < 0 ? Color.FromArgb(138, 145, 160) : s >= 85 ? Color.FromArgb(46, 125, 50) : s >= 65 ? Color.FromArgb(180, 95, 6) : Color.FromArgb(198, 40, 40); }
-        protected override void OnPaint(PaintEventArgs e)
+        // a drawing error must never reach Windows' error box: the ring is decoration
+        protected override void OnPaint(PaintEventArgs e) { try { Paint_(e.Graphics); } catch { } }
+        void Paint_(Graphics g)
         {
-            var g = e.Graphics; g.Clear(Under); g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Under); g.SmoothingMode = SmoothingMode.AntiAlias;
             int d = Math.Min(Width, Height) - S(4), th = Math.Max(S(6), d / 9);
+            if (d < S(24)) return;   // too small to draw (while the window lays itself out)
             var r = new Rectangle((Width - d) / 2 + th / 2, (Height - d) / 2 + th / 2, d - th, d - th);
             using (var p = new Pen(Theme.Dark ? Color.FromArgb(60, 60, 72) : Color.FromArgb(230, 232, 238), th)) g.DrawEllipse(p, r);
-            if (Score >= 0) using (var p = new Pen(ColorFor(Score), th) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawArc(p, r, -90, (float)(360.0 * Score / 100));
+            if (Score > 0) using (var p = new Pen(ColorFor(Score), th) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawArc(p, r, -90, (float)(360.0 * Score / 100));   // an arc of 0 degrees is an error
             var big = BigFont ?? Font;
             {
                 var bs = TextRenderer.MeasureText(g, Score < 0 ? "?" : Score.ToString(), big);
@@ -40,9 +43,11 @@ namespace CDriveCleaner
         public HealthReport Report; public bool Checking;
         public Font HeadFont, ChipFont;
         public HealthStrip() { Cursor = Cursors.Hand; }
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnPaint(PaintEventArgs e) { try { Paint_(e.Graphics); } catch { } }   // never an error box from drawing
+        void Paint_(Graphics g)
         {
-            var g = e.Graphics; g.Clear(Under); g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Under); g.SmoothingMode = SmoothingMode.AntiAlias;
+            if (Width < S(200) || Height < S(60)) return;   // too small to draw (while the window lays itself out)
             var card = new Rectangle(0, 0, Width - 1, Height - 1);
             using (var b = new SolidBrush(Theme.Panel)) g.FillRectangle(b, card);
             using (var p = new Pen(Theme.Grid)) g.DrawRectangle(p, card);
@@ -52,7 +57,7 @@ namespace CDriveCleaner
             int th = Math.Max(S(5), ring / 9);
             var arc = new Rectangle(rr.X + th / 2, rr.Y + th / 2, rr.Width - th, rr.Height - th);
             using (var p = new Pen(Theme.Dark ? Color.FromArgb(60, 60, 72) : Color.FromArgb(230, 232, 238), th)) g.DrawEllipse(p, arc);
-            if (score >= 0) using (var p = new Pen(HealthRing.ColorFor(score), th) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawArc(p, arc, -90, (float)(360.0 * score / 100));
+            if (score > 0) using (var p = new Pen(HealthRing.ColorFor(score), th) { StartCap = LineCap.Round, EndCap = LineCap.Round }) g.DrawArc(p, arc, -90, (float)(360.0 * score / 100));
             string num = score < 0 ? "?" : score.ToString();
             TextRenderer.DrawText(g, num, HeadFont, rr, HealthRing.ColorFor(score), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
             var flags = TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | (Rtl ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : 0);

@@ -21,6 +21,19 @@ namespace CDriveCleaner
 {
     public static class SelfTest
     {
+        // errors in the test windows (Program sets this up for --selftest): named in the report instead of an error box
+        public static readonly List<Exception> UiErrors = new List<Exception>();
+        static string UiErrorText()
+        {
+            lock (UiErrors)
+            {
+                if (UiErrors.Count == 0) return "";
+                var e = UiErrors[0];
+                var at = (e.StackTrace ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Contains("CDriveCleaner.")).Take(3);
+                return "; window error (" + UiErrors.Count + "): " + e.GetType().Name + ": " + e.Message + " @ " + string.Join(" < ", at);
+            }
+        }
+
         public static int Run(bool showResult)
         {
             var rep = new StringBuilder();
@@ -1323,7 +1336,7 @@ namespace CDriveCleaner
                             if (scans < 2) waiting.Add("scans " + scans); if (!dashDone) waiting.Add("dashboard"); if (!appsDone) waiting.Add("apps"); if (!storeDone) waiting.Add("store apps");
                             if (!undoDone) waiting.Add("undo"); if (!phoneDone) waiting.Add("phone"); if (!startDone) waiting.Add("startup"); if (!moveDone) waiting.Add("move");
                             if (!diskDone) waiting.Add("disk health"); if (!overDone) waiting.Add("overview"); if (!driveDone) waiting.Add("drives");
-                            uiErr = "timed out after " + timeout.Interval / 60000 + " minutes waiting for: " + string.Join(", ", waiting);
+                            uiErr = "timed out after " + timeout.Interval / 60000 + " minutes waiting for: " + string.Join(", ", waiting) + UiErrorText();
                             form.Close();
                         };
                         timeout.Start();
@@ -2366,6 +2379,7 @@ namespace CDriveCleaner
                 try { Fs.Delete(root); } catch { }
                 Catalog.WindowsOnLinux = false; MainForm.ForceWindowsUi = false;
             }
+            check(UiErrors.Count == 0, "No error in any test window" + UiErrorText());
 
             rep.AppendLine();
             rep.AppendLine(fails == 0 ? "RESULT: ALL TESTS PASSED" : "RESULT: " + fails + " TEST(S) FAILED");

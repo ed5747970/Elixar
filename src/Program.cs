@@ -51,6 +51,9 @@ namespace CDriveCleaner
                 Sys.TryDpiAware();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                // an error in a test window is recorded and reported, never a box that waits for a click
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (o, e) => { lock (SelfTest.UiErrors) SelfTest.UiErrors.Add(e.Exception); };
                 return SelfTest.Run(!args.Contains("--quiet"));
             }
             int ci = Array.IndexOf(args, "--check-space");
