@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.61</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.62</p></div>
 </div></header>
 <main class="wrap">
 
@@ -85,6 +85,19 @@
 
 <h2 id="dashboard">Dashboard</h2>
 <p>The Dashboard opens first. It tells you at a glance how your drives are doing and what you can do about it. Looking never deletes anything; every clean asks first.</p>
+<h3>PC health</h3>
+<p>Under the drive picture, <strong>PC health</strong> gives this PC one score from 0 to 100 and a score for each of six areas. It is worked out from what Windows already records, so checking changes nothing and sends nothing anywhere. It is checked when the Dashboard opens (at most every 30 minutes); click it to see what Elixar found.</p>
+<table>
+  <tr><th>Area</th><th>What Elixar looks at</th><th>What the button does</th></tr>
+  <tr><td><strong>Security</strong></td><td>Microsoft Defender (or your other antivirus) on and up to date; the firewall; when Windows Update last installed something and whether it keeps failing; apps with updates waiting; Secure Boot, TPM, User Account Control; BitLocker on C:</td><td>Repair Windows (fixes the store updates come from), Update apps (winget / Microsoft Store, a restore point first), or Windows' own settings page. Elixar never switches the firewall, User Account Control or BitLocker itself</td></tr>
+  <tr><td><strong>Stability</strong></td><td>Blue screens, sudden power-offs and apps that crashed 3 times or more in the last 30 days, with the stop code in plain words and the file an app keeps crashing in</td><td>Tools &gt; Drivers</td></tr>
+  <tr><td><strong>Speed</strong></td><td>How long Windows takes to start (and how long it took a few weeks ago), the startup programs that slow it most, how full memory is and what uses it, the power plan</td><td>Tools &gt; Startup, Task Manager, or <em>Use Balanced</em> (asks first; Control Panel &gt; Power Options switches it back)</td></tr>
+  <tr><td><strong>Space</strong></td><td>Free space on C:, folders growing fast or looking unusual</td><td>Check &amp; fix, Growing fast</td></tr>
+  <tr><td><strong>Drives</strong></td><td>The drives' own health counters (Tools &gt; Disk health)</td><td>Tools &gt; Disk health</td></tr>
+  <tr><td><strong>Safety net</strong></td><td>How old the last restore point is; whether your files are backed up (File History, or OneDrive backing up Documents)</td><td><em>Make one now</em> (a Windows restore point), or File History's settings</td></tr>
+  <tr><td><strong>Battery</strong> (laptops only, not scored)</td><td>How much of its original charge the battery still holds, and its charge cycles</td><td>&ndash;</td></tr>
+</table>
+<p>Security and Stability count most in the total. An area Elixar can't read on a PC (for example on Windows Server) is left out rather than counted against it. Some findings are your decision - no backup because you use another backup program, BitLocker off on a desktop, Power saver on purpose: click <strong>Ignore</strong> and they no longer lower the score (<em>Watch it again</em> undoes that). A PC counts as a laptop only when it has a battery <em>and</em> its case says it is portable, so a desktop with a UPS on USB doesn't get a battery card. The weekly summary email starts with the score and what to fix; nothing is fixed from an email. There is no registry cleaner and no &ldquo;RAM booster&rdquo;: they don't make a PC faster and can break Windows.</p>
 <h3>Check &amp; fix</h3>
 <p>The purple <strong>&#10003; Check &amp; fix</strong> button next to the drives is the one button for everyday care. It checks in about a minute (nothing changes while it checks) and shows four numbers - space that can be freed, startup programs that slow Windows down, app updates, disk health - and a list of fixes:</p>
 <table>
@@ -541,6 +554,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-10-30</td><td>1.2.62</td><td>PC health: one score for Security, Stability, Speed, Space, Drives and your Safety net (and the battery on a laptop), read from what Windows records; each finding with its fix (Repair Windows, Update apps, Drivers, Startup, a restore point, Windows' own settings); Ignore for your-decision findings; the score in the weekly summary email</td></tr>
   <tr><td>2026-10-29</td><td>1.2.61</td><td>Growing fast: the folders on C: that grow fast are found once a day and studied (an app&rsquo;s logs or caches, your files, Windows, or something unusual), with a notification; an app&rsquo;s old logs and caches can be kept in check with a daily rule you allow; unusual ones get a Microsoft Defender scan, never a delete</td></tr>
   <tr><td>2026-10-27</td><td>1.2.60</td><td>Elixar for Business: email alerts to IT from the Cure Server (a disk failing, C: almost full, a PC not reporting; one email for every new problem, a weekly reminder, and when it is fixed)</td></tr>
   <tr><td>2026-10-27</td><td>1.2.59</td><td>Check &amp; fix on the Dashboard (one button: Safe clean, startup programs you can open yourself, app updates, disk and Windows status; a restore point first). Tools &rsaquo; Repair Windows (DISM and SFC). Tools &rsaquo; Secure wipe (wipe free space, shred files; TRIM on SSDs). Release code signing through SSL.com eSigner</td></tr>

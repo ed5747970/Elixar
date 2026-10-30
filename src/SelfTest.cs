@@ -1814,6 +1814,8 @@ namespace CDriveCleaner
                         SelfTest1250.All(root, check);
                         // 1.2.59: Check & fix, Repair Windows, Secure wipe
                         SelfTest1259.All(root, check);
+                        // 1.2.62: PC health
+                        SelfTest1262.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

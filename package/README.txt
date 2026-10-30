@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.61)
+ELIXAR  (version 1.2.62)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,22 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.62
+- PC health: one score (0-100) on the Dashboard for Security, Stability,
+  Speed, Space, Drives and your Safety net, from what Windows already
+  records. Checking only reads; nothing is sent anywhere.
+  - Security: Defender (or your antivirus), firewall, Windows Update
+    stuck or failing, apps with updates, Secure Boot, TPM, UAC, BitLocker.
+  - Stability: blue screens (stop code in plain words), sudden power-offs
+    and apps that keep crashing, in the last 30 days.
+  - Speed: startup time and what slows it, memory, power plan.
+  - Safety net: restore point age, File History or OneDrive backup.
+  - Battery wear on laptops (a battery AND a portable case; a desktop's
+    UPS doesn't count).
+  Every fix is a button: Elixar's own tools, Windows' own settings page,
+  or one logged step after asking (update apps, make a restore point, use
+  the Balanced power plan). The weekly summary email shows the score.
 
 NEW IN 1.2.61
 - Growing fast: once a day Elixar finds the folders on C: that grow fast

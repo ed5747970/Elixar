@@ -66,6 +66,8 @@ namespace CDriveCleaner
             return null;
         }
 
+        public static bool RestartPendingNow() { return RestartPending(); }
+
         static bool RestartPending()
         {
             if (RestartOverride != null) return RestartOverride();
@@ -107,6 +109,7 @@ namespace CDriveCleaner
             StartupImpactData impact = null;
             try { impact = ImpactOverride != null ? ImpactOverride() : (Win.IsWindows ? StartupImpact.Read() : null); } catch { }
             var optional = startup.Where(e => e.Enabled && !e.Missing && e.Flag != StartupFlag.Danger && OptionalName(e) != null).ToList();
+            if (!Policy.Allowed("startup.change")) optional.Clear();   // the company's policy decides (Policy manager)
             r.SlowStartup = optional.Count;
             if (optional.Count > 0)
             {
@@ -123,6 +126,7 @@ namespace CDriveCleaner
             try { if (UpdatesOverride != null) ups = UpdatesOverride(); else if (Win.IsWindows && WinGet.Available) { string e; ups = WinGet.List(out e); } } catch { }
             ups = ups.Where(u => WinGet.TrustedSource(u.Source)).ToList();
             r.Updates = ups.Count;
+            if (!Policy.Allowed("apps.update")) ups.Clear();   // counted, but not offered: the company's policy decides
             if (ups.Count > 0)
                 r.Items.Add(new FixItem { Kind = FixKind.Updates, Tag = "Safe", On = true, Updates = ups, Right = "",
                                           Title = "Update " + ups.Count + " app" + (ups.Count == 1 ? "" : "s"),
@@ -171,7 +175,8 @@ namespace CDriveCleaner
         public static FixResult Fix(IEnumerable<FixItem> chosen, Action<string> log)
         {
             var res = new FixResult();
-            var sel = chosen.Where(i => i.On && !i.Locked).ToList();
+            // checked again here, whoever asks: a fix the policy blocks is never done
+            var sel = chosen.Where(i => i.On && !i.Locked && (i.Kind != FixKind.Startup || Policy.Allowed("startup.change")) && (i.Kind != FixKind.Updates || Policy.Allowed("apps.update"))).ToList();
             Action<string> say = s => { res.Lines.Add(s); if (log != null) log(s); };
             if (sel.Count == 0) return res;
             using (ChangeLog.In("Check & fix"))

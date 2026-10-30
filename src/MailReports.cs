@@ -217,9 +217,11 @@ namespace CDriveCleaner
         }
 
         // ---------- the four kinds of email ----------
-        public static Doc Summary(long free, long total, List<CleanItem> items, DiskReport disks, string lastClean)
+        public static Doc Summary(long free, long total, List<CleanItem> items, DiskReport disks, string lastClean) { return Summary(free, total, items, disks, lastClean, null); }
+        public static Doc Summary(long free, long total, List<CleanItem> items, DiskReport disks, string lastClean, HealthReport health)
         {
             var d = new Doc(L("Your weekly Elixar summary", "הסיכום השבועי של Elixar"), "#5b4cc4");
+            HealthLines(d, health);
             SpaceLines(d, free, total);
             try { d.Image(TrendChart.Png(SpaceHistory.Read(), DateTime.Today, 56), L("Free space on C: over the last 8 weeks", "השטח הפנוי ב-C: ב-8 השבועות האחרונים")); } catch { }
             if (lastClean != null) d.P(lastClean);
@@ -227,6 +229,18 @@ namespace CDriveCleaner
             WatchLines(d);
             DiskLines(d, disks);
             return d;
+        }
+
+        // PC health: the score and what needs you (Dashboard > PC health); the email only tells, it never fixes
+        static void HealthLines(Doc d, HealthReport r)
+        {
+            if (r == null || r.Total < 0) return;
+            string word = r.Word == "Good" ? L("Good", "טוב") : r.Word == "Fair" ? L("Fair", "סביר") : L("Poor", "חלש");
+            d.Big(L("PC health", "בריאות המחשב"), r.Total + "/100 · " + word, r.Total >= 85 ? "#2e7d32" : r.Total >= 65 ? "#b45f06" : "#c62828");
+            var todo = r.Items.Where(i => !i.Ignored && (i.Level == HLevel.Bad || i.Level == HLevel.Warn)).OrderByDescending(i => (int)i.Level).ThenByDescending(i => i.Penalty).Take(6).ToList();
+            if (todo.Count == 0) { d.P(L("Nothing needs fixing.", "אין מה לתקן.")); return; }
+            d.Table(todo.Select(i => new[] { i.Title, Lang.MailT(i.Area), i.Level == HLevel.Bad ? L("important", "חשוב") : L("worth fixing", "כדאי לתקן") }));
+            d.P(L("Open Elixar > Dashboard > PC health to fix them. Nothing is changed from an email.", "פתחו את Elixar > לוח בקרה > בריאות המחשב כדי לתקן. שום דבר לא משתנה מתוך מייל."));
         }
 
         // the folders that keep growing, with how often to look at them (Dashboard > Watch)
@@ -338,7 +352,9 @@ namespace CDriveCleaner
             if (p.Summary && MailPrefs.SummaryDue(p.LastSummary, DateTime.Today, p.Day))
             {
                 if (disks == null) disks = DiskHealth.Read();
-                string e = Summary(free, total, measured(), disks, LastCleanLine()).Send();
+                HealthReport health = null;
+                if (Win.IsWindows) try { health = Health.Check(true, null); } catch { }
+                string e = Summary(free, total, measured(), disks, LastCleanLine(), health).Send();
                 Automation.Log("Email: weekly summary " + (e == null ? "sent." : "not sent: " + e));
                 if (e == null) p.LastSummary = DateTime.Today;
             }

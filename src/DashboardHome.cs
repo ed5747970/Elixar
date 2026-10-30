@@ -758,12 +758,13 @@ namespace CDriveCleaner
 
         Control BuildOverview()
         {
-            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = new Padding(0), Padding = new Padding(0, 0, 0, S(4)), AutoScroll = true };
+            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = new Padding(0), Padding = new Padding(0, 0, 0, S(4)), AutoScroll = true };
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             t.RowStyles.Add(new RowStyle(SizeType.Absolute, S(206)));
+            t.RowStyles.Add(new RowStyle(SizeType.Absolute, LinuxUi ? 0 : HealthRowH));   // PC health (Windows)
             t.RowStyles.Add(new RowStyle(SizeType.Absolute, S(130)));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            t.AutoScrollMinSize = new Size(0, S(660));
+            t.AutoScrollMinSize = new Size(0, S(660) + (LinuxUi ? 0 : HealthRowH));
 
             hero = new HeroCard
             {
@@ -816,7 +817,11 @@ namespace CDriveCleaner
             cardDrives.FooterClicked += () => ShowMove();
             bottom.Controls.Add(cardWins, 0, 0); bottom.Controls.Add(cardDrives, 1, 0); bottom.Controls.Add(cardActivity, 2, 0);
 
-            t.Controls.Add(hero, 0, 0); t.Controls.Add(tileGrid, 0, 1); t.Controls.Add(bottom, 0, 2);
+            healthStrip = new HealthStrip { Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, Font = new Font("Segoe UI", 9f), ChipFont = new Font("Segoe UI Semibold", 10f),
+                                            HeadFont = new Font("Segoe UI Semibold", 15f), Visible = !LinuxUi, AccessibleName = Lang.T("PC health") };
+            new ToolTip().SetToolTip(healthStrip, Lang.T("Security, stability, speed, space, drives and your safety net, scored from what Windows records. Click to see."));
+            healthStrip.Click += (o, e) => OpenHealth();
+            t.Controls.Add(hero, 0, 0); t.Controls.Add(healthStrip, 0, 1); t.Controls.Add(tileGrid, 0, 2); t.Controls.Add(bottom, 0, 3);
             t.Resize += (o, e) => LayoutTiles(tiles.Length == 7 ? (t.ClientSize.Width >= S(1250) ? 7 : 4) : (t.ClientSize.Width >= S(1000) ? 6 : 3));
             FormClosing += (o, e) => { if (!e.Cancel) formClosing = true; };
             FormClosed += (o, e) => { if (!testMode) Adb.StopOwnServer(); };
@@ -826,6 +831,8 @@ namespace CDriveCleaner
 
         // all tiles in one row on a wide window; on a narrower one two rows (3 + 3, or 4 + 3 with seven tiles,
         // laid on a 12-column grid so both rows are filled edge to edge)
+        int HealthRowH { get { return S(104); } }
+
         void LayoutTiles(int cols)
         {
             if (cols == tileCols || tileGrid == null) return;
@@ -847,8 +854,8 @@ namespace CDriveCleaner
             tileGrid.ResumeLayout();
             if (dashOverview != null)
             {
-                dashOverview.RowStyles[1].Height = S(130) * rows;
-                dashOverview.AutoScrollMinSize = new Size(0, S(660) + S(130) * (rows - 1));
+                dashOverview.RowStyles[2].Height = S(130) * rows;
+                dashOverview.AutoScrollMinSize = new Size(0, S(660) + (LinuxUi ? 0 : HealthRowH) + S(130) * (rows - 1));
             }
         }
 
@@ -899,6 +906,7 @@ namespace CDriveCleaner
             if (hero == null || IsDisposed || formClosing) return;
             if (sumBusy) { sumAgain = true; return; }
             sumBusy = true;
+            RefreshHealth();
             var sum = new DashSummary { Measured = ready, Cleaning = cleaningNow, Free = Sys.Free(), Total = Sys.Total() };
             if (ready)
             {
