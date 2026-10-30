@@ -52,7 +52,7 @@ jobs:
       business_manifest: ${{ steps.hashes.outputs.business_manifest }}
       programs: ${{ steps.hashes.outputs.programs }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v4.2.2, pinned to its commit
         with:
           persist-credentials: false   # the job's token isn't left in .git/config for later steps
       - name: Build and run the self-test (both editions)
@@ -158,7 +158,7 @@ jobs:
     runs-on: windows-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v4.2.2, pinned to its commit
         with:
           persist-credentials: false
           sparse-checkout: package
