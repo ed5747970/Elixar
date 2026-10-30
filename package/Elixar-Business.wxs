@@ -20,8 +20,8 @@
     <Media Id="1" Cabinet="elixar.cab" EmbedCab="yes" />
     <Property Id="ARPCOMMENTS" Value="The cure for a cluttered PC" />
     <Property Id="ARPNOMODIFY" Value="1" />
-    <!-- the enrollment token is never written to Windows Installer's logs (msiexec /l*v, Intune, SCCM) -->
-    <Property Id="MsiHiddenProperties" Value="CURETOKEN" />
+    <!-- the enrollment token is never written to Windows Installer's logs (msiexec /l*v, Intune, SCCM): WiX lists it in MsiHiddenProperties -->
+    <Property Id="CURETOKEN" Hidden="yes" Secure="yes" />
 
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">

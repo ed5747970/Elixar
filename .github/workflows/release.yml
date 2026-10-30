@@ -9,12 +9,14 @@
 #   sign-msi        checks the programs inside each MSI are exactly the signed ones, then code-signs the MSIs
 #   sign-manifests  only Elixar's own files: checks every file against the recorded SHA-256, then signs the manifests
 #   publish         checks again and publishes (the only job with a write token)
-# Dry run: push a tag like dryrun-v1.2.62 (or tick "dry run" when running by hand): everything runs and is checked,
-# but nothing is code-signed, the manifests are signed with a throwaway key, and nothing is published.
+# Dry run: push a branch named release-dryrun/1.2.62 (or tick "dry run" when running by hand): everything runs and is
+# checked, but nothing is code-signed, the manifests are signed with a throwaway key, and nothing is published. A dry run
+# uses the "dry-run" environment, never "release", so it can't reach the signing secrets kept there.
 name: Release
 on:
   push:
-    tags: [ 'v*', 'dryrun-v*' ]
+    tags: [ 'v*' ]
+    branches: [ 'release-dryrun/**' ]
   workflow_dispatch:
     inputs:
       version:
@@ -27,9 +29,9 @@ on:
 permissions:
   contents: read
 env:
-  # typed as 1.2.52 or v1.2.52: the tag is always v1.2.52 (a dry-run tag dryrun-v1.2.52 means v1.2.52)
-  TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || github.ref_name }}
-  DRY: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') || startsWith(github.ref_name, 'dryrun-') }}
+  # typed as 1.2.52 or v1.2.52: the tag is always v1.2.52 (the dry-run branch release-dryrun/1.2.52 means v1.2.52)
+  TAG: ${{ github.event_name == 'workflow_dispatch' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || (startsWith(github.ref, 'refs/heads/release-dryrun/') && format('v{0}', github.ref_name) || github.ref_name) }}
+  DRY: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release-dryrun/')) }}
 defaults:
   run:
     # no PowerShell profile is loaded, so an earlier step can't plant code that runs in a later one
@@ -38,7 +40,7 @@ defaults:
 jobs:
   package:
     # the "release" environment: in Settings > Environments it can require your approval before its secrets are used
-    environment: release
+    environment: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release-dryrun/'))) && 'dry-run' || 'release' }}
     runs-on: windows-latest
     env:
       HAS_PFX: ${{ secrets.CODESIGN_PFX != '' }}
@@ -111,7 +113,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $v = (Get-Item out\Elixar.exe).VersionInfo.FileVersion
-          $tag = ("$env:TAG" -replace '^dryrun-', '').TrimStart('v')
+          $tag = ("$env:TAG" -replace '^vrelease-dryrun/', '').TrimStart('v')
           if ($tag -notmatch '^\d+\.\d+\.\d+$' -or -not $v.StartsWith("$tag.")) { throw "Tag $tag does not match the version in the code ($v). Change AssemblyVersion in src\CDriveCleaner.cs." }
           function Pack($name, $edition, $files, $zip, $manifest) {
             $pkg = "pkg\$name"
@@ -182,7 +184,7 @@ jobs:
   sign-msi:
     needs: [package, msi]
     if: needs.msi.result == 'success'
-    environment: release
+    environment: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release-dryrun/'))) && 'dry-run' || 'release' }}
     runs-on: windows-latest
     continue-on-error: true
     env:
@@ -237,7 +239,7 @@ jobs:
   sign-manifests:
     # only Elixar's own files are on this machine: nothing from outside the repository runs before the key is used
     needs: package
-    environment: release
+    environment: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release-dryrun/'))) && 'dry-run' || 'release' }}
     runs-on: windows-latest
     env:
       WANT_PRIVATE_ZIP: ${{ needs.package.outputs.private_zip }}

@@ -48,8 +48,11 @@ jobs:
           $pol = 'HKLM:\SOFTWARE\Policies\Elixar\Cure'
 
           # 1. the MSI the way Intune / Group Policy installs it: Cure Agent on, settings to come from Group Policy
-          $code = Msi "/i `"$PWD\Elixar-Business.msi`" CUREAGENT=1" 'msi-install.log'
+          # (a token given to the MSI must never reach its log: no server is given, so the agent still waits for Group Policy)
+          $probe = "e2e-hidden-" + [guid]::NewGuid().ToString('N')
+          $code = Msi "/i `"$PWD\Elixar-Business.msi`" CUREAGENT=1 CURETOKEN=$probe" 'msi-install.log'
           Check "MSI installs (CUREAGENT=1)" ($code -eq 0) "exit $code"
+          Check "the enrollment token isn't in the installer's log" (-not (Select-String -Path msi-install.log -Pattern $probe -SimpleMatch -Quiet))
           Check "files in Program Files\Elixar" ((Test-Path "$dir\Elixar.exe") -and (Test-Path $agent) -and (Test-Path $server))
           Write-Host "Folder permissions:"; icacls $dir; Write-Host "Owner: $((Get-Acl $dir).Owner)"
           Write-Host (Select-String -Path msi-install.log -Pattern 'InstallCureAgent|CureAgent.exe' -SimpleMatch | Select-Object -First 6 | Out-String)
