@@ -177,7 +177,7 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: package
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2, pinned to its commit
         with: { name: programs, path: out }
       - name: Build the MSIs for IT (Intune, Group Policy, SCCM)
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
@@ -207,7 +207,7 @@ jobs:
       HAS_ESIGNER: ${{ secrets.ES_USERNAME != '' }}
       PROGRAMS: ${{ needs.package.outputs.programs }}
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2, pinned to its commit
         with: { name: msi-unsigned, path: sign\msi }
       - name: Check that each MSI holds exactly the programs the package job made
         run: |
@@ -263,7 +263,7 @@ jobs:
       WANT_BUSINESS_ZIP: ${{ needs.package.outputs.business_zip }}
       WANT_BUSINESS_MANIFEST: ${{ needs.package.outputs.business_manifest }}
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2, pinned to its commit
         with: { name: release-files, path: release }
       - name: Check every file against the SHA-256 the package job recorded, and each manifest against its zip
         run: |
@@ -313,12 +313,12 @@ jobs:
       WANT_BUSINESS_ZIP: ${{ needs.package.outputs.business_zip }}
       WANT_BUSINESS_MANIFEST: ${{ needs.package.outputs.business_manifest }}
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2, pinned to its commit
         with: { name: release-files, path: release }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2, pinned to its commit
         continue-on-error: true
         with: { name: signatures, path: release }
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4.3.0, pinned to its commit
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333   # v8.0.2, pinned to its commit
         if: needs.sign-msi.result == 'success'
         continue-on-error: true
         with: { name: msi, path: release }
