@@ -1,4 +1,4 @@
-ELIXAR  (version 1.2.62)
+ELIXAR  (version 1.2.63)
 The cure for a cluttered PC
 Made by Elisar
 =======================
@@ -9,6 +9,11 @@ TWO EDITIONS
 - Elixar for Business (Elixar-Business.zip / Elixar-Business.msi): for IT -
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
+
+NEW IN 1.2.63
+- Every Elixar window fits the screen it is on, so a long page (Settings)
+  can always be scrolled to the end, and the mouse wheel scrolls the page
+  under the pointer (also right after clicking a tab).
 
 NEW IN 1.2.62
 - PC health: one score (0-100) on the Dashboard for Security, Stability,

@@ -86,6 +86,7 @@ namespace CDriveCleaner
             var wa = Screen.PrimaryScreen.WorkingArea;
             Size = new Size(Math.Min(S(1120), wa.Width), Math.Min(S(880), wa.Height));
             MinimumSize = new Size(Math.Min(S(780), wa.Width), Math.Min(S(560), wa.Height));
+            WindowFit.Watch(this);   // always fits the screen it is on; the mouse wheel scrolls the page under the pointer
             try { Icon = Brand.Load(32); } catch { }
 
             lblTop = new Label

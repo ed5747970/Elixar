@@ -239,7 +239,7 @@ namespace CDriveCleaner
             S = scale;
             Text = Lang.T("Check & fix"); Font = new Font("Segoe UI", 9.5f); StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false; MaximizeBox = false; ShowIcon = false; ShowInTaskbar = false;
-            ClientSize = new Size(S(720), S(600)); MinimumSize = new Size(S(560), S(420)); BackColor = Color.White;
+            ClientSize = new Size(S(720), S(600)); MinimumSize = new Size(S(560), S(420)); BackColor = Color.White; WindowFit.Watch(this);
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(S(18), S(14), S(18), S(14)) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));

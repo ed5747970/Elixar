@@ -109,7 +109,7 @@ namespace CDriveCleaner
             this.testMode = testMode; S = scale; this.go = go;
             Text = Lang.T("PC health"); Font = new Font("Segoe UI", 9.5f); StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false; ShowIcon = false; ShowInTaskbar = false; BackColor = Color.White;
-            ClientSize = new Size(S(860), S(640)); MinimumSize = new Size(S(620), S(440));
+            ClientSize = new Size(S(860), S(640)); MinimumSize = new Size(S(620), S(440)); WindowFit.Watch(this);
             if (Lang.Rtl) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
             var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(S(18), S(14), S(18), S(12)) };
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));

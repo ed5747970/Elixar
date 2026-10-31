@@ -330,6 +330,54 @@ namespace CDriveCleaner
             });
 #endif
 
+            Run(check, "Settings scrolls: in a short window the bottom of the page (This PC) can still be reached", () =>
+            {
+                bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
+                try
+                {
+                    using (var m = new MainForm(true))
+                    {
+                        m.StartPosition = FormStartPosition.Manual; m.Location = new System.Drawing.Point(0, 0); m.Size = new System.Drawing.Size(1100, 560);
+                        m.Show(); m.ShowSettings(); Pump(() => false, 800);
+                        bool ok = m.SettingsReachesBottom;
+                        m.Close();
+                        return ok ? null : "the bottom of Settings can't be reached";
+                    }
+                }
+                finally { MainForm.ForceWindowsUi = keepUi; }
+            });
+
+            Run(check, "Windows fit the screen (never wider or taller, title bar on screen) and the mouse wheel scrolls the page under the pointer (Settings reaches its last line)", () =>
+            {
+                var work = new System.Drawing.Rectangle(0, 0, 1366, 728);
+                var a = WindowFit.Fit(new System.Drawing.Rectangle(-200, -40, 1680, 1050), work);
+                if (a != work) return "too big: " + a;
+                var b = WindowFit.Fit(new System.Drawing.Rectangle(900, 500, 800, 600), work);
+                if (b != new System.Drawing.Rectangle(566, 128, 800, 600)) return "off the edge: " + b;
+                var c = WindowFit.Fit(new System.Drawing.Rectangle(100, 100, 800, 600), work);
+                if (c != new System.Drawing.Rectangle(100, 100, 800, 600)) return "a window that fits moved";
+                bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
+                try
+                {
+                    using (var m = new MainForm(true))
+                    {
+                        m.Size = new System.Drawing.Size(1000, 560); m.Show(); Pump(() => false, 400);
+                        m.ShowSettings(); Pump(() => false, 400);
+                        var page = m.SettingsPageContent;
+                        if (page == null) return "settings page";
+                        var leaf = page.Controls.Cast<Control>().Last();
+                        var to = WheelRouter.Target(leaf);
+                        if (to == null || !to.AutoScroll) return "the wheel over Settings has no page to scroll";
+                        if (!m.SettingsReachesBottom) return "Settings doesn't reach its last line";
+                        var lv = new ListView(); page.Controls.Add(lv);
+                        if (WheelRouter.Target(lv) != null) return "a list keeps its own wheel";
+                        m.Close();
+                    }
+                }
+                finally { MainForm.ForceWindowsUi = keepUi; }
+                return null;
+            });
+
             Run(check, "PC health in Hebrew: the window, the tabs, the buttons and every finding", () =>
             {
                 Lang.Hebrew = true;

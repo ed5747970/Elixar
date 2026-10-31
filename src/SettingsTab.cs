@@ -31,14 +31,30 @@ namespace CDriveCleaner
         public string SettingsState { get { return "tab " + (pageSettings != null && tabs.TabPages.Contains(pageSettings)) + ", chosen " + ChosenLanguage + "/" + ChosenTheme + ", saved " + Settings.Language + "/" + Settings.ThemeMode + ", apply " + (btnApplySettings.Enabled ? "on" : "off"); } }
 
         public void ShowSettings() { tabs.SelectedTab = pageSettings; }
+        Panel settingsScroll;
+        public Control SettingsPageContent { get { return settingsScroll == null || settingsScroll.Controls.Count == 0 ? null : settingsScroll.Controls[0]; } }   // self-test
+        // self-test: the whole page can be reached (taller than the window -> it scrolls to the last line)
+        public bool SettingsReachesBottom
+        {
+            get
+            {
+                if (settingsScroll == null || settingsScroll.Controls.Count == 0) return false;
+                var content = settingsScroll.Controls[0];
+                if (content.Height <= settingsScroll.ClientSize.Height) return true;
+                settingsScroll.ScrollControlIntoView(content.Controls[content.Controls.Count - 1]);
+                settingsScroll.AutoScrollPosition = new Point(0, content.Height);
+                return settingsScroll.VerticalScroll.Visible && -settingsScroll.AutoScrollPosition.Y + settingsScroll.ClientSize.Height >= content.Height - S(2);
+            }
+        }
 
         void BuildSettingsTab()
         {
             pageSettings = new TabPage("Settings") { BackColor = Color.FromArgb(246, 248, 251) };
+            // the page is as tall as what it holds, inside a panel that scrolls: a table that fills the window squeezes
+            // itself to the window's height and never shows a scroll bar, so the bottom of the page couldn't be reached
             var t = Page(14);
-            for (int i = 0; i < 13; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            t.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            t.AutoScroll = true;
+            for (int i = 0; i < 14; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.Dock = DockStyle.Top; t.AutoSize = true; t.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             Func<string, Label> head = text => new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11f), Text = text, Margin = new Padding(0, S(10), 0, S(4)) };
             Func<string, RadioButton> radio = text => new RadioButton { Text = text, AutoSize = true, Margin = new Padding(S(4), S(4), S(22), S(4)) };
 
@@ -91,7 +107,9 @@ namespace CDriveCleaner
             t.Controls.Add(head("Security and protection"), 0, 9); t.Controls.Add(BuildPinBox(), 0, 10);
             t.Controls.Add(head("This PC"), 0, 11); t.Controls.Add(pcButtons, 0, 12);
             var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 13);
-            pageSettings.Controls.Add(t);
+            settingsScroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = pageSettings.BackColor };
+            settingsScroll.Controls.Add(t);
+            pageSettings.Controls.Add(settingsScroll);
 
             // the saved choices
             (Settings.Language == "he" ? rbHebrew : Settings.Language == "ar" ? rbArabic : Settings.Language == "ru" ? rbRussian : Settings.Language == "es" ? rbSpanish : rbEnglish).Checked = true;
