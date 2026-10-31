@@ -347,6 +347,7 @@ namespace CDriveCleaner
     {
         public MicrosoftSetupForm(float scale)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             Func<int, int> S = px => (int)Math.Round(px * scale);
             Text = Lang.T("Set up Microsoft sign-in"); Icon = Brand.Load(32); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false; MaximizeBox = false; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Padding = new Padding(S(16)); Font = new Font("Segoe UI", 9.5f);
@@ -361,7 +362,7 @@ namespace CDriveCleaner
                 "4. API permissions > Add a permission > Microsoft Graph > Delegated: Mail.Send (and Mail.ReadWrite only if you want Email cleaning). User.Read is already there.",
                 "5. Copy the \"Application (client) ID\" from the Overview page and paste it below. No secret is needed." })
                 f.Controls.Add(L(Lang.T(st)));
-            var row = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
             var id = new TextBox { Width = S(300), Text = MicrosoftAuth.ClientId ?? "" };
             var save = new Button { AutoSize = true, Text = Lang.T("Save"), Font = new Font("Segoe UI Semibold", 9.5f) };
             var open = new Button { AutoSize = true, Text = Lang.T("Open entra.microsoft.com") };
@@ -386,6 +387,7 @@ namespace CDriveCleaner
     {
         public GoogleSetupForm(float scale)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             Func<int, int> S = px => (int)Math.Round(px * scale);
             Text = Lang.T("Set up Google sign-in"); Icon = Brand.Load(32); StartPosition = FormStartPosition.CenterParent; FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false; MaximizeBox = false; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Padding = new Padding(S(16)); Font = new Font("Segoe UI", 9.5f);
@@ -409,7 +411,7 @@ namespace CDriveCleaner
                                     "Then allow only \"Send email on your behalf\". Elixar can't read your mail.")));
             var status = new Label { AutoSize = true, MaximumSize = new Size(S(640), 0), ForeColor = Color.DimGray, Margin = new Padding(0, S(4), 0, S(8)),
                                      Text = Lang.T(GoogleAuth.HasClient ? "A Google client is already set up. You can replace it." : "No Google client set up yet.") };
-            var row = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0) };
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0) };
             var btnOpen = new Button { AutoSize = true, Text = Lang.T("Open Google Cloud console") };
             var btnFile = new Button { AutoSize = true, Text = Lang.T("Choose the downloaded file..."), Font = new Font("Segoe UI Semibold", 9.5f) };
             var btnClose = new Button { AutoSize = true, Text = Lang.T("Close"), DialogResult = DialogResult.OK };

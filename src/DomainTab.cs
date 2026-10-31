@@ -126,8 +126,12 @@ namespace CDriveCleaner
             domPort = new NumericUpDown { Minimum = 1024, Maximum = 65535, Value = CureServer.DefaultPort, Width = S(80) };
             domGroup = new TextBox { Width = S(300), Text = "" };
             Func<string, Label> lbl = t => new Label { AutoSize = true, Text = t, Margin = new Padding(0, S(6), S(6), 0) };
-            r1.Controls.AddRange(new Control[] { lbl("Port"), domPort, lbl("   Who may see the web console (a domain group, optional)"), domGroup });
+            r1.Controls.AddRange(new Control[] { lbl("Port"), domPort });
             st.Controls.Add(r1);
+            // on its own line: next to the port it went past the right edge of a narrow window
+            var r1b = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, S(4)) };
+            r1b.Controls.AddRange(new Control[] { lbl("Who may see the web console (a domain group, optional)"), domGroup });
+            st.Controls.Add(r1b);
             domSetupBtn = MakeButton("Make this PC the Cure Server...");
             domSetupBtn.Font = new Font("Segoe UI Semibold", 9.5f);
             domSetupBtn.Click += (o, e) => DomainSetup();
@@ -141,7 +145,7 @@ namespace CDriveCleaner
 
             // ---- the PCs ----
             domMain = new Panel { Dock = DockStyle.Fill };
-            var head = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false };
+            var head = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true };   // the buttons go to a second line in a narrow window
             head.Controls.Add(Title("Domain PCs"));
             domStatus = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(14), S(10), S(10), 0) };
             domRefresh = MakeButton("Refresh"); domRefresh.Click += (o, e) => DomainLoad();
@@ -149,7 +153,7 @@ namespace CDriveCleaner
             var exp = MakeButton("Export (CSV)..."); exp.Click += (o, e) => DomainExport();
             domAlerts = MakeButton("Email alerts..."); domAlerts.Click += (o, e) => OpenAlerts();
             head.Controls.AddRange(new Control[] { domStatus, domRefresh, domWeb, exp, domAlerts });
-            domKpis = new FlowLayoutPanel { Dock = DockStyle.Top, Height = S(98), WrapContents = false, Padding = new Padding(0, S(4), 0, S(4)) };
+            domKpis = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, MinimumSize = new Size(0, S(98)), WrapContents = true, Padding = new Padding(0, S(4), 0, S(4)) };   // the tiles wrap (they were cut off)
 
             var split = new SplitContainer { Dock = DockStyle.Fill, FixedPanel = FixedPanel.Panel1, SplitterWidth = S(8), Orientation = Orientation.Vertical };
             split.HandleCreated += (o, e) => { try { split.SplitterDistance = S(300); } catch { } };
@@ -202,7 +206,8 @@ namespace CDriveCleaner
             domRemove.Click += (o, e) => DomainRemove();
             add(domRemove);
             domDetail.Controls.Add(col);
-            domDetail.Resize += (o, e) => { int w = Math.Max(S(500), domDetail.ClientSize.Width - S(30)); domFill.Width = w; foreach (var lv in new[] { domItems, domPlaces, domApps, domDisks }) lv.Width = w; };
+            // the bar and the lists are as wide as the column (they were at least 500 wide, so in a narrow window their right side was cut off)
+            col.SizeChanged += (o, e) => { int w = Math.Max(S(260), col.ClientSize.Width - S(8)); if (domFill.Width != w) domFill.Width = w; foreach (var lv in new[] { domItems, domPlaces, domApps, domDisks }) if (lv.Width != w) lv.Width = w; };
             split.Panel2.Controls.Add(domDetail);
 
             domMain.Controls.Add(split); domMain.Controls.Add(domKpis); domMain.Controls.Add(head);

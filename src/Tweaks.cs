@@ -166,13 +166,16 @@ namespace CDriveCleaner
             t.Controls.Add(Title("Windows tweaks"), 0, 0);
             tweakStatus = Note("Switch off what Windows shows or sends that you didn't ask for. Every change is written in Logs with the old value, so each one can be put back.");
             t.Controls.Add(tweakStatus, 0, 1);
-            var grid = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Margin = new Padding(0, 0, 0, S(6)) };
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, S(640))); grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            // the text column takes what the state column leaves (it was a fixed 640, so in a narrow window the state was cut off)
+            var grid = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top, Margin = new Padding(0, 0, 0, S(6)) };
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            var helps = new List<Label>();
             int row = 0;
             foreach (var tw in Tweaks.All)
             {
                 var box = new CheckBox { AutoSize = true, Text = tw.Name + (tw.Admin ? "  (for everyone on this PC)" : ""), Font = new Font("Segoe UI Semibold", 9.75f), Margin = new Padding(0, S(6), 0, 0), Tag = tw };
                 var help = new Label { AutoSize = true, ForeColor = Color.DimGray, Text = tw.Help, MaximumSize = new Size(S(620), 0), Margin = new Padding(S(20), 0, 0, S(4)) };
+                TextFit.Skip(help); helps.Add(help);
                 var st = new Label { AutoSize = true, Margin = new Padding(S(10), S(8), 0, 0) };
                 var left = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
                 left.Controls.Add(box); left.Controls.Add(help);
@@ -181,6 +184,13 @@ namespace CDriveCleaner
                 box.CheckedChanged += (o, e) => { if (!tweakLoading) UpdateTweakButtons(); };
             }
             t.Controls.Add(grid, 0, 2);
+            grid.Layout += (o, e) =>
+            {
+                int stateW = 0;
+                foreach (var s in tweakStates) stateW = Math.Max(stateW, s.PreferredWidth + s.Margin.Horizontal);
+                int w = Math.Max(S(240), Math.Min(S(620), grid.ClientSize.Width - stateW - S(20) - S(8)));
+                foreach (var h in helps) if (h.MaximumSize.Width != w) h.MaximumSize = new Size(w, 0);
+            };
             var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, S(4), 0, 0) };
             btnTweakApply = MakeButton("Apply"); btnTweakApply.Font = new Font("Segoe UI Semibold", 9f);
             btnTweakDefault = MakeButton("Put all back to Windows' default");

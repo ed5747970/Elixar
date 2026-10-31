@@ -1249,6 +1249,7 @@ namespace CDriveCleaner
             d["Protect Elixar with a PIN or password"] = "הגנה על Elixar עם PIN או סיסמה";
             d["Set it up..."] = "הגדרה...";
             d["Logs"] = "יומן";
+            d["More"] = "עוד";
             d["Change log"] = "יומן שינויים";
             d["Every change Elixar makes to this PC: registry values (with the value before and after), files moved to Undo or deleted, Windows commands, apps, startup, security and settings. If something stops working after a change, find it here: registry values can be put back with one click, files from Tools > Undo. Passwords are never written here."] = "כל שינוי ש-Elixar עושה במחשב הזה: ערכי רישום (עם הערך לפני ואחרי), קבצים שהועברו לביטול או נמחקו, פקודות Windows, אפליקציות, הפעלה, אבטחה והגדרות. אם משהו מפסיק לעבוד אחרי שינוי, מוצאים אותו כאן: ערכי רישום מחזירים בלחיצה אחת, וקבצים דרך כלים > ביטול. סיסמאות אף פעם לא נכתבות כאן.";
             d["Show:"] = "הצגה:";

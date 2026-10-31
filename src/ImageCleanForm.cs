@@ -24,6 +24,7 @@ namespace CDriveCleaner
 
         public ImageCleanForm(bool testMode)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             test = testMode;
             using (var g = CreateGraphics()) sc = Math.Max(1f, g.DpiX / 96f);
             Text = Lang.T("Image cleanup");

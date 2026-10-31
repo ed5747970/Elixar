@@ -57,8 +57,11 @@ namespace CDriveCleaner
             catch { }
         }
 
-        public static void Sent(string what) { lock (gate) { LoadLocked(); LastSent = DateTime.Now; LastWhat = what; SignedOut = false; Save(); } }
-        public static void Failed(string error, bool signedOut) { lock (gate) { LoadLocked(); LastFail = DateTime.Now; LastError = error; if (signedOut) SignedOut = true; Save(); } }
+        // what happened last is the newer one, even within the same tick of Windows' clock (about 16 ms: a fail right
+        // after a send got the same time and was not shown)
+        public static void Sent(string what) { lock (gate) { LoadLocked(); LastSent = After(LastFail); LastWhat = what; SignedOut = false; Save(); } }
+        public static void Failed(string error, bool signedOut) { lock (gate) { LoadLocked(); LastFail = After(LastSent); LastError = error; if (signedOut) SignedOut = true; Save(); } }
+        static DateTime After(DateTime other) { var now = DateTime.Now; return now > other ? now : other.AddTicks(1); }
         public static void Reset() { lock (gate) { try { string f = File_; if (f != null && File.Exists(f)) File.Delete(f); } catch { } LoadLocked(); } }
         public static void Notified() { lock (gate) { LoadLocked(); LastNotified = DateTime.Now; Save(); } }
 

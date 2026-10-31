@@ -17,6 +17,7 @@ namespace CDriveCleaner
 
         public IntegrityForm(float scale)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             Func<int, int> S = px => (int)Math.Round(px * scale);
             Text = "Verify Elixar"; Icon = Brand.Load(32); StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9.5f); Size = new Size(S(820), S(500)); MinimizeBox = false; MaximizeBox = false;

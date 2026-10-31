@@ -272,7 +272,8 @@ namespace CDriveCleaner
 
         void BuildWipe()
         {
-            pageWipe = new TabPage("Secure wipe") { BackColor = Color.FromArgb(246, 248, 251) };
+            pageWipe = new TabPage("Secure wipe") { BackColor = Color.FromArgb(246, 248, 251), AutoScroll = true };
+            pageWipe.AutoScrollMinSize = new Size(0, S(640));   // shorter than this, the page scrolls (the Shred buttons stay reachable)
             var t = Page(5);
             for (int i = 0; i < 5; i++) t.RowStyles.Add(new RowStyle(i == 3 ? SizeType.Percent : SizeType.AutoSize, i == 3 ? 100 : 0));
             t.Controls.Add(Title("Secure wipe"), 0, 0);
@@ -300,6 +301,7 @@ namespace CDriveCleaner
             // shred files
             var g2 = new GroupBox { Text = "Shred files", Dock = DockStyle.Fill, Padding = new Padding(S(10), S(6), S(10), S(8)) };
             var t2 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+            t2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));   // as wide as the box (an auto-size column grew past it in a narrow window)
             t2.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t2.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); t2.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t2.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(S(900), 0), ForeColor = Color.DimGray, Margin = new Padding(S(1), S(2), 0, S(6)),
                                         Text = "Pick files (or drag them here): each is overwritten, renamed and deleted. Windows', apps' and Elixar's own files are refused. " +

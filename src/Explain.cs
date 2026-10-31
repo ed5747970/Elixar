@@ -159,13 +159,14 @@ namespace CDriveCleaner
         public readonly Explanation E;
         public ExplainForm(Explanation e, Color tierColor, float scale)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             E = e;
             Func<int, int> S = v => (int)Math.Round(v * scale);
             Text = Lang.T("Is this safe to delete?");
             FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = MinimizeBox = false; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
             Font = new Font("Segoe UI", 9.5f); BackColor = Color.White; ClientSize = new Size(S(560), S(360)); AutoScaleMode = AutoScaleMode.None;
             if (Lang.Rtl) { RightToLeft = RightToLeft.Yes; RightToLeftLayout = true; }
-            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Padding = new Padding(S(16), S(12), S(16), S(10)) };
+            var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, AutoScroll = true, Padding = new Padding(S(16), S(12), S(16), S(10)) };   // a long explanation scrolls
             t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             for (int i = 0; i < 6; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.RowStyles.Add(new RowStyle(SizeType.Percent, 100));

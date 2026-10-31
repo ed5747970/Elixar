@@ -55,7 +55,7 @@ namespace CDriveCleaner
             else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
-            toolsTabs.SelectedIndexChanged += (o, e) => OnToolsTab();
+            toolsTabs.SelectedIndexChanged += (o, e) => { OnToolsTab(); RefitText(); };
         }
 
         void OnToolsTab()

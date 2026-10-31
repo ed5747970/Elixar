@@ -106,6 +106,7 @@ namespace CDriveCleaner
         public TrendForm(float scale, List<SpaceHistory.Point> points) : this(scale, points, null) { }
         public TrendForm(float scale, List<SpaceHistory.Point> points, List<Growth.Change> grew)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             Func<int, int> S = px => (int)Math.Round(px * scale);
             pts = points; fc = SpaceHistory.Predict(points, DateTime.Today);
             Text = "Space trend - drive C:"; Icon = Brand.Load(32); StartPosition = FormStartPosition.CenterParent;

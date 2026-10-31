@@ -298,6 +298,7 @@ namespace CDriveCleaner
 
         public CureAlertsForm(bool testMode, Func<int, int> scale, string dataDir)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             this.testMode = testMode; S = scale;
             Text = Lang.T("Email alerts"); Font = new Font("Segoe UI", 9.5f); StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false; MaximizeBox = false; ShowIcon = false; ShowInTaskbar = false; FormBorderStyle = FormBorderStyle.FixedDialog; BackColor = Color.White;

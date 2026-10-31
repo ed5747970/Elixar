@@ -106,6 +106,7 @@ namespace CDriveCleaner
 
         public DrillForm(string startPath, float scale, Icon icon, Func<string, string> ownerName = null, Action<string> uninstall = null, Action<string> explain = null)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             this.ownerName = ownerName;
             this.uninstall = uninstall;
             S = px => (int)Math.Round(px * scale);

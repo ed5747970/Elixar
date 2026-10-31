@@ -26,6 +26,8 @@ namespace CDriveCleaner
         {
             if (f.WindowState != FormWindowState.Normal) return;
             var work = Screen.FromControl(f).WorkingArea;
+            // a window that sizes itself to what it shows: taller (or wider) than the screen, it gets the screen's size and scrolls
+            if (f.AutoSize && (f.Height > work.Height || f.Width > work.Width)) { f.AutoSize = false; f.AutoScroll = true; }
             if (f.MinimumSize.Width > work.Width || f.MinimumSize.Height > work.Height)
                 f.MinimumSize = new Size(Math.Min(f.MinimumSize.Width, work.Width), Math.Min(f.MinimumSize.Height, work.Height));
             var b = Fit(f.Bounds, work);
@@ -83,6 +85,58 @@ namespace CDriveCleaner
                 return true;
             }
             catch { return false; }
+        }
+    }
+}
+
+namespace CDriveCleaner
+{
+    // Long texts wrap to the width that is really visible: a label's MaximumSize (or no limit) can be wider than a narrow
+    // window, and then the end of the text was cut off. Runs after the window or a page changes size.
+    public static class TextFit
+    {
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Label, object> orig = new System.Runtime.CompilerServices.ConditionalWeakTable<Label, object>();
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Label, object> skip = new System.Runtime.CompilerServices.ConditionalWeakTable<Label, object>();
+
+        // a label whose width its page sets itself (in a table column); TextFit leaves it alone
+        public static void Skip(Label l) { skip.GetValue(l, x => (object)true); }
+
+        public static void Apply(Control root)
+        {
+            if (root == null || !root.IsHandleCreated || !root.Visible) return;
+            foreach (Control c in root.Controls) Walk(c);
+        }
+
+        static void Walk(Control c)
+        {
+            if (!c.Visible) return;
+            var l = c as Label;
+            object no;
+            if (l != null && l.AutoSize && !(l is LinkLabel && l.Text.Length < 40) && !skip.TryGetValue(l, out no)) Fit(l);
+            foreach (Control k in c.Controls) Walk(k);
+        }
+
+        static Control Viewport(Control c)
+        {
+            for (var p = c.Parent; p != null; p = p.Parent)
+                if (p is TabPage || p is Form || (p is ScrollableControl && ((ScrollableControl)p).AutoScroll)) return p;
+            return null;
+        }
+
+        static void Fit(Label l)
+        {
+            var v = Viewport(l); if (v == null || l.Parent == null) return;
+            object o = orig.GetValue(l, x => (object)x.MaximumSize.Width);
+            int max = (int)o;
+            int left; try { left = v.PointToClient(l.Parent.PointToScreen(l.Location)).X; } catch { return; }
+            int avail = v.ClientSize.Width - left - l.Margin.Right - SystemInformation.VerticalScrollBarWidth - 4;
+            if (avail < 120) return;
+            int want = max == 0 ? (l.PreferredWidth > avail ? avail : 0) : Math.Min(max, avail);
+            if (l.MaximumSize.Width == want) return;
+            l.MaximumSize = new Size(want, 0);
+            // the boxes around it grow or shrink with the new number of lines (a label under it could end up outside)
+            for (var p = l.Parent; p != null && p != v; p = p.Parent) p.PerformLayout();
+            v.PerformLayout();
         }
     }
 }

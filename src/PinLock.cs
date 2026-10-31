@@ -190,6 +190,7 @@ namespace CDriveCleaner
 
         public PinForm(Mode m)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             mode = m;
             using (var g = CreateGraphics()) sc = Math.Max(1f, g.DpiX / 96f);
             Text = "Elixar"; Icon = Brand.Load(32); Font = new Font("Segoe UI", 10f);

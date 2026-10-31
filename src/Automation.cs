@@ -521,7 +521,7 @@ namespace CDriveCleaner
             r3.Controls.AddRange(new Control[] { chkClean, cmbDay, timeClean, lblSchedClean, btnTimes2 });
             lblAutoItems = new Label
             {
-                AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(22), S(6), 0, 0),
+                AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(700), 0), Margin = new Padding(S(22), S(6), 0, 0),
                 Text = "Cleans: " + string.Join(", ", Automation.AutoItems().Select(i => i.Name)) +
                        (!LinuxUi ? ".\nNever: Caution items, Recycle Bin, browser caches or DISM. Open apps are skipped, never closed. A notification shows what was freed."
                                       : ".\nNever: the Trash, browser caches or anything that needs your password. Open apps are skipped, never closed. A notification shows what was freed.")
@@ -539,17 +539,17 @@ namespace CDriveCleaner
             foreach (var d in TidyPrefs.BinChoices) cmbBinDays.Items.Add(d + " days");
             cmbBinDays.SelectedIndex = 1;   // 30 days
             r5.Controls.AddRange(new Control[] { chkBin, cmbBinDays });
-            var binNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(22), S(2), 0, S(4)),
+            var binNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(700), 0), Margin = new Padding(S(22), S(2), 0, S(4)),
                 Text = !LinuxUi ? "On every internal drive, only your own Recycle Bin. What you deleted recently stays, so you can still get it back." : "Only what has been in the Trash that long." };
             var r6 = Row();
             cmbUndoDays = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = S(90) };
             foreach (var d in TidyPrefs.UndoChoices) cmbUndoDays.Items.Add(d + " days");
             cmbUndoDays.SelectedIndex = 1;  // 30 days
             r6.Controls.AddRange(new Control[] { Lbl("Keep files you remove (Smart scan, Duplicates) in Undo for"), cmbUndoDays });
-            var undoNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(2), S(2), 0, S(4)),
+            var undoNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(700), 0), Margin = new Padding(S(2), S(2), 0, S(4)),
                 Text = "Tools > Undo puts them back, also from USB drives (which have no Recycle Bin). After that they are deleted for good. Undo uses your second drive when you have one, so C: gets its space back right away." };
             chkLowClean = new CheckBox { AutoSize = true, Text = "When C: drops under the alert limit, run the Safe clean right away (at most once a day)", Margin = new Padding(0, S(6), 0, 0) };
-            lblTidyState = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(860), 0), Margin = new Padding(S(2), S(8), 0, 0), Text = "Checking..." };
+            lblTidyState = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(700), 0), Margin = new Padding(S(2), S(8), 0, 0), Text = "Checking..." };
             ft.Controls.AddRange(new Control[] { r5, binNote, r6, undoNote, chkLowClean, lblTidyState });
             gTidy.Controls.Add(ft);
 

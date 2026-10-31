@@ -23,6 +23,7 @@ namespace CDriveCleaner
 
         public WatchForm(bool testMode, IEnumerable<DashLoc> places, Action<string> open)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             test = testMode; openFolder = open;
             locs = (places ?? new DashLoc[0]).Where(p => !string.IsNullOrEmpty(p.Id)).GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
             using (var g = CreateGraphics()) sc = Math.Max(1f, g.DpiX / 96f);

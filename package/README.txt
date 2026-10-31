@@ -14,6 +14,12 @@ NEW IN 1.2.63
 - Every Elixar window fits the screen it is on, so a long page (Settings)
   can always be scrolled to the end, and the mouse wheel scrolls the page
   under the pointer (also right after clicking a tab).
+- Nothing is cut off in a small window: the tab bar shows icons and then a
+  "More" menu instead of drawing tabs on top of each other; the Cleaner's
+  buttons, Windows tweaks, Secure wipe, Automation, Domain PCs and the
+  setup windows show all their parts or scroll to them.
+- Fixed: an email that failed right after one was sent was sometimes not
+  shown as failed in Settings.
 
 NEW IN 1.2.62
 - PC health: one score (0-100) on the Dashboard for Security, Stability,

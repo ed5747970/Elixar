@@ -44,6 +44,7 @@ namespace CDriveCleaner
 
         public SmartScanForm(MainForm owner, string root, string title, float scale, bool testMode)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             this.owner = owner; this.root = root; this.title = title; test = testMode;
             S = px => (int)Math.Round(px * scale);
             Text = Lang.T("Smart scan of " + title);

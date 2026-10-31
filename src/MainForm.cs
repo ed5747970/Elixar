@@ -87,6 +87,7 @@ namespace CDriveCleaner
             Size = new Size(Math.Min(S(1120), wa.Width), Math.Min(S(880), wa.Height));
             MinimumSize = new Size(Math.Min(S(780), wa.Width), Math.Min(S(560), wa.Height));
             WindowFit.Watch(this);   // always fits the screen it is on; the mouse wheel scrolls the page under the pointer
+            Resize += (o, e) => RefitText();
             try { Icon = Brand.Load(32); } catch { }
 
             lblTop = new Label
@@ -190,6 +191,24 @@ namespace CDriveCleaner
             btnClean.Anchor = AnchorStyles.Right | AnchorStyles.Top;
             btnRow.Controls.Add(flow, 0, 0);
             btnRow.Controls.Add(btnClean, 1, 0);
+            // in a narrow window the buttons wrap onto a second line: the row grows with them (it stayed one line tall, so
+            // buttons were cut off). The bottom area grows too, but never so much that the list above disappears: in a
+            // short window the log gets smaller first (the buttons and the progress bar always show)
+            Action fitBottom = () =>
+            {
+                if (pageClean == null || pageClean.ClientSize.Height <= 0) return;
+                int h = 0;   // where the buttons end (not the flow's own height: it fills its cell)
+                foreach (Control c in flow.Controls) if (c.Visible) h = Math.Max(h, c.Bottom + c.Margin.Bottom);
+                h += flow.Padding.Bottom + flow.Margin.Vertical;
+                if (h <= 0) return;
+                if (btnRow.MinimumSize.Height != h) btnRow.MinimumSize = new Size(0, h);
+                int fixedRows = bottom.Padding.Vertical + S(44) + (chkRestore.Visible ? chkRestore.Height + chkRestore.Margin.Vertical : 0) + Math.Max(h, btnRow.Height) + S(22) + S(4);
+                int want = fixedRows + S(150);   // the log's usual height
+                int room = pageClean.ClientSize.Height - lblTop.Height - lblScan.Height - S(110);   // keep about 4 lines of the list
+                int to = Math.Max(fixedRows, Math.Min(want, room));
+                if (bottom.Height != to) bottom.Height = to;
+            };
+            flow.Layout += (o, e) => fitBottom();
 
             progress = new ProgressBar { Dock = DockStyle.Fill, Margin = new Padding(S(2), S(6), S(2), S(2)) };
 
@@ -212,6 +231,7 @@ namespace CDriveCleaner
             tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(S(14), S(5)) };
             pageDash = new TabPage("Dashboard") { BackColor = Color.FromArgb(246, 248, 251) };
             pageClean = new TabPage("Cleaner");
+            pageClean.Resize += (o, e) => fitBottom();
 
             // docking order: fill first, then edges
             pageClean.Controls.Add(list);
@@ -259,6 +279,7 @@ namespace CDriveCleaner
             tabs.TabPages.Add(pageLogs);
             tabs.TabPages.Add(pagePolicy);
             bool appsLoaded = false, autoLoaded = false;
+            tabs.SelectedIndexChanged += (o, e) => RefitText();
             tabs.SelectedIndexChanged += (o, e) =>
             {
                 if (tabs.SelectedTab == pageApps && !appsLoaded) { appsLoaded = true; if (appsTabs.SelectedTab == pageStore) RefreshStoreApps(); else RefreshApps(); }

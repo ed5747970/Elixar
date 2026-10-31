@@ -70,6 +70,7 @@ namespace CDriveCleaner
 
         NiceBox(string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, int defaultButton)
         {
+            WindowFit.Watch(this);   // fits the screen (a tall window is made smaller; its page scrolls)
             fullText = text;
             using (var g = CreateGraphics()) sc = Math.Max(1f, g.DpiX / 96f);
             Text = caption;

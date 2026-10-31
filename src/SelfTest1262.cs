@@ -378,6 +378,77 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "Nothing is cut off: every tab and Tools page at 780x560, 1024x600 and 1280x720, the windows it opens and the top bar show all their parts (or scroll to them, or put them under More)", () =>
+            {
+                bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
+                var found = new List<string>();
+                try
+                {
+                    using (var m = new MainForm(true))
+                    {
+                        m.StartPosition = FormStartPosition.Manual; m.Location = new System.Drawing.Point(0, 0);
+                        m.Show(); Pump(() => false, 800);
+                        foreach (var sz in new[] { new System.Drawing.Size(780, 560), new System.Drawing.Size(1024, 600), new System.Drawing.Size(1280, 720) })
+                        {
+                            m.Size = sz; Pump(() => false, 500);
+                            found.AddRange(m.AuditLayout());
+                        }
+                        Func<int, int> S1 = x => x;
+                        var places = new List<DashLoc> { new DashLoc { Id = "temp", Name = "Your temp files", Path = System.IO.Path.GetTempPath(), Tier = "safe", Bytes = 1L << 30, Own = 1L << 30 } };
+                        var pts = new List<SpaceHistory.Point>();
+                        for (int i = 0; i < 30; i++) pts.Add(new SpaceHistory.Point { Day = DateTime.Today.AddDays(i - 30), Free = (100L - i) << 30, Total = 500L << 30 });
+                        var dialogs = new List<Func<Form>>
+                        {
+                            () => new HealthForm(true, S1, a => { }),
+                            () => new CheckFixForm(true, S1),
+                            () => new GrowingForm(true, S1, x => { }, () => { }, () => { }),
+                            () => new ImageCleanForm(true),
+                            () => new TrendForm(1f, pts),
+                            () => new UnattendForm(true),
+                            () => new WatchForm(true, places, x => { }),
+                            () => new IntegrityForm(1f),
+                            () => new ExplainForm(Explain.For(System.IO.Path.GetTempPath(), places, null), System.Drawing.Color.SeaGreen, 1f),
+                            () => new MicrosoftSetupForm(1f),
+                            () => new GoogleSetupForm(1f),
+                            () => new PinForm(PinForm.Mode.Set),
+                        };
+                        foreach (var make in dialogs)
+                        {
+                            Form f = make();
+                            try
+                            {
+                                f.StartPosition = FormStartPosition.Manual; f.Location = new System.Drawing.Point(0, 0);
+                                f.Show(m); Pump(() => false, 500);
+                                found.AddRange(UiAudit.Find(f, f.GetType().Name));
+                                if (f.FormBorderStyle == FormBorderStyle.Sizable)
+                                {
+                                    f.Size = f.MinimumSize.Width > 0 ? f.MinimumSize : new System.Drawing.Size(640, 420); Pump(() => false, 400);
+                                    TextFit.Apply(f); Pump(() => false, 200);
+                                    found.AddRange(UiAudit.Find(f, f.GetType().Name + " (smallest)"));
+                                }
+                            }
+                            finally { f.Close(); f.Dispose(); }
+                        }
+                        m.Close();
+                    }
+                }
+                finally { MainForm.ForceWindowsUi = keepUi; }
+                // the top bar in a very narrow window: icons only, then the last tabs go into "More", and nothing overlaps
+                using (var f = new Form { Width = 460, Height = 200 })
+                {
+                    var bar = new NavBar { Dock = DockStyle.Top, Height = 46, Font = new System.Drawing.Font("Segoe UI", 10f) };
+                    foreach (var t in new[] { "Dashboard", "Domain PCs", "Apps", "Cleaner", "Tools", "Phone", "Email", "Automation" }) bar.Items.Add(new NavBar.Item { Text = t });
+                    foreach (var t in new[] { "Settings", "Logs", "Policy manager" }) bar.Items.Add(new NavBar.Item { Text = t, Right = true, Glyph = "gear" });
+                    f.Controls.Add(bar); f.Show(); Pump(() => false, 300);
+                    var bad = bar.Problems();
+                    if (bad.Count > 0) found.AddRange(bad);
+                    else if (!bar.IconsOnly || bar.Overflow.Count == 0 || bar.Overflow.Last().Text != "Automation" || bar.More.Rect.IsEmpty) found.Add("narrow top bar: icons " + bar.IconsOnly + ", in More: " + string.Join(",", bar.Overflow.Select(i => i.Text)));
+                    f.Close();
+                }
+                found = found.Distinct().ToList();
+                return found.Count == 0 ? null : found.Count + " cut off: " + string.Join(" | ", found.Take(6));
+            });
+
             Run(check, "PC health in Hebrew: the window, the tabs, the buttons and every finding", () =>
             {
                 Lang.Hebrew = true;

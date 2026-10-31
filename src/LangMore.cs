@@ -175,6 +175,7 @@ namespace CDriveCleaner
             new[] { "Apply", "تطبيق", "Применить", "Aplicar" },
             new[] { "Put all back to Windows' default", "أعد الكل إلى إعداد Windows الافتراضي", "Вернуть всё по умолчанию Windows", "Volver todo a lo predeterminado de Windows" },
             new[] { "See the changes in Logs", "اعرض التغييرات في السجلات", "Изменения в Журнале", "Ver los cambios en Registros" },
+            new[] { "More", "المزيد", "Ещё", "Más" },
             new[] { "Windows' default", "إعداد Windows الافتراضي", "По умолчанию Windows", "Predeterminado de Windows" },
             new[] { "Partly on", "مفعّل جزئيًا", "Частично включено", "Activado en parte" },
             new[] { "set by the policy", "محدد بالسياسة", "задано политикой", "fijado por la directiva" },

@@ -32,21 +32,73 @@ namespace CDriveCleaner
 
         static Color Bar { get { return Theme.Dark ? Color.FromArgb(36, 36, 44) : Color.White; } }
 
+        // where every item goes. Too narrow for all of them (a small window, a long language): first Settings, Logs and
+        // Policy manager show only their icons, then the tabs get closer together, then the last tabs move into "More"
+        // (they used to be drawn on top of each other)
+        public readonly Item More = new Item { Text = "More" };
+        public readonly List<Item> Overflow = new List<Item>();
+        public bool IconsOnly { get; private set; }
+
+        int FullW(Graphics g, Item it, int side) { return W(g, Lang.T(it.Text), Font) + side + (it.Glyph != null ? S(22) : 0); }
+        int IconW() { return S(16) + S(24); }
+
+        public void Arrange(Graphics g)
+        {
+            int pad = S(10), gap = S(4), middle = S(12), room = Width - 2 * pad;
+            var left = Items.Where(i => !i.Right).ToList(); var right = Items.Where(i => i.Right).ToList();
+            Func<int, bool, int> total = (side, icons) =>
+                left.Sum(i => FullW(g, i, side) + gap) + right.Sum(i => (icons ? IconW() : FullW(g, i, S(28))) + gap) + middle;
+            int side2 = S(28); IconsOnly = false;
+            if (total(side2, false) > room) { IconsOnly = true; if (total(side2, true) > room) side2 = S(14); }
+            Overflow.Clear(); More.Rect = Rectangle.Empty;
+            int rightW = right.Sum(i => (IconsOnly ? IconW() : FullW(g, i, S(28))) + gap);
+            int leftRoom = room - rightW - middle, used = 0;
+            int moreW = W(g, Lang.T(More.Text) + "  \u25BE", Font) + side2;
+            if (left.Sum(i => FullW(g, i, side2) + gap) > leftRoom)
+                foreach (var it in left)
+                {
+                    int w = FullW(g, it, side2) + gap;
+                    if (Overflow.Count > 0 || used + w > leftRoom - moreW - gap) Overflow.Add(it); else used += w;
+                }
+            int x = pad, xr = Width - pad;
+            foreach (var it in Items)
+            {
+                if (Overflow.Contains(it)) { it.Rect = Rectangle.Empty; continue; }
+                int w = it.Right ? (IconsOnly ? IconW() : FullW(g, it, S(28))) : FullW(g, it, side2);
+                var r = it.Right ? new Rectangle(xr - w, S(6), w, Height - S(12)) : new Rectangle(x, S(6), w, Height - S(12));
+                if (it.Right) xr -= w + gap; else x += w + gap;
+                it.Rect = M(r);
+            }
+            if (Overflow.Count > 0) More.Rect = M(new Rectangle(x, S(6), moreW, Height - S(12)));
+        }
+
+        // for the self-test: items drawn on top of each other or past the edge
+        public List<string> Problems()
+        {
+            using (var g = CreateGraphics()) Arrange(g);
+            var shown = Items.Where(i => !Overflow.Contains(i)).ToList(); if (Overflow.Count > 0) shown.Add(More);
+            var bad = new List<string>();
+            foreach (var a in shown)
+            {
+                if (a.Rect.Left < 0 || a.Rect.Right > Width) bad.Add("the tab \"" + a.Text + "\" goes past the edge of the bar");
+                foreach (var b in shown) if (a != b && string.CompareOrdinal(a.Text, b.Text) < 0 && a.Rect.IntersectsWith(b.Rect)) bad.Add("the tabs \"" + a.Text + "\" and \"" + b.Text + "\" are drawn on top of each other");
+            }
+            return bad;
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.Clear(Bar);
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var p = new Pen(Theme.Grid)) g.DrawLine(p, 0, Height - 1, Width, Height - 1);
-            int pad = S(10), gap = S(4), x = pad, xr = Width - pad;
-            foreach (var it in Items)
+            Arrange(g);
+            var all = Items.Where(i => !Overflow.Contains(i)).ToList(); if (Overflow.Count > 0) all.Add(More);
+            foreach (var it in all)
             {
-                string text = Lang.T(it.Text);
-                int w = W(g, text, Font) + S(28) + (it.Glyph != null ? S(22) : 0);
-                var r = it.Right ? new Rectangle(xr - w, S(6), w, Height - S(12)) : new Rectangle(x, S(6), w, Height - S(12));
-                if (it.Right) xr -= w + gap; else x += w + gap;
-                it.Rect = M(r);
-                bool sel = it == Selected, hov = it == hover && it.Enabled && !sel;
+                string text = Lang.T(it.Text) + (it == More ? "  \u25BE" : "");
+                bool icon = it.Right && IconsOnly;
+                bool sel = it == Selected || it == More && Overflow.Contains(Selected), hov = it == hover && it.Enabled && !sel;
                 if (sel || hov)
                     using (var path = Round(it.Rect, S(8)))
                     using (var b = new SolidBrush(sel ? Mix(Bar, Theme.Accent, Theme.Dark ? 0.22 : 0.10) : Mix(Bar, Theme.Ink, 0.05)))
@@ -56,15 +108,16 @@ namespace CDriveCleaner
                 if (it.Glyph != null)
                 {
                     int gs = S(16);
-                    var gr = M(new Rectangle(r.X + S(12), r.Y + (r.Height - gs) / 2, gs, gs));
+                    var gr = new Rectangle(icon ? it.Rect.X + (it.Rect.Width - gs) / 2 : Rtl ? it.Rect.Right - S(12) - gs : it.Rect.X + S(12), it.Rect.Y + (it.Rect.Height - gs) / 2, gs, gs);
                     if (it.Glyph == "list") ListGlyph(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
                     else if (it.Glyph == "shield") ShieldGlyph(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
                     else Gear(g, gr, ink, Math.Max(1.5f, S(2) * .8f));
-                    tr = M(new Rectangle(r.X + S(20), r.Y, r.Width - S(20), r.Height));
+                    tr = Rtl ? new Rectangle(it.Rect.X, it.Rect.Y, it.Rect.Width - S(20), it.Rect.Height) : new Rectangle(it.Rect.X + S(20), it.Rect.Y, it.Rect.Width - S(20), it.Rect.Height);
                 }
                 if (bold == null || bold.Size != Font.Size) bold = new Font(Font, FontStyle.Bold);
-                TextRenderer.DrawText(g, text, sel ? bold : Font, tr, ink,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | (Rtl ? TextFormatFlags.RightToLeft : 0));
+                if (!icon)
+                    TextRenderer.DrawText(g, text, sel ? bold : Font, tr, ink,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | (Rtl ? TextFormatFlags.RightToLeft : 0));
                 if (sel)
                     using (var b = new SolidBrush(Theme.Accent))
                     using (var path = Round(new RectangleF(it.Rect.X + S(12), Height - S(4), it.Rect.Width - S(24), S(3)), S(1)))
@@ -118,14 +171,14 @@ namespace CDriveCleaner
             }
         }
 
-        Item Hit(Point p) { return Items.FirstOrDefault(i => i.Rect.Contains(p)); }
+        Item Hit(Point p) { if (More.Rect.Contains(p)) return More; return Items.FirstOrDefault(i => !Overflow.Contains(i) && i.Rect.Contains(p)); }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
             var h = Hit(e.Location);
             Cursor = h != null && h.Enabled ? Cursors.Hand : Cursors.Default;
-            string t = h != null && !h.Enabled ? Lang.T(h.Tip) : "";
+            string t = h != null && !h.Enabled ? Lang.T(h.Tip) : h != null && h.Right && IconsOnly ? Lang.T(h.Text) : "";
             if (t != lastTip) { lastTip = t; tip.SetToolTip(this, t); }
             if (h != hover) { hover = h; Invalidate(); }
         }
@@ -135,9 +188,25 @@ namespace CDriveCleaner
             base.OnMouseClick(e);
             var h = Hit(e.Location);
             if (h == null || e.Button != MouseButtons.Left) return;
+            if (h == More) { ShowMore(); return; }
             if (!h.Enabled) { tip.Show(Lang.T(h.Tip), this, e.Location.X, Height, 2500); return; }
             Selected = h; Invalidate();
             if (Picked != null) Picked(h);
+        }
+
+        // the tabs that didn't fit, as a menu under "More"
+        void ShowMore()
+        {
+            var menu = new ContextMenuStrip { RightToLeft = RightToLeft };
+            foreach (var it in Overflow)
+            {
+                var x = it;
+                var mi = new ToolStripMenuItem(Lang.T(it.Text)) { Enabled = it.Enabled, Checked = it == Selected, ToolTipText = it.Enabled ? "" : Lang.T(it.Tip) };
+                mi.Click += (o, e) => { Selected = x; Invalidate(); if (Picked != null) Picked(x); };
+                menu.Items.Add(mi);
+            }
+            menu.Closed += (o, e) => BeginInvoke((Action)(() => menu.Dispose()));
+            menu.Show(this, new Point(Rtl ? More.Rect.Right : More.Rect.Left, Height));
         }
 
         public void Select(TabPage p)
