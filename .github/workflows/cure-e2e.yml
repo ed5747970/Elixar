@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned to its commit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1, pinned to its commit
         with:
           persist-credentials: false
       - name: Build Elixar for Business and its MSI
@@ -46,6 +46,9 @@ jobs:
           }
           $dir = 'C:\Program Files\Elixar'; $agent = "$dir\CureAgent.exe"; $server = "$dir\CureServer.exe"; $pc = $env:COMPUTERNAME.ToUpper()
           $pol = 'HKLM:\SOFTWARE\Policies\Elixar\Cure'
+          # every connection Elixar's programs make from here on is recorded (checked at the end: only this PC)
+          & .\tools\netwatch.ps1 start
+          $portsBefore = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $_.LocalPort }) | Sort-Object -Unique
 
           # 1. the MSI the way Intune / Group Policy installs it: Cure Agent on, settings to come from Group Policy
           # (a token given to the MSI must never reach its log: no server is given, so the agent still waits for Group Policy)
@@ -84,6 +87,12 @@ jobs:
           Check "firewall rule on the domain profile only" ($fw -and "$($fw.Profile)" -eq 'Domain') "$($fw.Profile)"
           $acl = (Get-Acl 'C:\ProgramData\Elixar\CureServer').Access | Where-Object { $_.FileSystemRights -match 'Write|Modify|FullControl' } | ForEach-Object { "$($_.IdentityReference)" }
           Check "server data folder: only admins, SYSTEM and the service can write" (-not ($acl | Where-Object { $_ -notmatch 'Administrators|SYSTEM|CureServer|CREATOR OWNER' })) ($acl -join ', ')
+          # the only new open port is the console's, and it belongs to Windows' HTTP.sys (HTTPS only), not to Elixar's programs
+          $cure = @(Get-Process CureAgent, CureServer -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
+          $own = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $cure -contains $_.OwningProcess }) + @(Get-NetUDPEndpoint -ErrorAction SilentlyContinue | Where-Object { $cure -contains $_.OwningProcess })
+          Check "Cure Agent and Cure Server open no ports of their own" ($cure.Count -ge 1 -and $own.Count -eq 0) (($own | ForEach-Object { "$($_.LocalAddress):$($_.LocalPort)" }) -join ', ')
+          $newPorts = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -eq 4 -and $portsBefore -notcontains $_.LocalPort } | ForEach-Object { $_.LocalPort }) | Sort-Object -Unique
+          Check "the only new port is 8443 (the console, HTTPS)" ("$newPorts" -eq '8443') "new: $newPorts"
           Check "the settings key isn't readable by users" (-not ((Get-Acl 'HKLM:\SOFTWARE\Elixar\CureServer').Access | Where-Object { "$($_.IdentityReference)" -match 'Users|Everyone' }))
 
           # 3. the agent's settings, as a Group Policy would write them; the service picks them up
@@ -154,6 +163,17 @@ jobs:
           Start-Sleep 5
           $o = (& $agent --send | Out-String); Check "old token can't join again" ($LASTEXITCODE -ne 0 -and $o -match '403') $o
 
+          # the desktop app's everyday commands: they work on this PC only
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\fleet" | Out-Null
+          foreach ($a in @('--status', '--list-items', "--report `"$env:RUNNER_TEMP\fleet`"")) {
+            $p = Start-Process "$dir\Elixar.exe" -ArgumentList $a -Wait -PassThru -WindowStyle Hidden
+            Check "Elixar.exe $a" ($p.ExitCode -eq 0) "exit $($p.ExitCode)"
+          }
+
+          # what went over the network: Elixar's programs talked only to this PC (the Cure Server is on it)
+          & .\tools\netwatch.ps1 check
+          Check "network watch: Elixar, Cure Agent and Cure Server connected only to this PC (Windows' firewall audit, event 5156)" ($LASTEXITCODE -eq 0)
+
           # 7. uninstall: nothing is left behind (the reports stay unless --purge)
           $code = Msi "/x `"$PWD\Elixar-Business.msi`"" 'msi-remove.log'
           Check "MSI uninstall" ($code -eq 0) "exit $code"
@@ -179,7 +199,7 @@ jobs:
           Write-Host "::notice title=Cure end-to-end::$script:passes checks passed"
       - name: Keep the MSI logs
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4.6.2, pinned to its commit
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9   # v7.0.2, pinned to its commit
         with:
           name: cure-e2e-logs
           path: msi-*.log
