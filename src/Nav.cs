@@ -28,7 +28,118 @@ namespace CDriveCleaner
         readonly ToolTip tip = new ToolTip();
         string lastTip = "";
 
-        public NavBar() { TabStop = false; }
+        // the keyboard reaches the bar with Tab: Left/Right (or Home/End) move between tabs, Enter or Space opens one.
+        // Screen readers see a tab list with one tab per page (name, selected, unavailable).
+        public NavBar() { TabStop = true; SetStyle(ControlStyles.Selectable, true); AccessibleName = Lang.T("Pages"); AccessibleRole = AccessibleRole.PageTabList; }
+        int focusAt = -1;
+
+        // what shows, in the order it shows (left to right): the tabs that fit, More, then Policy manager, Logs, Settings
+        public List<Item> Shown()
+        {
+            var l = Items.Where(i => !i.Right && !Overflow.Contains(i)).ToList();
+            if (Overflow.Count > 0) l.Add(More);
+            l.AddRange(Items.Where(i => i.Right).Reverse());
+            return l;
+        }
+
+        // every page in order, for Ctrl+Tab and Ctrl+1..9 (those under More too)
+        public List<Item> InOrder() { return Items.Where(i => !i.Right).Concat(Items.Where(i => i.Right).Reverse()).ToList(); }
+
+        public void Pick(Item it)
+        {
+            if (it == null) return;
+            if (it == More) { ShowMore(); return; }
+            if (!it.Enabled) { tip.Show(Lang.T(it.Tip), this, Math.Max(0, it.Rect.X), Height, 2500); return; }
+            bool had = Focused;
+            Selected = it; Invalidate();
+            if (Picked != null) Picked(it);
+            if (had && !Focused) Focus();   // the keyboard stays on the bar (Tab goes on into the page)
+            if (Focused) { var sh = Shown(); focusAt = sh.IndexOf(Overflow.Contains(it) ? More : it); Announce(); }
+        }
+
+        // Ctrl+Tab / Ctrl+Shift+Tab: the next or previous page that can open
+        public void Step(int dir)
+        {
+            var all = InOrder(); if (all.Count == 0) return;
+            int i = Math.Max(0, all.IndexOf(Selected));
+            for (int k = 0; k < all.Count; k++) { i = (i + dir + all.Count) % all.Count; if (all[i].Enabled) { Pick(all[i]); return; } }
+        }
+
+        protected override bool IsInputKey(Keys k)
+        {
+            var key = k & Keys.KeyCode;
+            if (key == Keys.Left || key == Keys.Right || key == Keys.Home || key == Keys.End || key == Keys.Enter || key == Keys.Space) return true;
+            return base.IsInputKey(k);
+        }
+
+        protected override void OnGotFocus(EventArgs e)
+        {
+            base.OnGotFocus(e);
+            using (var g = CreateGraphics()) Arrange(g);
+            var sh = Shown(); focusAt = sh.IndexOf(Overflow.Contains(Selected) ? More : Selected); if (focusAt < 0) focusAt = 0;
+            Invalidate(); Announce();
+        }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+            var sh = Shown(); if (sh.Count == 0) return;
+            if (focusAt < 0 || focusAt >= sh.Count) focusAt = 0;
+            int fwd = Rtl ? -1 : 1;   // in Hebrew the bar runs right to left, so the arrows do too
+            if (e.KeyCode == Keys.Right) focusAt = (focusAt + fwd + sh.Count) % sh.Count;
+            else if (e.KeyCode == Keys.Left) focusAt = (focusAt - fwd + sh.Count) % sh.Count;
+            else if (e.KeyCode == Keys.Home) focusAt = 0;
+            else if (e.KeyCode == Keys.End) focusAt = sh.Count - 1;
+            else if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space) { Pick(sh[focusAt]); e.Handled = e.SuppressKeyPress = true; return; }
+            else return;
+            e.Handled = e.SuppressKeyPress = true;
+            Invalidate(); Announce();
+        }
+
+        public void KeyForTest(Keys k) { OnKeyDown(new KeyEventArgs(k)); }   // self-test
+
+        public Item FocusedItem { get { var sh = Shown(); return Focused && focusAt >= 0 && focusAt < sh.Count ? sh[focusAt] : null; } }
+
+        void Announce() { if (focusAt >= 0) try { AccessibilityNotifyClients(AccessibleEvents.Focus, focusAt); AccessibilityNotifyClients(AccessibleEvents.Selection, focusAt); } catch { } }
+
+        protected override AccessibleObject CreateAccessibilityInstance() { return new BarA(this); }
+
+        class BarA : ControlAccessibleObject
+        {
+            readonly NavBar bar;
+            public BarA(NavBar b) : base(b) { bar = b; }
+            public override AccessibleRole Role { get { return AccessibleRole.PageTabList; } }
+            public override int GetChildCount() { return bar.Shown().Count; }
+            public override AccessibleObject GetChild(int i) { var sh = bar.Shown(); return i >= 0 && i < sh.Count ? new TabA(bar, sh[i], this) : null; }
+            public override AccessibleObject GetFocused() { var f = bar.FocusedItem; return f == null ? base.GetFocused() : new TabA(bar, f, this); }
+            public override AccessibleObject GetSelected() { return bar.Selected == null ? null : new TabA(bar, bar.Selected, this); }
+        }
+
+        class TabA : AccessibleObject
+        {
+            readonly NavBar bar; readonly Item it; readonly AccessibleObject parent;
+            public TabA(NavBar b, Item i, AccessibleObject p) { bar = b; it = i; parent = p; }
+            public override string Name { get { return Lang.T(it.Text); } set { } }
+            public override string Description { get { return it.Enabled ? "" : Lang.T(it.Tip); } }
+            public override AccessibleRole Role { get { return it == bar.More ? AccessibleRole.ButtonMenu : AccessibleRole.PageTab; } }
+            public override AccessibleObject Parent { get { return parent; } }
+            public override string DefaultAction { get { return Lang.T(it == bar.More ? "Open" : "Switch"); } }
+            public override Rectangle Bounds { get { return it.Rect.IsEmpty ? Rectangle.Empty : bar.RectangleToScreen(it.Rect); } }
+            public override AccessibleStates State
+            {
+                get
+                {
+                    var s = AccessibleStates.Focusable | AccessibleStates.Selectable;
+                    if (!it.Enabled) s |= AccessibleStates.Unavailable;
+                    if (it == bar.Selected) s |= AccessibleStates.Selected;
+                    if (it == bar.FocusedItem) s |= AccessibleStates.Focused;
+                    if (it.Rect.IsEmpty) s |= AccessibleStates.Invisible;
+                    return s;
+                }
+            }
+            public override void DoDefaultAction() { bar.Pick(it); }
+        }
 
         static Color Bar { get { return Theme.Dark ? Color.FromArgb(36, 36, 44) : Color.White; } }
 
@@ -122,6 +233,10 @@ namespace CDriveCleaner
                     using (var b = new SolidBrush(Theme.Accent))
                     using (var path = Round(new RectangleF(it.Rect.X + S(12), Height - S(4), it.Rect.Width - S(24), S(3)), S(1)))
                         g.FillPath(b, path);
+                if (it == FocusedItem)   // where the keyboard is
+                    using (var pen = new Pen(Theme.Accent, Math.Max(1.5f, S(2))) { DashStyle = DashStyle.Dot })
+                    using (var path = Round(new RectangleF(it.Rect.X + 1.5f, it.Rect.Y + 1.5f, it.Rect.Width - 3, it.Rect.Height - 3), S(7)))
+                        g.DrawPath(pen, path);
             }
         }
 
@@ -188,10 +303,7 @@ namespace CDriveCleaner
             base.OnMouseClick(e);
             var h = Hit(e.Location);
             if (h == null || e.Button != MouseButtons.Left) return;
-            if (h == More) { ShowMore(); return; }
-            if (!h.Enabled) { tip.Show(Lang.T(h.Tip), this, e.Location.X, Height, 2500); return; }
-            Selected = h; Invalidate();
-            if (Picked != null) Picked(h);
+            Pick(h);
         }
 
         // the tabs that didn't fit, as a menu under "More"
@@ -207,6 +319,7 @@ namespace CDriveCleaner
             }
             menu.Closed += (o, e) => BeginInvoke((Action)(() => menu.Dispose()));
             menu.Show(this, new Point(Rtl ? More.Rect.Right : More.Rect.Left, Height));
+            if (Focused) foreach (ToolStripItem mi in menu.Items) if (mi.Enabled) { mi.Select(); break; }   // from the keyboard: the arrows work at once
         }
 
         public void Select(TabPage p)
@@ -224,6 +337,36 @@ namespace CDriveCleaner
         public List<string> NavGreyed { get { return nav.Items.Where(i => !i.Enabled).Select(i => i.Text).ToList(); } }
         public List<string> NavRightItems { get { return nav.Items.Where(i => i.Right).Select(i => i.Text).ToList(); } }
         public string NavRight { get { var r = nav.Items.FirstOrDefault(i => i.Right); return r == null ? "" : r.Text; } }
+
+        // Ctrl+Tab / Ctrl+Shift+Tab: next / previous page; Ctrl+1 ... Ctrl+9: the pages in the order of the bar.
+        // Inside a page that has its own tabs (Tools, Apps), Ctrl+Tab still switches those, as in every Windows program.
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (nav != null && Visible)
+            {
+                if ((keyData == (Keys.Control | Keys.Tab) || keyData == (Keys.Control | Keys.Shift | Keys.Tab)) && !InInnerTabs())
+                { nav.Step((keyData & Keys.Shift) != 0 ? -1 : 1); return true; }
+                var key = keyData & Keys.KeyCode;
+                if ((keyData & Keys.Modifiers) == Keys.Control && key >= Keys.D1 && key <= Keys.D9)
+                {
+                    var all = nav.InOrder(); int n = key - Keys.D1;
+                    if (n < all.Count) { nav.Pick(all[n]); return true; }
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        public NavBar NavForTest { get { return nav; } }
+        public bool ShortcutForTest(Keys k) { var m = new Message(); return ProcessCmdKey(ref m, k); }
+        public TabPage CurrentPage { get { return tabs.SelectedTab; } }
+
+        bool InInnerTabs()
+        {
+            for (Control c = ActiveControl; c != null; c = c is ContainerControl ? ((ContainerControl)c).ActiveControl : null)
+                for (var p = c; p != null && p != this; p = p.Parent)
+                    if (p is TabControl && p != tabs) return true;
+            return false;
+        }
 
         // the pages stay in the (hidden-header) tab control, so every "show this tab" keeps working
         void BuildNav()

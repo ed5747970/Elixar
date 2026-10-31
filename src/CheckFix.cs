@@ -252,7 +252,10 @@ namespace CDriveCleaner
                 cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
                 var p = new Panel { Dock = DockStyle.Fill, Height = S(62), Margin = new Padding(0, 0, S(8), 0), BorderStyle = BorderStyle.FixedSingle };
                 var v = new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 15f), Text = "...", Location = new Point(S(8), S(24)) };
-                p.Controls.Add(new Label { AutoSize = true, Text = Lang.T(k).ToUpperInvariant(), Font = new Font("Segoe UI", 7.5f), ForeColor = Color.DimGray, Location = new Point(S(8), S(6)) });
+                // a long caption (another language, a narrow window) ends in "..." instead of running past the tile
+                var cap = new Label { AutoSize = false, AutoEllipsis = true, Text = Lang.T(k).ToUpperInvariant(), Font = new Font("Segoe UI", 7.5f), ForeColor = Color.DimGray, Bounds = new Rectangle(S(8), S(6), Math.Max(S(40), p.Width - S(12)), S(16)), Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top };
+                new ToolTip().SetToolTip(cap, cap.Text);
+                p.Controls.Add(cap);
                 p.Controls.Add(v); cardValue[k] = v; cards.Controls.Add(p);
             }
             rows = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, ColumnCount = 3, Margin = new Padding(0) };

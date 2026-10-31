@@ -1,6 +1,6 @@
 # Records every network connection Elixar's programs make, using Windows' own firewall audit (the Windows Filtering
 # Platform writes event 5156 for each connection it allows, with the program that made it). Used by the CI runs on a
-# throwaway Windows PC: start it, run Elixar / Cure Agent / Cure Server, then check. The check fails when one of them
+# throwaway Windows PC (it always sets the exit code: 0 = fine, 1 = an unexpected connection): start it, run Elixar / Cure Agent / Cure Server, then check. The check fails when one of them
 # connected anywhere other than this PC itself, unless that address is passed with -Allow.
 #   netwatch.ps1 start
 #   netwatch.ps1 check [-Allow host-or-ip, ...]
@@ -20,7 +20,7 @@ if ($Mode -eq 'start') {
   wevtutil sl Security /ms:536870912   # 512 MB: every connection on the PC is written, keep them all for this run
   (Get-Date).ToString('o') | Set-Content $stamp
   Write-Host "Network watch: on (every connection made from now on is recorded)"
-  return
+  exit 0
 }
 
 $since = [DateTime]::Parse((Get-Content $stamp -Raw).Trim(), $null, 'RoundtripKind')
@@ -53,4 +53,6 @@ if ($bad.Count) {
   Write-Host ("::error title=Unexpected connection::" + ($bad -join '%0A'))
   exit 1
 }
-Write-Host "::notice title=Network watch::Elixar's programs connected only to this PC$(if ($Allow) { ' and ' + ($Allow -join ', ') })"
+$list = if ($seen.Count) { ($seen.Keys | Sort-Object | ForEach-Object { "$_ x$($seen[$_])" }) -join '%0A' } else { 'no connections at all' }
+Write-Host "::notice title=Network watch::Elixar's programs connected only to this PC$(if ($Allow) { ' and ' + ($Allow -join ', ') }) ($($events.Count) connections recorded on the PC). Theirs:%0A$list"
+exit 0

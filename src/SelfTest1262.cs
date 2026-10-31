@@ -378,6 +378,50 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "The top bar works from the keyboard and for screen readers: Tab reaches it, arrows and Enter open a page, Ctrl+Tab and Ctrl+1..9 switch pages (skipping greyed ones), each page is a named tab", () =>
+            {
+                bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
+                try
+                {
+                    using (var m = new MainForm(true))
+                    {
+                        m.Size = new System.Drawing.Size(1280, 720); m.Show(); Pump(() => false, 600);
+                        var nav = m.NavForTest;
+                        if (!nav.TabStop) return "the bar can't get the keyboard focus";
+                        nav.Focus(); Pump(() => false, 200);
+                        if (nav.FocusedItem == null || nav.FocusedItem.Text != "Dashboard") return "focus starts on " + (nav.FocusedItem == null ? "nothing" : nav.FocusedItem.Text);
+                        nav.KeyForTest(Keys.Right); var second = nav.FocusedItem;
+                        nav.KeyForTest(Keys.Enter); Pump(() => false, 300);
+                        if (second == null || m.CurrentPage != second.Page) return "Right + Enter didn't open the next page";
+                        nav.KeyForTest(Keys.End); if (nav.FocusedItem == null || nav.FocusedItem.Text != "Settings") return "End: " + (nav.FocusedItem == null ? "-" : nav.FocusedItem.Text);
+                        var order = nav.InOrder();
+                        m.ShortcutForTest(Keys.Control | Keys.D1); Pump(() => false, 200);
+                        if (m.CurrentPage != order[0].Page) return "Ctrl+1";
+                        m.ShortcutForTest(Keys.Control | Keys.D3); Pump(() => false, 200);
+                        if (m.CurrentPage != order[2].Page) return "Ctrl+3";
+                        var auto = order.First(i => i.Text == "Automation"); nav.Pick(auto); Pump(() => false, 200);
+                        m.ShortcutForTest(Keys.Control | Keys.Tab); Pump(() => false, 200);
+                        var next = order.Skip(order.IndexOf(auto) + 1).First(i => i.Enabled);
+                        if (m.CurrentPage != next.Page) return "Ctrl+Tab after Automation went to " + m.CurrentPage.Text + ", not " + next.Text;
+                        m.ShortcutForTest(Keys.Control | Keys.Shift | Keys.Tab); Pump(() => false, 200);
+                        if (m.CurrentPage != auto.Page) return "Ctrl+Shift+Tab";
+                        var acc = nav.AccessibilityObject;
+                        if (acc.Role != AccessibleRole.PageTabList || acc.GetChildCount() != nav.Shown().Count) return "screen reader: the bar isn't a tab list of " + nav.Shown().Count;
+                        var kids = Enumerable.Range(0, acc.GetChildCount()).Select(i => acc.GetChild(i)).ToList();
+                        if (kids[0].Name != "Dashboard" || kids[0].Role != AccessibleRole.PageTab) return "screen reader: first tab is " + kids[0].Name;
+                        var selKid = kids.FirstOrDefault(k => (k.State & AccessibleStates.Selected) != 0);
+                        if (selKid == null || selKid.Name != "Automation") return "screen reader: the open page isn't marked selected";
+                        var grey = nav.Items.FirstOrDefault(i => !i.Enabled);
+                        if (grey != null && (kids.First(k => k.Name == grey.Text).State & AccessibleStates.Unavailable) == 0) return "screen reader: a greyed tab isn't marked unavailable";
+                        kids.First(k => k.Name == "Cleaner").DoDefaultAction(); Pump(() => false, 200);
+                        if (m.CurrentPage.Text != "Cleaner") return "screen reader: the tab's action didn't open it";
+                        m.Close();
+                    }
+                }
+                finally { MainForm.ForceWindowsUi = keepUi; }
+                return null;
+            });
+
             Run(check, "Nothing is cut off: every tab and Tools page at 780x560, 1024x600 and 1280x720, the windows it opens and the top bar show all their parts (or scroll to them, or put them under More)", () =>
             {
                 bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;

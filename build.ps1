@@ -24,7 +24,7 @@ if ($msid -and -not ($msid -as [guid])) { throw "ELIXAR_MS_ID must be the Applic
 [IO.File]::WriteAllText($cfg, "repo=$($env:GITHUB_REPOSITORY)`nkey=$key`ngoogle-id=$gid`ngoogle-secret=$gsec`nms-id=$msid`nsponsor=$($env:ELIXAR_SPONSOR)", (New-Object Text.UTF8Encoding $false))
 
 $refs = "System.dll","System.Core.dll","System.Drawing.dll","System.Windows.Forms.dll","Microsoft.VisualBasic.dll","System.Xml.dll",
-        "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll","System.Security.dll" | ForEach-Object { "/r:$_" }
+        "System.ServiceProcess.dll","System.Web.Extensions.dll","System.IO.Compression.dll","System.IO.Compression.FileSystem.dll","System.Security.dll","Accessibility.dll" | ForEach-Object { "/r:$_" }
 $src = Get-ChildItem (Join-Path $root "src\*.cs") | ForEach-Object { $_.FullName }
 $common = @("/nologo", "/optimize+", "/win32icon:$root\app.ico", "/win32manifest:$root\app.manifest",
             "/resource:$root\app.ico,Elixar.app.ico", "/resource:$root\brand.png,Elixar.brand.png",

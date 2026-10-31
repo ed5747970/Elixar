@@ -101,6 +101,10 @@ namespace CDriveCleaner
         // a label whose width its page sets itself (in a table column); TextFit leaves it alone
         public static void Skip(Label l) { skip.GetValue(l, x => (object)true); }
 
+        // a row of buttons that goes onto a second line when the window (or a longer language) is too narrow for it
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<FlowLayoutPanel, object> rows = new System.Runtime.CompilerServices.ConditionalWeakTable<FlowLayoutPanel, object>();
+        public static FlowLayoutPanel WrapRow(FlowLayoutPanel f) { f.WrapContents = true; rows.GetValue(f, x => (object)true); return f; }
+
         public static void Apply(Control root)
         {
             if (root == null || !root.IsHandleCreated || !root.Visible) return;
@@ -113,6 +117,8 @@ namespace CDriveCleaner
             var l = c as Label;
             object no;
             if (l != null && l.AutoSize && !(l is LinkLabel && l.Text.Length < 40) && !skip.TryGetValue(l, out no)) Fit(l);
+            var row = c as FlowLayoutPanel;
+            if (row != null && rows.TryGetValue(row, out no)) FitRow(row);
             foreach (Control k in c.Controls) Walk(k);
         }
 
@@ -121,6 +127,17 @@ namespace CDriveCleaner
             for (var p = c.Parent; p != null; p = p.Parent)
                 if (p is TabPage || p is Form || (p is ScrollableControl && ((ScrollableControl)p).AutoScroll)) return p;
             return null;
+        }
+
+        static void FitRow(FlowLayoutPanel f)
+        {
+            var v = Viewport(f); if (v == null || f.Parent == null) return;
+            int left; try { left = v.PointToClient(f.Parent.PointToScreen(f.Location)).X; } catch { return; }
+            int avail = v.ClientSize.Width - left - f.Margin.Right - SystemInformation.VerticalScrollBarWidth - 4;
+            if (avail < 160 || f.MaximumSize.Width == avail) return;
+            f.MaximumSize = new Size(avail, 0);
+            for (var p = f.Parent; p != null && p != v; p = p.Parent) p.PerformLayout();
+            v.PerformLayout();
         }
 
         static void Fit(Label l)

@@ -36,14 +36,14 @@ namespace CDriveCleaner
             rbOther = new RadioButton { AutoSize = true, Text = "Other (Yahoo, iCloud, AOL, GMX...)", Margin = new Padding(0, S(3), 0, 0) };
             pnlChoose.Controls.AddRange(new Control[] { lblWhich, rbGmail, rbOutlook, rbOther });
 
-            pnlGoogle = Row(); pnlGoogle.Margin = new Padding(0, S(6), 0, 0);
+            pnlGoogle = TextFit.WrapRow(Row()); pnlGoogle.Margin = new Padding(0, S(6), 0, 0);
             btnMailSignIn = MakeButton("Sign in with Google"); btnMailSignIn.Font = new Font("Segoe UI Semibold", 9f);
             btnMailSetup = MakeButton("Set up Google sign-in (one time)...");
             // without Google's sign-in keys in this copy: a Gmail app password works right away
             btnGmailApp = MakeButton("Use a Gmail app password instead..."); btnGmailApp.Font = new Font("Segoe UI Semibold", 9f);
             pnlGoogle.Controls.AddRange(new Control[] { btnMailSignIn, btnGmailApp, btnMailSetup });
 
-            pnlMicrosoft = Row(); pnlMicrosoft.Margin = new Padding(0, S(6), 0, 0);
+            pnlMicrosoft = TextFit.WrapRow(Row()); pnlMicrosoft.Margin = new Padding(0, S(6), 0, 0);
             btnMsSignIn = MakeButton("Sign in with Microsoft"); btnMsSignIn.Font = new Font("Segoe UI Semibold", 9f);
             btnMsSetup = MakeButton("Set up Microsoft sign-in (one time)...");
             pnlMicrosoft.Controls.AddRange(new Control[] { btnMsSignIn, btnMsSetup });

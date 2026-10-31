@@ -10,6 +10,16 @@ TWO EDITIONS
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
 
+NEW IN 1.2.64
+- The top bar works from the keyboard: Tab reaches it, the arrows and
+  Enter open a page, Ctrl+Tab and Ctrl+1...9 switch pages. Screen readers
+  read it as tabs.
+- Arabic, Russian and Spanish now cover every page's title and button,
+  PC health and Check & fix.
+- Every build is checked on a Windows PC in the cloud: Elixar, Cure Agent
+  and Cure Server connect only to the PC itself (and Cure Agent to your
+  Cure Server), recorded with Windows' own firewall audit.
+
 NEW IN 1.2.63
 - Every Elixar window fits the screen it is on, so a long page (Settings)
   can always be scrolled to the end, and the mouse wheel scrolls the page
