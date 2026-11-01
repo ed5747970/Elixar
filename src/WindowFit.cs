@@ -22,7 +22,23 @@ namespace CDriveCleaner
             return new Rectangle(x, y, w, h);
         }
 
-        public static void Keep(Form f)
+        // after you move or resize a window yourself: it is only made smaller than the screen and its title bar kept where
+        // you can grab it. Where you put it is yours (half on another monitor, partly past an edge), unlike Fit, which
+        // puts the whole window on the screen when it opens.
+        public static Rectangle Reachable(Rectangle window, Rectangle work, int titleBar, int grip)
+        {
+            int w = Math.Min(window.Width, work.Width), h = Math.Min(window.Height, work.Height);
+            int x = window.Left, y = window.Top;
+            if (y < work.Top) y = work.Top;                                   // the title bar above the screen
+            if (y > work.Bottom - titleBar) y = work.Bottom - titleBar;       // ... or below it (under the taskbar)
+            int g = Math.Min(grip, w);
+            if (x + w < work.Left + g) x = work.Left + g - w;                 // a piece of it stays on the screen to grab
+            if (x > work.Right - g) x = work.Right - g;
+            return new Rectangle(x, y, w, h);
+        }
+
+        public static void Keep(Form f) { Keep(f, true); }
+        public static void Keep(Form f, bool whole)
         {
             if (f.WindowState != FormWindowState.Normal) return;
             var work = Screen.FromControl(f).WorkingArea;
@@ -30,16 +46,16 @@ namespace CDriveCleaner
             if (f.AutoSize && (f.Height > work.Height || f.Width > work.Width)) { f.AutoSize = false; f.AutoScroll = true; }
             if (f.MinimumSize.Width > work.Width || f.MinimumSize.Height > work.Height)
                 f.MinimumSize = new Size(Math.Min(f.MinimumSize.Width, work.Width), Math.Min(f.MinimumSize.Height, work.Height));
-            var b = Fit(f.Bounds, work);
+            var b = whole ? Fit(f.Bounds, work) : Reachable(f.Bounds, work, SystemInformation.CaptionHeight + 8, 120);
             if (b != f.Bounds) f.Bounds = b;
         }
 
-        // fits now, and again after the window is resized, moved to another screen, or Windows changes its size
+        // fits when it opens; after that it never gets bigger than the screen and its title bar stays reachable
         public static void Watch(Form f)
         {
-            f.Shown += (o, e) => Keep(f);
-            f.ResizeEnd += (o, e) => Keep(f);
-            f.Resize += (o, e) => { if (f.WindowState == FormWindowState.Normal && !resizing) { resizing = true; try { Keep(f); } finally { resizing = false; } } };
+            f.Shown += (o, e) => Keep(f, true);
+            f.ResizeEnd += (o, e) => Keep(f, false);   // also after a move
+            f.Resize += (o, e) => { if (f.WindowState == FormWindowState.Normal && !resizing) { resizing = true; try { Keep(f, false); } finally { resizing = false; } } };
             WheelRouter.Install();
         }
         [ThreadStatic] static bool resizing;

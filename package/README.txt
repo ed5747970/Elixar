@@ -10,6 +10,14 @@ TWO EDITIONS
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
 
+NEW IN 1.2.65
+- PC health: Ignore now sticks for an app whose name has a symbol in it
+  (like Notepad++).
+- A window you move half onto another monitor stays where you put it;
+  only a title bar you can't reach is brought back on the screen.
+- Cure Server: wrong enrollment tokens are counted per IPv6 network (/64),
+  not per single address.
+
 NEW IN 1.2.64
 - The top bar works from the keyboard: Tab reaches it, the arrows and
   Enter open a page, Ctrl+Tab and Ctrl+1...9 switch pages. Screen readers

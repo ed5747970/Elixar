@@ -100,18 +100,35 @@ namespace CDriveCleaner
         static Answer A(int status, object o) { return new Answer { Status = status, Body = CureProtocol.Json().Serialize(o) }; }
         static Answer Err(int status, string msg) { return A(status, new Dictionary<string, string> { { "error", msg } }); }
 
+        // who a wrong token is counted against: one IPv4 address, or one IPv6 network (/64: one home or office has a whole
+        // /64, so counting single IPv6 addresses would let one place guess from thousands of them)
+        public static string Source(string ip)
+        {
+            System.Net.IPAddress a;
+            if (!System.Net.IPAddress.TryParse(ip ?? "", out a)) return ip ?? "";
+            if (a.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6) return a.ToString();
+            var b = a.GetAddressBytes();
+            bool mapped = b.Take(10).All(x => x == 0) && b[10] == 0xFF && b[11] == 0xFF;   // ::ffff:10.0.0.9 is an IPv4 address
+            if (mapped) return new System.Net.IPAddress(b.Skip(12).ToArray()).ToString();
+            return "v6:" + BitConverter.ToString(b, 0, 8).Replace("-", "").ToLowerInvariant() + "/64";
+        }
+
         public Answer Enroll(byte[] body, string ip)
         {
             if (TokenHash.Length != 64) return Err(503, "This Cure Server has no enrollment token yet.");
             // wrong tokens are limited per address, so guessing (or flooding) from one place can't stop real PCs from enrolling
-            string from = ip ?? "";
+            string from = Source(ip);
             lock (gate)
             {
                 Queue<DateTime> bad;
                 if (badEnrolls.TryGetValue(from, out bad)) { while (bad.Count > 0 && DateTime.UtcNow - bad.Peek() > TimeSpan.FromHours(1)) bad.Dequeue(); if (bad.Count >= MaxBadEnrollPerHour) return Err(429, "Too many wrong enrollment tokens from this address."); }
                 while (enrolls.Count > 0 && DateTime.UtcNow - enrolls.Peek() > TimeSpan.FromHours(1)) enrolls.Dequeue();
                 if (enrolls.Count >= MaxEnrollPerHour) return Err(429, "Too many new PCs this hour.");
-                if (badEnrolls.Count > 10000) badEnrolls.Clear();   // memory stays bounded
+                if (badEnrolls.Count > 10000)   // memory stays bounded: addresses with no wrong token in the last hour go first
+                {
+                    foreach (var k in badEnrolls.Where(kv => kv.Value.Count == 0 || DateTime.UtcNow - kv.Value.Last() > TimeSpan.FromHours(1)).Select(kv => kv.Key).ToList()) badEnrolls.Remove(k);
+                    if (badEnrolls.Count > 10000) badEnrolls.Clear();
+                }
             }
             Dictionary<string, object> o;
             try { o = CureProtocol.Json().Deserialize<Dictionary<string, object>>(Encoding.UTF8.GetString(body)); } catch { return Err(400, "Not JSON."); }

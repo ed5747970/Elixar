@@ -212,14 +212,22 @@ namespace CDriveCleaner
         // as you can't hide a finding. Only findings that are your decision can be ignored at all (see CanIgnore).
         public static string IgnoreFileOverride;   // self-test
         static string IgnoreFile { get { return IgnoreFileOverride ?? Paths.FileIn("health-ignore.txt"); } }
+        static bool KeyOk(string k) { return Regex.IsMatch(k ?? "", @"^[a-z0-9:._ -]{1,80}$", RegexOptions.IgnoreCase); }
+        // a key every finding can have: letters, digits and . _ - only (an app called "notepad++.exe" too)
+        public static string SafeKey(string prefix, string name)
+        {
+            string k = Regex.Replace((name ?? "").ToLowerInvariant(), @"[^a-z0-9._ -]", "_");
+            return prefix + (k.Length > 80 - prefix.Length ? k.Substring(0, 80 - prefix.Length) : k);
+        }
         public static HashSet<string> IgnoredKeys()
         {
             var h = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try { if (File.Exists(IgnoreFile)) foreach (var k in File.ReadAllLines(IgnoreFile)) if (Regex.IsMatch(k.Trim(), @"^[a-z0-9:._ -]{1,80}$", RegexOptions.IgnoreCase)) h.Add(k.Trim()); } catch { }
+            try { if (File.Exists(IgnoreFile)) foreach (var k in File.ReadAllLines(IgnoreFile)) if (KeyOk(k.Trim())) h.Add(k.Trim()); } catch { }
             return h;
         }
         public static void Ignore(string key, bool on)
         {
+            if (!KeyOk(key)) return;
             var h = IgnoredKeys(); if (on) h.Add(key); else h.Remove(key);
             try { File.WriteAllLines(IgnoreFile, h.OrderBy(x => x).ToArray()); } catch { }
         }
@@ -359,7 +367,7 @@ namespace CDriveCleaner
                     var mod = g.Where(c => c.Module.Length > 0).GroupBy(c => c.Module, StringComparer.OrdinalIgnoreCase).OrderByDescending(x => x.Count()).FirstOrDefault();
                     string app = AppName(g.Key);
                     bool same = mod != null && mod.Count() * 10 >= g.Count() * 6 && !mod.Key.Equals(g.Key, StringComparison.OrdinalIgnoreCase);
-                    add(new HFind { Area = "Stability", Key = "crash:" + g.Key.ToLowerInvariant(), Level = HLevel.Warn, Penalty = 5, CanIgnore = true,
+                    add(new HFind { Area = "Stability", Key = SafeKey("crash:", g.Key), Level = HLevel.Warn, Penalty = 5, CanIgnore = true,
                                     Title = H(app + " crashed " + g.Count() + " times this month", app + " קרס " + g.Count() + " פעמים החודש"),
                                     Detail = same ? H("Most times in the same file (" + mod.Key + "): often an add-in or plug-in. Update or remove it.", "רוב הפעמים באותו קובץ (" + mod.Key + "): לרוב תוסף. עדכן או הסר אותו.")
                                                   : H("Updating or reinstalling it usually helps.", "עדכון או התקנה מחדש בדרך כלל עוזרים.") });
@@ -386,7 +394,7 @@ namespace CDriveCleaner
                     add(new HFind { Area = "Speed", Key = "boot", Level = recent > 150000 ? HLevel.Bad : slowStart || worse ? HLevel.Warn : HLevel.Ok, Penalty = recent > 150000 ? 25 : slowStart || worse ? 15 : 0,
                                     Act = HAct.Startup, Button = slowStart || worse ? "Startup..." : "",
                                     Title = H("Windows takes " + Dur(recent) + " to start" + (before > 0 ? " (" + Dur(before) + " " + (older[0].When > now.AddDays(-45) ? "a few weeks ago" : "before") + ")" : ""),
-                                              "Windows עולה תוך " + DurHe(recent) + (before > 0 ? " (" + DurHe(before) + " לפני כמה שבועות)" : "")),
+                                              "Windows עולה תוך " + DurHe(recent) + (before > 0 ? " (" + DurHe(before) + " " + (older[0].When > now.AddDays(-45) ? "לפני כמה שבועות" : "קודם") + ")" : "")),
                                     Detail = slowText.Length > 0 ? slowText : H("From Windows' own startup measurements.", "מהמדידות של Windows בזמן ההפעלה.") });
                 }
                 if (f.RamLoad >= 0)

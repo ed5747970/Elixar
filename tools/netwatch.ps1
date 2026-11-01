@@ -1,5 +1,5 @@
 # Records every network connection Elixar's programs make, using Windows' own firewall audit (the Windows Filtering
-# Platform writes event 5156 for each connection it allows, with the program that made it). Used by the CI runs on a
+# Platform writes event 5156 for each connection it allows and 5157 for each one it blocks, with the program). Used by the CI runs on a
 # throwaway Windows PC (it always sets the exit code: 0 = fine, 1 = an unexpected connection): start it, run Elixar / Cure Agent / Cure Server, then check. The check fails when one of them
 # connected anywhere other than this PC itself, unless that address is passed with -Allow.
 #   netwatch.ps1 start
@@ -24,7 +24,7 @@ if ($Mode -eq 'start') {
 }
 
 $since = [DateTime]::Parse((Get-Content $stamp -Raw).Trim(), $null, 'RoundtripKind')
-$events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 5156; StartTime = $since } -ErrorAction SilentlyContinue)
+$events = @(Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 5156, 5157; StartTime = $since } -ErrorAction SilentlyContinue)   # tried and blocked counts too
 if ($events.Count -eq 0) { throw "Network watch: Windows recorded no connections at all since $since, so the audit isn't working (the check would prove nothing)" }
 
 # this PC's own addresses: connections to them never leave the PC
@@ -41,7 +41,7 @@ foreach ($e in $events) {
   if ($d['Direction'] -ne '%%14593') { continue }   # outbound only (what the server receives is checked by its own tests)
   $dest = ("" + $d['DestAddress']) -replace '^::ffff:', ''
   $where = if ($own -contains $dest -or $dest.StartsWith('127.')) { 'this PC' } elseif ($allowed -contains $dest) { 'allowed' } else { 'NOT EXPECTED' }
-  $key = "$app -> ${dest}:$($d['DestPort']) ($where)"
+  $key = "$app -> ${dest}:$($d['DestPort']) ($where$(if ($e.Id -eq 5157) { ', blocked' }))"
   $seen[$key] = 1 + [int]$seen[$key]
 }
 

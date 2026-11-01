@@ -197,7 +197,8 @@ namespace CDriveCleaner
             return bad;
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        protected override void OnPaint(PaintEventArgs e) { try { Paint_(e); } catch { } }   // a drawing error never reaches Windows' error box
+        void Paint_(PaintEventArgs e)
         {
             var g = e.Graphics;
             g.Clear(Bar);

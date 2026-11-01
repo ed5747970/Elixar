@@ -119,6 +119,7 @@ namespace CDriveCleaner
                 if (Get(r, "shutdown") != null) return "the power-off right before a blue screen isn't a separate problem";
                 var cr = Get(r, "crash:outlook.exe"); if (cr == null || !cr.Title.StartsWith("Outlook crashed 6 times") || !cr.Detail.Contains("ZoomOutlookAddin.dll")) return "crash";
                 if (Get(r, "crash:notepad.exe") != null) return "one crash isn't a pattern";
+                if (Health.SafeKey("crash:", "Notepad++.exe") != "crash:notepad__.exe" || Health.SafeKey("crash:", new string('a', 200)).Length != 80) return "safe keys";
                 var bt = Get(r, "boot"); if (bt == null || bt.Level != HLevel.Warn || !bt.Title.Contains("1 min 12 s") || !bt.Title.Contains("48 s") || !bt.Detail.Contains("Teams")) return "boot: " + (bt == null ? "none" : bt.Title);
                 var me = Get(r, "memory"); if (me == null || me.Level != HLevel.Warn || !me.Detail.Contains("Chrome")) return "memory";
                 var pw = Get(r, "power"); if (pw == null || pw.Act != HAct.PowerBalanced) return "power plan";
@@ -262,6 +263,8 @@ namespace CDriveCleaner
                     var k = Health.IgnoredKeys(); if (k.Count != 1 || !k.Contains("backup")) return "ignore file: " + string.Join(",", k);
                     Health.Ignore("power", true); Health.Ignore("backup", false);
                     k = Health.IgnoredKeys(); if (k.Count != 1 || !k.Contains("power")) return "ignore and undo";
+                    string np = Health.SafeKey("crash:", "notepad++.exe"); Health.Ignore(np, true); Health.Ignore("bad|key", true);
+                    k = Health.IgnoredKeys(); if (!k.Contains(np) || k.Count != 2) return "an app with + in its name stays ignored (" + string.Join(",", k) + ")";
                 }
                 finally { Health.IgnoreFileOverride = null; }
                 var f = Fine(); f.SecureBoot = false;
@@ -316,6 +319,11 @@ namespace CDriveCleaner
                 if (enroll("t", "PC1", "10.0.0.9") != 429) return "the flooding address is stopped";
                 if (enroll("t", "PC1", "10.0.0.5") != 200) return "a real PC elsewhere still enrolls";
                 if (enroll("t", "PC1", "10.0.0.6") != 200) return "second enrollment";
+                // IPv6: one network (/64) counts as one place; an IPv4 address written as IPv6 is that IPv4 address
+                for (int i = 0; i < CureServer.MaxBadEnrollPerHour; i++) if (enroll("wrong", "X", "2001:db8:1:2::" + (i + 1).ToString("x")) != 403) return "v6 wrong token " + i;
+                if (enroll("wrong", "X", "2001:db8:1:2:ffff::7") != 429) return "a /64 is one place";
+                if (enroll("wrong", "X", "2001:db8:1:3::1") != 403) return "another /64 isn't stopped";
+                if (CureServer.Source("::ffff:10.0.0.9") != "10.0.0.9" || CureServer.Source("10.0.0.9") != "10.0.0.9") return "mapped v4";
                 var pcs = srv.Pcs();
                 if (pcs.Count != 2 || pcs.Any(p => !(bool)p["twice"]) || !pcs.All(p => (string)p["ip"] != "")) return "enrolled twice isn't shown";
                 if (!(bool)srv.Pc((string)pcs[0]["id"])["twice"]) return "pc page";
@@ -356,6 +364,15 @@ namespace CDriveCleaner
                 if (b != new System.Drawing.Rectangle(566, 128, 800, 600)) return "off the edge: " + b;
                 var c = WindowFit.Fit(new System.Drawing.Rectangle(100, 100, 800, 600), work);
                 if (c != new System.Drawing.Rectangle(100, 100, 800, 600)) return "a window that fits moved";
+                // moved by you: where you put it stays (half past the right edge, onto another monitor); only a lost title bar is brought back
+                var d = WindowFit.Reachable(new System.Drawing.Rectangle(900, 200, 800, 600), work, 31, 120);
+                if (d != new System.Drawing.Rectangle(900, 200, 800, 600)) return "a window you moved half off the screen was moved back: " + d;
+                var e2 = WindowFit.Reachable(new System.Drawing.Rectangle(300, -50, 800, 600), work, 31, 120);
+                if (e2.Top != 0 || e2.Left != 300) return "a title bar above the screen: " + e2;
+                var f2 = WindowFit.Reachable(new System.Drawing.Rectangle(-790, 720, 800, 600), work, 31, 120);
+                if (f2.Top != 728 - 31 || f2.Right != 120) return "a window almost off the left and bottom: " + f2;
+                var g2 = WindowFit.Reachable(new System.Drawing.Rectangle(0, 0, 1700, 900), work, 31, 120);
+                if (g2.Width != 1366 || g2.Height != 728) return "bigger than the screen after a resize: " + g2;
                 bool keepUi = MainForm.ForceWindowsUi; MainForm.ForceWindowsUi = true;
                 try
                 {
