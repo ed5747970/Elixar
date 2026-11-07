@@ -40,7 +40,14 @@ namespace CDriveCleaner
             int fails = 0;
             if (Lx.On) Catalog.WindowsOnLinux = true;   // sections 1-4 check Windows' lists and logic; 4L checks Linux
             var failed = new List<string>();
-            Action<bool, string> check = (ok, what) => { rep.AppendLine((ok ? "PASS  " : "FAIL  ") + what); if (!ok) { fails++; failed.Add(what); } };
+            // each finished check is also written at once (a test PC's run that gets stuck still shows how far it got)
+            string progress = null;
+            try { progress = Win.IsWindows ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "selftest-progress.txt") : null; if (progress != null) File.WriteAllText(progress, ""); } catch { progress = null; }
+            Action<bool, string> check = (ok, what) =>
+            {
+                rep.AppendLine((ok ? "PASS  " : "FAIL  ") + what); if (!ok) { fails++; failed.Add(what); }
+                if (progress != null) try { File.AppendAllText(progress, (ok ? "PASS  " : "FAIL  ") + what + "\r\n"); } catch { }
+            };
             rep.AppendLine("Elixar self-test  " + DateTime.Now.ToString("s") + "   (Elixar " + typeof(SelfTest).Assembly.GetName().Version + ", made by Elisar)");
             rep.AppendLine("System: " + OsInfo.Current.Name + "   (" + Environment.OSVersion + ")   .NET: " + Environment.Version + "   64-bit process: " + Environment.Is64BitProcess + "   admin: " + Sys.IsAdmin());
             rep.AppendLine();

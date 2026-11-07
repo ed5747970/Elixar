@@ -53,7 +53,7 @@ namespace CDriveCleaner
                 }
             return s;
         }
-        public static string DefaultDataDir { get { return Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Elixar"), "CureServer"); } }
+        public static string DefaultDataDir { get { return Path.Combine(Paths.Data, "CureServer"); } }   // inside Elixar's own protected data folder
         public static string HashToken(string token) { using (var sha = SHA256.Create()) return CureProtocol.Hex(sha.ComputeHash(Encoding.UTF8.GetBytes(token ?? ""))); }
         public static string NewToken() { return Convert.ToBase64String(CureProtocol.NewKey()).Replace('+', '-').Replace('/', '_').TrimEnd('='); }
 

@@ -65,3 +65,7 @@ jobs:
           path: |
             out/selftest-report.txt
             out/business/selftest-report.txt
+            out/selftest-progress.txt
+            out/business/selftest-progress.txt
+            out/selftest-hang.png
+            out/business/selftest-hang.png

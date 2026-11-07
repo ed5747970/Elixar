@@ -52,9 +52,26 @@ Write-Host "Built $biz, CureAgent.exe and CureServer.exe (Elixar for Business)"
 if ($SelfTest) {
     $failed = 0
     foreach ($e in @($exe, $biz)) {
-        $p = Start-Process -FilePath $e -ArgumentList "--selftest", "--quiet" -Wait -PassThru
+        $p = Start-Process -FilePath $e -ArgumentList "--selftest", "--quiet" -PassThru
+        $null = $p.Handle   # keeps the exit code readable
         $report = Join-Path (Split-Path $e) "selftest-report.txt"
+        $progress = Join-Path (Split-Path $e) "selftest-progress.txt"
         Write-Host "===== Self-test: $e"
+        if (-not $p.WaitForExit(15 * 60 * 1000)) {
+            # stuck (a window waiting for a click?): a picture of the screen, the last checks it finished, then stop it
+            Write-Host "Self-test still running after 15 minutes: stopped. The last checks it finished:"
+            try {
+                Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+                $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+                $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+                [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+                $bmp.Save((Join-Path (Split-Path $e) "selftest-hang.png"))
+            } catch { Write-Host "No screen picture: $_" }
+            if (Test-Path $progress) { Get-Content $progress -Tail 8 }
+            try { $p.Kill() } catch { }
+            $failed += 1000
+            continue
+        }
         if (Test-Path $report) { Get-Content $report }
         if ($p.ExitCode -ne 0) { $failed += $p.ExitCode }
     }

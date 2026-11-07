@@ -149,7 +149,7 @@ namespace CDriveCleaner
             return err;
         }
 
-        // robocopy (part of Windows) copies the folder to another drive; links inside it are not followed
+        // copies the folder to another drive, into a new folder only administrators can change
         public static Func<string, string, string> CopyOverride;
         public static string CopyTo(OldProfile p, string destRoot)
         {
@@ -159,9 +159,11 @@ namespace CDriveCleaner
             if (CopyOverride != null) return CopyOverride(p.Folder, dest);
             string bad = PrepareCopyFolder(destRoot, dest);
             if (bad != null) return bad;
-            string o = Sys.Run("robocopy.exe", Sys.ArgQuote(p.Folder) + " " + Sys.ArgQuote(dest) + " /E /XJ /R:1 /W:1 /COPY:DAT /DCOPY:T /NP /NFL /NDL", 6 * 3600 * 1000);
-            // robocopy says ERROR on a file it couldn't copy; codes 8+ mean failures
-            return o.Contains(" ERROR ") ? (Lang.Hebrew ? "חלק מהקבצים לא הועתקו: " : "Some files were not copied: ") + dest : null;
+            // file by file through checked handles: a folder on the way renamed or swapped for a link meanwhile can't send
+            // the copied files somewhere else (a copy by folder names, like robocopy's, could be)
+            var r = Mover.CopyChecked(p.Folder, dest);
+            if (r.Failed == 0) return null;
+            return (Lang.Hebrew ? r.Failed + " קבצים לא הועתקו (בשימוש, ארוכים מדי או קישורים). העותק: " : r.Failed + " files were not copied (in use, too long or links). The copy: ") + dest;
         }
 
         // The copy runs as administrator, so it goes into a new folder Elixar makes itself: on NTFS only administrators can

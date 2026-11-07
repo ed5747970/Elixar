@@ -342,6 +342,14 @@ namespace CDriveCleaner
             return r;
         }
 
+        // a copy where every file is read and written through checked handles (links are skipped, never followed)
+        public static Result CopyChecked(string src, string dst)
+        {
+            var r = new Result(); var copied = new List<string>();
+            CopyTree(src, dst, r, copied, null);
+            return r;
+        }
+
         static void CopyTree(string src, string dst, Result r, List<string> copied, Action<string> log)
         {
             DirectoryInfo di;
@@ -422,14 +430,23 @@ namespace CDriveCleaner
                     }
                     continue;
                 }
-                SafeFile.MakeDir(cur);
-                if (!acl) continue;
+                // made with its rights in one step: setting them afterwards, by name, could land on whatever another account
+                // put there a moment later (a link to one of Windows' folders, say)
                 try
                 {
                     bool usersLevel = i == 0 && parts.Count >= 2 && parts[0].Equals("Users", StringComparison.OrdinalIgnoreCase);
-                    new DirectoryInfo(cur).SetAccessControl(usersLevel ? UsersAcl() : PrivateAcl(me));
+                    if (acl) Directory.CreateDirectory(cur, usersLevel ? UsersAcl() : PrivateAcl(me)); else Directory.CreateDirectory(cur);
                 }
-                catch (Exception e) { return cur + ": couldn't be made private (" + e.Message + ")."; }
+                catch (Exception e) { return cur + ": couldn't be made (" + e.Message + ")."; }
+                if (!SafeDelete.NoLinks(cur)) return cur + " is a link to another place.";
+                if (!acl) continue;
+                try
+                {
+                    var made = new DirectoryInfo(cur).GetAccessControl();
+                    if (!TrustedOwner((System.Security.Principal.SecurityIdentifier)made.GetOwner(typeof(System.Security.Principal.SecurityIdentifier)), me) || !made.AreAccessRulesProtected)
+                        return cur + " was made by someone else at the same moment.";
+                }
+                catch (Exception e) { return cur + ": couldn't be checked (" + e.Message + ")."; }
             }
             return null;
         }

@@ -599,13 +599,20 @@ namespace CDriveCleaner
                 FILE_BASIC_INFO bi;
                 if (!GetFileInformationByHandleEx(h, 0, out bi, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO)))) return false;
                 if ((bi.FileAttributes & ATTR_DIRECTORY) == 0 || (bi.FileAttributes & ATTR_REPARSE) != 0) return false;   // a file or a link: not this
+                bool cleared = false;
                 if ((bi.FileAttributes & 0x7) != 0)   // read-only, hidden, system
                 {
                     var clear = new FILE_BASIC_INFO { FileAttributes = ATTR_DIRECTORY };
-                    SetFileInformationByHandle(h, 0, ref clear, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO)));
+                    cleared = SetFileInformationByHandle(h, 0, ref clear, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO)));
                 }
                 var disp = new FILE_DISPOSITION_INFO { DeleteFile = true };
-                return SetFileInformationByHandle(h, 4, ref disp, 1);   // fails when the folder isn't empty
+                if (SetFileInformationByHandle(h, 4, ref disp, 1)) return true;   // fails when the folder isn't empty
+                if (cleared)   // it stays: as it was (hidden or system folders stay so)
+                {
+                    var back = new FILE_BASIC_INFO { FileAttributes = bi.FileAttributes };
+                    SetFileInformationByHandle(h, 0, ref back, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO)));
+                }
+                return false;
             }
         }
 

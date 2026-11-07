@@ -281,6 +281,20 @@ namespace CDriveCleaner
                     return null;
                 });
 
+            Run(check, "Attack review: an old account's copy is made file by file through checked handles into a new folder", () =>
+            {
+                string dir = Path.Combine(root, "acctcopy2-1266"); if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                string src = Path.Combine(Path.Combine(dir, "Users"), "dana"), dst = Path.Combine(dir, "backup");
+                Directory.CreateDirectory(Path.Combine(src, "Documents")); Directory.CreateDirectory(dst);
+                File.WriteAllText(Path.Combine(Path.Combine(src, "Documents"), "a.txt"), "dana's file");
+                var e = OldAccounts.CopyTo(new OldProfile { Folder = src, Name = "dana" }, dst);
+                if (e != null) return "copy: " + e;
+                var made = Directory.GetDirectories(dst);
+                if (made.Length != 1 || !Path.GetFileName(made[0]).StartsWith("Elixar account copy - dana")) return "folder: " + string.Join(",", made);
+                if (File.ReadAllText(Path.Combine(Path.Combine(made[0], "Documents"), "a.txt")) != "dana's file") return "content";
+                return null;
+            });
+
             Run(check, "Attack review: Move off C: replaces a same-size file someone put in the new place (only an identical file counts as copied)", () =>
             {
                 string dir = Path.Combine(root, "move-1266"); if (Directory.Exists(dir)) Directory.Delete(dir, true);
