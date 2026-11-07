@@ -21,7 +21,6 @@ namespace CDriveCleaner
 {
     static class Program
     {
-        [STAThread]
         // What Elixar passes on when it asks Windows for administrator rights: only --install or --uninstall, which then ask
         // you on screen. Never --quiet or --purge: any program, even one without administrator rights, can start Elixar, and
         // Windows would then show Elixar's usual prompt, so one "Yes" would remove Elixar and its Undo backups unseen.
@@ -30,6 +29,7 @@ namespace CDriveCleaner
             return string.Join(" ", (args ?? new string[0]).Where(x => x == "--install" || x == "--uninstall").Distinct());
         }
 
+        [STAThread]   // must stay right above Main: Windows' windows and dialogs need it
         static int Main(string[] args)
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs

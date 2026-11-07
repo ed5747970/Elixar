@@ -336,6 +336,14 @@ namespace CDriveCleaner
                     return null;
                 });
 
+            Run(check, "Elixar starts its windows the way Windows needs (one-thread mode on Main)", () =>
+            {
+                var main = typeof(Program).GetMethod("Main", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                if (main == null || main.GetCustomAttributes(typeof(STAThreadAttribute), false).Length == 0) return "Main has lost [STAThread]";
+                if (Win.IsWindows && Thread.CurrentThread.GetApartmentState() != ApartmentState.STA) return "running in " + Thread.CurrentThread.GetApartmentState();
+                return null;
+            });
+
             Run(check, "Attack review: another program can't borrow Elixar's administrator rights through Windows' prompt (quiet uninstall, --purge, command-line changes are confirmed)", () =>
             {
                 if (Program.ElevationArgs(new[] { "--uninstall", "--quiet", "--purge" }) != "--uninstall") return "elevation passes: " + Program.ElevationArgs(new[] { "--uninstall", "--quiet", "--purge" });
