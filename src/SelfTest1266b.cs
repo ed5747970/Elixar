@@ -281,6 +281,47 @@ namespace CDriveCleaner
                     return null;
                 });
 
+            Run(check, "Attack review: Move off C: replaces a same-size file someone put in the new place (only an identical file counts as copied)", () =>
+            {
+                string dir = Path.Combine(root, "move-1266"); if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                string from = Path.Combine(dir, "from"), to = Path.Combine(dir, "to");
+                Directory.CreateDirectory(from); Directory.CreateDirectory(to);
+                File.WriteAllText(Path.Combine(from, "report.docx"), "my real report");
+                File.WriteAllText(Path.Combine(to, "report.docx"), "planted file!!");   // same length, other content
+                File.WriteAllText(Path.Combine(from, "same.txt"), "identical"); File.WriteAllText(Path.Combine(to, "same.txt"), "identical");
+                var r = Mover.Move(from, to, x => true, null);
+                if (!r.Switched || r.Failed != 0) return "move: " + string.Join("; ", r.Problems);
+                if (File.ReadAllText(Path.Combine(to, "report.docx")) != "my real report") return "the planted file was kept and the real one deleted";
+                if (File.ReadAllText(Path.Combine(to, "same.txt")) != "identical") return "identical file";
+                if (!Mover.SameContent(Path.Combine(to, "same.txt"), Path.Combine(to, "same.txt")) || Mover.SameContent(Path.Combine(to, "same.txt"), Path.Combine(to, "report.docx"))) return "compare";
+                return null;
+            });
+
+            if (Win.IsWindows)
+                Run(check, "Attack review: Move off C: never uses a folder another account made; the folders it makes are private like C:\\Users\\you", () =>
+                {
+                    System.Security.Principal.SecurityIdentifier me; using (var id = System.Security.Principal.WindowsIdentity.GetCurrent()) me = id.User;
+                    var users = new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinUsersSid, null);
+                    var admins = new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid, null);
+                    if (Mover.TrustedOwner(users, me) || Mover.TrustedOwner(null, me) || Mover.TrustedOwner(new System.Security.Principal.SecurityIdentifier("S-1-5-21-1-2-3-1009"), me)) return "another account counted as yours";
+                    if (!Mover.TrustedOwner(me, me) || !Mover.TrustedOwner(admins, me)) return "you or administrators";
+                    string dir = Path.Combine(root, "movetarget-1266"); if (Directory.Exists(dir)) Directory.Delete(dir, true); Directory.CreateDirectory(dir);
+                    string to = Path.Combine(Path.Combine(dir, "me"), "Videos");
+                    var e = Mover.PrepareTarget(to);
+                    if (e != null || !Directory.Exists(to)) return "prepare: " + e;
+                    if (new DriveInfo(Path.GetPathRoot(dir)).DriveFormat == "NTFS")
+                    {
+                        var ds = new DirectoryInfo(Path.Combine(dir, "me")).GetAccessControl();
+                        if (!ds.AreAccessRulesProtected) return "the new folder still takes other accounts' rights from above";
+                        foreach (System.Security.AccessControl.FileSystemAccessRule rule in ds.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier)))
+                        {
+                            var sid = (System.Security.Principal.SecurityIdentifier)rule.IdentityReference;
+                            if (!sid.Equals(me) && !sid.IsWellKnown(System.Security.Principal.WellKnownSidType.LocalSystemSid) && !sid.Equals(admins)) return "someone else has rights: " + sid.Value;
+                        }
+                    }
+                    return null;
+                });
+
             Run(check, "Old accounts and alerts in the window: the Tools page lists old accounts with nothing ticked; Automation has the alerts box, fixed when the policy sets it", () =>
             {
                 string me = Dom + "1001";

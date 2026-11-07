@@ -324,7 +324,8 @@ namespace CDriveCleaner
         {
             var r = new Result();
             if (!Directory.Exists(from)) { r.Problems.Add("Folder not found: " + from); return r; }
-            Directory.CreateDirectory(to);
+            string unsafeWhy = PrepareTarget(to);
+            if (unsafeWhy != null) { r.Problems.Add(unsafeWhy + " Nothing was changed."); return r; }
             var copied = new List<string>();
             CopyTree(from, to, r, copied, log);
             if (r.Failed > 0) { r.Problems.Insert(0, r.Failed + " files could not be copied; nothing was changed. Close programs using them and try again."); return r; }
@@ -353,9 +354,11 @@ namespace CDriveCleaner
                 string target = Path.Combine(dst, f.Name);
                 try
                 {
-                    if (!(File.Exists(target) && new FileInfo(target).Length == f.Length))
+                    // a file already there counts only if it is the same, byte for byte (same size isn't enough:
+                    // it may be another version, or something someone else put there)
+                    if (!(File.Exists(target) && SameContent(f.FullName, target)))
                     {
-                        if (File.Exists(target)) Fs.Delete(target);
+                        if (File.Exists(target)) { if (Win.IsWindows) SafeDelete.Delete(target); else Del(target); }
                         SafeFile.Copy(f.FullName, target);   // read and written through checked handles: a link can't redirect it
                     }
                     if (new FileInfo(target).Length != f.Length) throw new IOException("copy is a different size");
@@ -367,6 +370,109 @@ namespace CDriveCleaner
         }
 
         static bool Del(string f) { File.SetAttributes(f, FileAttributes.Normal); File.Delete(f); return true; }
+
+        public static bool SameContent(string a, string b)
+        {
+            try
+            {
+                using (var x = new FileStream(a, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var y = new FileStream(b, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                {
+                    if (x.Length != y.Length) return false;
+                    var bx = new byte[1 << 20]; var by = new byte[1 << 20];
+                    while (true)
+                    {
+                        int n = x.Read(bx, 0, bx.Length);
+                        if (n == 0) return true;
+                        int m = 0; while (m < n) { int k = y.Read(by, m, n - m); if (k == 0) return false; m += k; }
+                        for (int i = 0; i < n; i++) if (bx[i] != by[i]) return false;
+                    }
+                }
+            }
+            catch { return false; }
+        }
+
+        // The new place becomes one of your folders, so it has to be yours. On a drive other than C:, Windows lets every
+        // account on the PC make and change folders at the top. So: never into a folder (or one on the way) that another
+        // account made, which could read, change or swap your files; the folders Elixar makes are set up like C:\Users
+        // (Users) and like your own folder there (only you, Windows and administrators).
+        public static string PrepareTarget(string to)
+        {
+            if (!Win.IsWindows) { Directory.CreateDirectory(to); return null; }
+            string full = Path.GetFullPath(to).TrimEnd('\\');
+            string root = Path.GetPathRoot(full);
+            string fs = ""; try { fs = new DriveInfo(root).DriveFormat ?? ""; } catch { }
+            bool acl = fs.Equals("NTFS", StringComparison.OrdinalIgnoreCase) || fs.Equals("ReFS", StringComparison.OrdinalIgnoreCase);
+            System.Security.Principal.SecurityIdentifier me;
+            using (var id = System.Security.Principal.WindowsIdentity.GetCurrent()) me = id.User;
+            var parts = full.Substring(root.Length).Split('\\').Where(x => x.Length > 0).ToList();
+            string cur = root.TrimEnd('\\');
+            for (int i = 0; i < parts.Count; i++)
+            {
+                cur = cur + "\\" + parts[i];
+                if (Directory.Exists(cur))
+                {
+                    if (!SafeDelete.NoLinks(cur)) return cur + " is a link to another place.";
+                    if (acl)
+                    {
+                        System.Security.Principal.SecurityIdentifier o = null;
+                        try { o = (System.Security.Principal.SecurityIdentifier)new DirectoryInfo(cur).GetAccessControl(System.Security.AccessControl.AccessControlSections.Owner).GetOwner(typeof(System.Security.Principal.SecurityIdentifier)); } catch { }
+                        if (!TrustedOwner(o, me))
+                            return cur + " was made by another account on this PC" + (o == null ? "" : " (" + AccountName(o) + ")") + ", which could read or change your files there. Choose another drive, or remove that folder first.";
+                    }
+                    continue;
+                }
+                SafeFile.MakeDir(cur);
+                if (!acl) continue;
+                try
+                {
+                    bool usersLevel = i == 0 && parts.Count >= 2 && parts[0].Equals("Users", StringComparison.OrdinalIgnoreCase);
+                    new DirectoryInfo(cur).SetAccessControl(usersLevel ? UsersAcl() : PrivateAcl(me));
+                }
+                catch (Exception e) { return cur + ": couldn't be made private (" + e.Message + ")."; }
+            }
+            return null;
+        }
+
+        static readonly System.Security.Principal.SecurityIdentifier TrustedInstaller = new System.Security.Principal.SecurityIdentifier("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464");
+        public static bool TrustedOwner(System.Security.Principal.SecurityIdentifier o, System.Security.Principal.SecurityIdentifier me)
+        {
+            if (o == null) return false;
+            return o.Equals(me) || o.IsWellKnown(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid) ||
+                   o.IsWellKnown(System.Security.Principal.WellKnownSidType.LocalSystemSid) || o.Equals(TrustedInstaller);
+        }
+        static string AccountName(System.Security.Principal.SecurityIdentifier s)
+        {
+            try { return s.Translate(typeof(System.Security.Principal.NTAccount)).Value; } catch { return s.Value; }
+        }
+        static System.Security.AccessControl.FileSystemAccessRule Rule(System.Security.Principal.IdentityReference who, System.Security.AccessControl.FileSystemRights r)
+        {
+            return new System.Security.AccessControl.FileSystemAccessRule(who, r,
+                System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                System.Security.AccessControl.PropagationFlags.None, System.Security.AccessControl.AccessControlType.Allow);
+        }
+        static System.Security.Principal.SecurityIdentifier Wk(System.Security.Principal.WellKnownSidType t) { return new System.Security.Principal.SecurityIdentifier(t, null); }
+        // like C:\Users: Windows and administrators change it, everyone else can look in
+        public static System.Security.AccessControl.DirectorySecurity UsersAcl()
+        {
+            var ds = new System.Security.AccessControl.DirectorySecurity();
+            ds.SetAccessRuleProtection(true, false);
+            ds.AddAccessRule(Rule(Wk(System.Security.Principal.WellKnownSidType.LocalSystemSid), System.Security.AccessControl.FileSystemRights.FullControl));
+            ds.AddAccessRule(Rule(Wk(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid), System.Security.AccessControl.FileSystemRights.FullControl));
+            ds.AddAccessRule(Rule(Wk(System.Security.Principal.WellKnownSidType.BuiltinUsersSid), System.Security.AccessControl.FileSystemRights.ReadAndExecute));
+            return ds;
+        }
+        // like your folder in C:\Users: you, Windows and administrators
+        public static System.Security.AccessControl.DirectorySecurity PrivateAcl(System.Security.Principal.SecurityIdentifier me)
+        {
+            var ds = new System.Security.AccessControl.DirectorySecurity();
+            ds.SetAccessRuleProtection(true, false);
+            ds.AddAccessRule(Rule(me, System.Security.AccessControl.FileSystemRights.FullControl));
+            ds.AddAccessRule(Rule(Wk(System.Security.Principal.WellKnownSidType.LocalSystemSid), System.Security.AccessControl.FileSystemRights.FullControl));
+            ds.AddAccessRule(Rule(Wk(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid), System.Security.AccessControl.FileSystemRights.FullControl));
+            try { ds.SetOwner(me); } catch { }
+            return ds;
+        }
 
         static void RemoveEmptyDirs(string dir)
         {
