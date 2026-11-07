@@ -23,10 +23,9 @@ namespace CDriveCleaner
         [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
         [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
         [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr p, uint access, out IntPtr token);
-        [DllImport("advapi32.dll", SetLastError = true)] static extern bool GetTokenInformation(IntPtr t, int cls, out int value, int len, out int ret);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool QueryFullProcessImageName(IntPtr h, int flags, StringBuilder name, ref int size);
         [DllImport("kernel32.dll")] static extern bool GetProcessTimes(IntPtr h, out long create, out long exit, out long kernel, out long user);
-        const uint QueryLimited = 0x1000, TokenQuery = 0x0008;
+        const uint QueryLimited = 0x1000, TokenQuery = 0x0008, TokenDuplicate = 0x0002;
 
         // null when the program that started Elixar has administrator rights (or is Windows itself);
         // otherwise its name ("" if it can't be told)
@@ -49,13 +48,14 @@ namespace CDriveCleaner
                     if (GetProcessTimes(h, out pc, out x1, out x2, out x3) && GetProcessTimes(me.Handle, out mc, out x1, out x2, out x3) && pc > mc) return "";
                     var sb = new StringBuilder(1024); int n = sb.Capacity;
                     string name = QueryFullProcessImageName(h, 0, sb, ref n) ? Path.GetFileName(sb.ToString()) : "";
+                    // has it administrator rights in use now? (the same test Elixar uses for itself: with Windows' prompt on, a
+                    // program you start normally has the Administrators group switched off; with the prompt off, it has it on)
                     IntPtr t;
-                    if (!OpenProcessToken(h, TokenQuery, out t)) return name;
+                    if (!OpenProcessToken(h, TokenQuery | TokenDuplicate, out t)) return name;
                     try
                     {
-                        int elevated, ret;
-                        if (!GetTokenInformation(t, 20 /* TokenElevation */, out elevated, 4, out ret)) return name;
-                        return elevated != 0 ? null : name;
+                        using (var id = new System.Security.Principal.WindowsIdentity(t))
+                            return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator) || id.IsSystem ? null : name;
                     }
                     finally { CloseHandle(t); }
                 }
@@ -73,6 +73,7 @@ namespace CDriveCleaner
             if (ParentOverride == null && (!Sys.IsAdmin() || RunsAsSystem())) return true;   // nothing to borrow, or Windows/IT's tools
             string parent = NonAdminParent();
             if (parent == null) return true;
+            if (AskOverride == null && !Environment.UserInteractive) return false;   // nobody could answer: not done
             string text = (Lang.Hebrew
                 ? "תוכנה אחרת" + (parent.Length > 0 ? " (" + parent + ")" : "") + " הפעילה את Elixar עם הרשאות מנהל כדי:\n\n" + what +
                   "\n\nלתוכנה הזו עצמה אין הרשאות מנהל. אשרו רק אם אתם הפעלתם את זה."

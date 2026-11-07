@@ -57,7 +57,12 @@ namespace CDriveCleaner
             if (args.Contains("--selftest"))
             {
                 // made for testing Elixar on a test PC; started by a program without administrator rights, it is confirmed first
-                if (!ParentGuard.Allow(Lang.Hebrew ? "להריץ את הבדיקה העצמית של Elixar (מיועדת למחשבי בדיקה; יוצרת ומוחקת קבצים והגדרות בדיקה)" : "run Elixar's self-test (made for test PCs; it makes and removes test files and settings)")) return 1;
+                // (no question here: a test run has nobody to answer; it just doesn't run)
+                if (Win.IsWindows && Sys.IsAdmin())
+                {
+                    string asker = ParentGuard.NonAdminParent();
+                    if (asker != null) return 7;   // nothing written: this folder may be one other programs can change
+                }
                 Sys.TryDpiAware();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
