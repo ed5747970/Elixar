@@ -705,6 +705,12 @@ namespace CDriveCleaner
         }
 
         public static HealthReport Check(bool withAppUpdates, Action<string> status) { return Check(withAppUpdates, false, status); }
+        // the daily security alerts' check: runs as you, without administrator rights, so its score is not kept as
+        // PC health's (that one is read with administrator rights and may see more)
+        public static HealthReport CheckQuiet()
+        {
+            return Evaluate(Collect(false, false, null), DateTime.Now, IgnoredKeys());
+        }
         public static HealthReport Check(bool withAppUpdates, bool freshApps, Action<string> status)
         {
             var f = Collect(withAppUpdates, freshApps, status);

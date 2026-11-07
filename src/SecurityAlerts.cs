@@ -94,12 +94,13 @@ namespace CDriveCleaner
             if (!On || (!Win.IsWindows && CheckOverride == null)) return 0;
             try
             {
-                var prev = Health.Remembered();
-                int before = prev == null ? -1 : prev.Total;
-                var r = CheckOverride != null ? CheckOverride() : Health.Check(false, null);
+                // compared with this check's own last score (same account, same rights), not PC health's
+                int before; if (!int.TryParse(Get("SecAlertScore", ""), out before)) before = -1;
+                var r = CheckOverride != null ? CheckOverride() : Health.CheckQuiet();
                 var state = Load();
                 var alerts = Decide(r, state, before, DateTime.Now);
                 Save(state);
+                if (r != null && r.Total >= 0) Set("SecAlertScore", r.Total.ToString(CultureInfo.InvariantCulture));
                 foreach (var a in alerts.Take(3))
                 {
                     if (log != null) log("Security alert: " + a.Title);
@@ -119,7 +120,14 @@ namespace CDriveCleaner
             have.AddRange(alerts.Select(a => DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "\t" + a.Title.Replace("\t", " ") + "\t" + a.Text.Replace("\t", " ")));
             Set("SecAlertMail", string.Join(Sep.ToString(), have.Skip(Math.Max(0, have.Count - 10))));
         }
-        public static List<string> Pending() { return Get("SecAlertMail", "").Split(Sep).Where(x => x.Length > 0).ToList(); }
+        // only alerts from the last 3 days (an old one, say from before email was connected, isn't news)
+        public static List<string> Pending()
+        {
+            return Get("SecAlertMail", "").Split(Sep).Where(x =>
+            {
+                DateTime t; return x.Length > 0 && DateTime.TryParse(x.Split('\t')[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out t) && (DateTime.Now - t).TotalDays <= 3;
+            }).ToList();
+        }
         public static void Sent() { Set("SecAlertMail", ""); }
     }
 }

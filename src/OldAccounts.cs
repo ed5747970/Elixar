@@ -140,7 +140,7 @@ namespace CDriveCleaner
             else
             {
                 string o = Sys.RunPowerShell("$ErrorActionPreference = 'Stop'; try { Get-CimInstance Win32_UserProfile -Filter " + Sys.PsQuote("SID='" + p.Sid + "'") +
-                                             " | Remove-CimInstance; 'OK' } catch { 'ERROR: ' + $_.Exception.Message }", 600000);
+                                             " | Remove-CimInstance; 'OK' } catch { 'ERROR: ' + $_.Exception.Message }", 3600000);   // a big folder takes a while
                 err = o.Contains("OK") && !o.Contains("ERROR") ? null : o.Trim();
             }
             using (ChangeLog.In("Old accounts"))

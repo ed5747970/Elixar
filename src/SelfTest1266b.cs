@@ -98,6 +98,8 @@ namespace CDriveCleaner
                     if (!html.Contains("firewall is off") || !text.Contains("Nothing is changed from an email") || !doc.Subject.Contains("needs you")) return "email: " + doc.Subject;
                     SecurityAlerts.Sent();
                     if (SecurityAlerts.Pending().Count != 0) return "sent, still pending";
+                    store["SecAlertMail"] = "2020-01-01T00:00:00\tOld alert\tfrom long ago";
+                    if (SecurityAlerts.Pending().Count != 0) return "an old alert would be emailed";
                     SecurityAlerts.SetOn(false); store["SecAlertActive"] = "";
                     if (SecurityAlerts.On || SecurityAlerts.Run(null) != 0 || told.Count != 2) return "turned off";
                     SecurityAlerts.SetOn(true);
@@ -107,6 +109,12 @@ namespace CDriveCleaner
                     Policy.OrgOverride = () => new Dictionary<string, string> { { "sec.alerts", "on" } };
                     try { if (!SecurityAlerts.On || !Policy.Fixes("sec.alerts")) return "policy on"; } finally { Policy.OrgOverride = null; }
                     if (Policy.Rule("sec.alerts") == null || Policy.Rule("sec.alerts").Default != "choice") return "policy rule";
+                    // the drop is measured against this check's own last score (it runs without administrator rights)
+                    store.Clear(); told.Clear();
+                    SecurityAlerts.CheckOverride = () => Report(86, false, false, null);
+                    if (SecurityAlerts.Run(null) != 0 || store["SecAlertScore"] != "86") return "first score";
+                    SecurityAlerts.CheckOverride = () => Report(71, false, false, null);
+                    if (SecurityAlerts.Run(null) != 1 || told.Count != 1 || told[0].Key != "drop" || store["SecAlertScore"] != "71") return "drop from its own score";
                     return null;
                 }
                 finally { SecurityAlerts.GetOverride = null; SecurityAlerts.SetOverride = null; SecurityAlerts.CheckOverride = null; SecurityAlerts.NotifyOverride = null; }
