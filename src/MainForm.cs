@@ -119,6 +119,7 @@ namespace CDriveCleaner
             list.Columns.Add("Level", S(80));
             list.Columns.Add("Size", S(90), HorizontalAlignment.Right);
             list.Columns.Add("Change", S(110), HorizontalAlignment.Right);
+            list.Columns.Add("Comes back", S(120));   // how fast it fills up again after a clean (learned on this PC)
             list.Columns.Add("Location", S(500));
 
             var gSafe = new ListViewGroup("Safe - rebuilt automatically", HorizontalAlignment.Left);
@@ -143,6 +144,7 @@ namespace CDriveCleaner
                 tierSub.ForeColor = it.Tier == Tier.Safe ? SafeColor : it.Tier == Tier.Review ? ReviewColor : CautionColor;
                 lvi.SubItems.Add("...");
                 lvi.SubItems.Add("");
+                lvi.SubItems.Add("").ForeColor = Color.DimGray;   // Comes back
                 var locSub = lvi.SubItems.Add(it.Where);
                 locSub.ForeColor = Color.DimGray;
                 lvi.Group = it.Drive != null ? DriveGroup(it.Drive) : it.Privacy ? gPrivacy : it.Tier == Tier.Safe ? gSafe : it.Tier == Tier.Review ? gReview : gCaution;
@@ -559,6 +561,7 @@ namespace CDriveCleaner
                 UpdateTotals();
                 if (t.IsFaulted) Log("Measuring failed: " + t.Exception.GetBaseException().Message);
                 ShowComparison(prev, watch.Elapsed);
+                if (!t.IsFaulted) ShowRegrowth(true);
                 if (!testMode && !t.IsFaulted) SpaceHistory.Record(Sys.Free(), Sys.Total());
                 if (after != null) after();
                 if (MeasureDone != null) MeasureDone();
@@ -953,6 +956,24 @@ namespace CDriveCleaner
             }));
         }
 
+        // the "Comes back" column: after a scan, the sizes teach Elixar how fast each cleaned item fills up again
+        Dictionary<string, RegrowthRecord> regrowth;
+        public void ShowRegrowth(bool observe)
+        {
+            if (observe) Regrowth.Observe(items.Where(i => !i.SizeUnknown).Select(i => new KeyValuePair<string, long>(i.Name, i.Size)), DateTime.Now);
+            regrowth = Regrowth.Load();
+            foreach (var it in items)
+            {
+                ListViewItem row; if (!rows.TryGetValue(it, out row) || row.SubItems.Count < 6) continue;
+                var cell = row.SubItems[4];
+                cell.Text = Regrowth.Label(regrowth, it.Name, DateTime.Now);
+                bool fast = Regrowth.Fast(regrowth, it.Name);
+                cell.ForeColor = fast ? CautionColor : Color.DimGray;
+                row.ToolTipText = fast ? Regrowth.Advice(Lang.T(it.Name)) : "";
+            }
+        }
+        public string ComesBackText(CleanItem it) { ListViewItem r; return rows.TryGetValue(it, out r) ? r.SubItems[4].Text : null; }
+
         void ShowComparison(ScanSnapshot prev, TimeSpan took)
         {
             var now = new ScanSnapshot { Time = DateTime.Now, Free = Sys.Free() };
@@ -1013,6 +1034,10 @@ namespace CDriveCleaner
             var lines = sel.Select(i => "  - " + Lang.T(i.Name) + "  (" + (i.SizeUnknown ? Lang.T("varies") : Fs.Fmt(i.Size)) + ")");
             string msg = Lang.T("Delete these " + sel.Count + " items?") + "\n\n" + string.Join("\n", lines) +
                          "\n\n" + Lang.T("Estimated space freed: " + Fs.Fmt(est)) + "\n\n" + Lang.T("This cannot be undone.");
+            var fastOnes = sel.Where(i => Regrowth.Fast(regrowth, i.Name)).Select(i => Lang.T(i.Name)).ToList();
+            if (fastOnes.Count > 0)
+                msg += "\n\n" + (Lang.Hebrew ? "חוזרים תוך יום-יומיים: " + string.Join(", ", fastOnes) + ". ניקוי שלהם מפנה מקום רק לזמן קצר ומאט את האפליקציות עד שהם מתמלאים שוב."
+                                               : "Back in a day or two: " + string.Join(", ", fastOnes) + ". Cleaning them frees space only for a short while and makes the apps slower until they refill.");
             if (Lang.Box(this, msg, "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
 
             // apps that must be closed first
@@ -1099,10 +1124,11 @@ namespace CDriveCleaner
                 cleaningNow = false;
                 Activity.Add("clean", "Cleaned " + (toRun.Count == 1 ? toRun[0].Name : toRun.Count + " items") + ", freed " + Fs.Fmt(total), total);
                 SetBusy(false);
+                long freeAfter = Sys.Free();
                 StartMeasure(() =>
                 {
                     RefreshDashboard();
-                    Lang.Box(this, "Done. Freed " + Fs.Fmt(total) + " on C:.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    Lang.Box(this, Results.AfterClean(total, Math.Max(0, freeAfter - total), freeAfter, Sys.Main), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 });
             }));
         }

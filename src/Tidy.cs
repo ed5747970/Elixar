@@ -231,7 +231,14 @@ namespace CDriveCleaner
                 {
                     Automation.Log("  C: is under " + pct + "% free: running the Safe clean now.");
                     p.LastLowClean = today; p.Save();
-                    Automation.AutoClean(true);
+                    long before = Sys.Free();
+                    Automation.LowClean();
+                    long after = Sys.Free(); bool still;
+                    string text = Automation.LowCleanNotice(before, after, Sys.Total(), pct, out still);
+                    Automation.Log("  " + text);
+                    Automation.Notify(still ? (Lang.Hebrew ? "כונן C: עדיין כמעט מלא" : "Drive C: is still almost full")
+                                            : (Lang.Hebrew ? "Elixar פינה " + Fs.Fmt(Math.Max(0, after - before)) + " כי C: היה כמעט מלא" : "Elixar freed " + Fs.Fmt(Math.Max(0, after - before)) + " because C: was low"),
+                                      text, still ? System.Windows.Forms.ToolTipIcon.Warning : System.Windows.Forms.ToolTipIcon.Info, still);
                 }
             }
             Automation.Log("Daily tidy done.");

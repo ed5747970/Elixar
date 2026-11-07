@@ -222,6 +222,7 @@ namespace CDriveCleaner
         {
             var d = new Doc(L("Your weekly Elixar summary", "הסיכום השבועי של Elixar"), "#5b4cc4");
             HealthLines(d, health);
+            ResultsLines(d);
             SpaceLines(d, free, total);
             try { d.Image(TrendChart.Png(SpaceHistory.Read(), DateTime.Today, 56), L("Free space on C: over the last 8 weeks", "השטח הפנוי ב-C: ב-8 השבועות האחרונים")); } catch { }
             if (lastClean != null) d.P(lastClean);
@@ -241,6 +242,18 @@ namespace CDriveCleaner
             if (todo.Count == 0) { d.P(L("Nothing needs fixing.", "אין מה לתקן.")); return; }
             d.Table(todo.Select(i => new[] { i.Title, Lang.MailT(i.Area), i.Level == HLevel.Bad ? L("important", "חשוב") : L("worth fixing", "כדאי לתקן") }));
             d.P(L("Open Elixar > Dashboard > PC health to fix them. Nothing is changed from an email.", "פתחו את Elixar > לוח בקרה > בריאות המחשב כדי לתקן. שום דבר לא משתנה מתוך מייל."));
+        }
+
+        // "Did it help?": what Elixar did for this PC, measured (Dashboard > What Elixar did for you)
+        public static Func<ResultsSummary> ResultsOverride;   // self-test
+        static void ResultsLines(Doc d)
+        {
+            ResultsSummary r;
+            try { r = ResultsOverride != null ? ResultsOverride() : Results.Read(); } catch { return; }
+            if (r == null || !r.Any) return;
+            d.Big(L("What Elixar did for you", "מה Elixar עשה בשבילך"), Results.Headline(r, DateTime.Now), "#5b4cc4");
+            var more = Results.Details(r);
+            if (more.Count > 0) d.P(string.Join(" · ", more));
         }
 
         // the folders that keep growing, with how often to look at them (Dashboard > Watch)

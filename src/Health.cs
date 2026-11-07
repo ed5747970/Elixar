@@ -539,6 +539,7 @@ namespace CDriveCleaner
 
             say("Reading startup times and memory...");
             try { f.Startup = StartupImpact.Read(); } catch { }
+            if (f.Startup != null) Results.RecordBoots(f.Startup.Boots);   // Windows keeps only its last few: "Did it help?" needs the older ones too
             try
             {
                 var m = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX)) };
@@ -677,6 +678,7 @@ namespace CDriveCleaner
         public static void Remember(HealthReport r)
         {
             if (r == null || r.Total < 0) return;
+            Results.RecordHealth(r.Total, r.At);
             try { Settings.Set("HealthLast", r.Total + "|" + r.At.ToString("s", CultureInfo.InvariantCulture) + "|" + string.Join(",", HealthReport.Areas.Select(a => r.Scores[a])) + "|" + r.ToFix); } catch { }
         }
         public static HealthReport Remembered()
@@ -703,6 +705,75 @@ namespace CDriveCleaner
             var r = Evaluate(f, DateTime.Now, IgnoredKeys());
             Remember(r);
             return r;
+        }
+
+        // ---- "Fix all safe": only the fixes that already have a one-click button, after a restore point ----
+        // Not included (they need you): app updates (an open app may be closed), restarts, Windows Update, BitLocker,
+        // Secure Boot, start-up apps (only you know which you use), and anything you chose to ignore.
+        public class SafePlan
+        {
+            public bool Power; public List<CleanItem> Clean = new List<CleanItem>(); public long CleanBytes;
+            public int Count { get { return 1 + (Power ? 1 : 0) + (Clean.Count > 0 ? 1 : 0); } }   // the restore point always comes first
+            public bool Worth { get { return Power || Clean.Count > 0; } }
+        }
+        public const long MinSafeClean = 50L << 20;   // under 50 MB a clean isn't worth listing
+
+        public static SafePlan PlanSafe(HealthReport r, bool measure)
+        {
+            var p = new SafePlan();
+            if (r == null) return p;
+            p.Power = r.Items.Any(i => i.Key == "power" && i.Act == HAct.PowerBalanced && !i.Ignored && i.Level != HLevel.Ok && i.Penalty > 0);
+            if (!measure) return p;
+            var items = new List<CleanItem>();
+            try { items = Automation.AutoItems(); } catch { }
+            var grow = Regrowth.Load();
+            foreach (var it in items)
+            {
+                if (Regrowth.Fast(grow, it.Name)) continue;   // back in a day or two: not worth it
+                long v; try { v = it.Measure(); } catch { continue; }
+                if (v <= 0) continue;
+                it.Size = v; p.Clean.Add(it); p.CleanBytes += v;
+            }
+            if (p.CleanBytes < MinSafeClean) { p.Clean.Clear(); p.CleanBytes = 0; }
+            return p;
+        }
+
+        public static List<string> PlanLines(SafePlan p)
+        {
+            var l = new List<string> { H("Make a restore point first", "ליצור קודם נקודת שחזור") };
+            if (p.Power) l.Add(H("Switch the power plan to Balanced", "להעביר את תוכנית החשמל ל'מאוזנת'"));
+            if (p.Clean.Count > 0) l.Add(H("Clean the Safe items, like the weekly clean (" + Fs.Fmt(p.CleanBytes) + ")", "לנקות את הפריטים הבטוחים, כמו בניקוי השבועי (" + Fs.Fmt(p.CleanBytes) + ")"));
+            return l;
+        }
+
+        // does them one after the other; returns what happened, in a few words
+        public static string DoSafe(SafePlan p, Action<string> log)
+        {
+            var done = new List<string>();
+            using (ChangeLog.In("PC health"))
+            {
+                string rp = MakeRestorePoint();
+                if (log != null) log(rp);
+                done.Add(rp.StartsWith("Restore point created", StringComparison.OrdinalIgnoreCase) ? H("restore point made", "נקודת שחזור נוצרה") : H("no restore point (" + rp + ")", "בלי נקודת שחזור (" + rp + ")"));
+                if (p.Power)
+                {
+                    string e = UseBalanced();
+                    done.Add(e == null ? H("power plan Balanced", "תוכנית חשמל מאוזנת") : H("power plan not changed (" + e + ")", "תוכנית החשמל לא שונתה (" + e + ")"));
+                }
+                if (p.Clean.Count > 0)
+                {
+                    long start = Sys.Free();
+                    foreach (var it in p.Clean)
+                    {
+                        if (it.Procs.Length > 0 && Sys.FindProcesses(it.Procs).Count > 0) { if (log != null) log("Skipped " + it.Name + " (the app is open)."); continue; }
+                        long before = Sys.Free(); string problem = null;
+                        try { it.Clean(log ?? (m => { })); } catch (Exception ex) { problem = ex.Message; }
+                        ChangeLog.Cleaned(it, Math.Max(0, Sys.Free() - before), problem, "PC health: Fix all safe");
+                    }
+                    done.Add(H(Fs.Fmt(Math.Max(0, Sys.Free() - start)) + " freed", "פונו " + Fs.Fmt(Math.Max(0, Sys.Free() - start))));
+                }
+            }
+            return string.Join(", ", done);
         }
     }
 }

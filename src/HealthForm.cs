@@ -95,7 +95,11 @@ namespace CDriveCleaner
     {
         readonly Func<int, int> S; readonly bool testMode;
         readonly Action<HAct> go;   // Elixar's own tools (the window closes first)
-        readonly HealthRing ring; readonly Label head, sub, status; readonly Segmented areas; readonly FlowLayoutPanel list; readonly Button btnAgain;
+        readonly HealthRing ring; readonly Label head, sub, status; readonly Segmented areas; readonly FlowLayoutPanel list; readonly Button btnAgain, btnFixAll;
+        Health.SafePlan plan; int planFor = -1;
+        public Health.SafePlan Plan { get { return plan; } }
+        public bool FixAllShown { get { return btnFixAll.Visible; } }
+        public string FixAllText { get { return btnFixAll.Text; } }
         HealthReport report; string[] tabNames = new string[0];
         public HealthReport Report { get { return report; } }
         public string StatusText { get { return status.Text; } }
@@ -132,8 +136,10 @@ namespace CDriveCleaner
                                  Text = Lang.T("Score: each area 0-100 from what was found; Security and Stability count most. No registry cleaner, no \"RAM booster\", nothing downloaded from driver sites.") };
             var bottom = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
             btnAgain = new Button { Text = Lang.T("Check again"), AutoSize = true, Enabled = false };
+            btnFixAll = new Button { Text = Lang.T("Fix all safe"), AutoSize = true, Visible = false, Font = new Font("Segoe UI Semibold", 9.5f) };
             var close = new Button { Text = Lang.T("Close"), AutoSize = true, DialogResult = DialogResult.Cancel };
-            bottom.Controls.AddRange(new Control[] { btnAgain, close });
+            bottom.Controls.AddRange(new Control[] { btnFixAll, btnAgain, close });
+            btnFixAll.Click += (o, e) => FixAllSafe();
             root.Controls.Add(top, 0, 0); root.Controls.Add(areas, 0, 1); root.Controls.Add(list, 0, 2); root.Controls.Add(status, 0, 3); root.Controls.Add(bottom, 0, 4);
             Controls.Add(root); CancelButton = close;
             btnAgain.Click += (o, e) => StartCheck();
@@ -176,8 +182,64 @@ namespace CDriveCleaner
             }
             areas.Selected = keep; areas.FitWidth(); areas.Invalidate();
             ShowArea();
+            PlanFixAll();
             if (Checked != null) Checked();
         }
+
+        // "Fix all safe (n)": what it would do is worked out right after each check (measuring the Safe items takes a moment)
+        void PlanFixAll()
+        {
+            var r = report; int at = r.GetHashCode(); planFor = at;
+            var quick = Health.PlanSafe(r, false);
+            plan = quick; ShowFixAll();
+            bool measure = !testMode || MeasureInTest;
+            if (!measure) return;
+            Task.Factory.StartNew(() => Health.PlanSafe(r, true), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            {
+                if (planFor != at || t.IsFaulted) return;
+                plan = t.Result; ShowFixAll();
+                if (Planned != null) Planned();
+            }));
+        }
+        public static bool MeasureInTest;   // self-test: measure the Safe items too
+        public event Action Planned;
+
+        void ShowFixAll()
+        {
+            btnFixAll.Visible = plan != null && plan.Worth;
+            if (plan != null) btnFixAll.Text = Lang.T("Fix all safe") + " (" + plan.Count + ")";
+        }
+
+        public void FixAllSafe()
+        {
+            if (plan == null || !plan.Worth) return;
+            var lines = Health.PlanLines(plan);
+            string msg = (Lang.Hebrew ? "Elixar יעשה את " + lines.Count + " הדברים האלה:" : "Elixar will do these " + lines.Count + " things:") + "\n\n" +
+                         string.Join("\n", lines.Select(l => "  - " + l)) + "\n\n" +
+                         (Lang.Hebrew ? "לא כלול (הם צריכים אותך): עדכוני אפליקציות, הפעלה מחדש, Windows Update, BitLocker, Secure Boot, אפליקציות בהפעלה, ומה שבחרת להתעלם ממנו."
+                                      : "Not included (they need you): app updates, restarts, Windows Update, BitLocker, Secure Boot, start-up apps, and anything you chose to ignore.");
+            if (!testMode && Lang.Box(this, msg, "Elixar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            int before = report == null ? -1 : report.Total;
+            var p = plan;
+            status.Text = Lang.T("Fixing..."); foreach (var b in Buttons) b.Enabled = false; btnFixAll.Enabled = false; btnAgain.Enabled = false;
+            Task.Factory.StartNew(() => Health.DoSafe(p, null), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
+            {
+                foreach (var b in Buttons) b.Enabled = true; btnFixAll.Enabled = true;
+                string done = t.IsFaulted ? Lang.T("Couldn't finish: " + t.Exception.GetBaseException().Message) : (Lang.Hebrew ? "בוצע: " : "Done: ") + t.Result + ".";
+                status.Text = done;
+                if (Acted != null) Acted();
+                // measure again: did it help?
+                Action after = null;
+                after = () =>
+                {
+                    Checked -= after;
+                    if (before >= 0 && report != null) status.Text = done + "  " + (Lang.Hebrew ? "בריאות המחשב: " : "PC health: ") + before + " \u2192 " + report.Total;
+                };
+                Checked += after;
+                if (!testMode) StartCheck(); else if (FixedInTest != null) FixedInTest();
+            }));
+        }
+        public event Action FixedInTest;   // self-test
 
         public void SelectArea(string a) { int i = Array.IndexOf(tabNames, a); if (i >= 0) { areas.Selected = i; areas.Invalidate(); ShowArea(); } }
 

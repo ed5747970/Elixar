@@ -70,6 +70,7 @@ namespace CDriveCleaner
             R("drivers.remove", "What Elixar may change", "Remove drivers", "Tools > Drivers: old and unused driver packages.", "allow", Allow),
             R("phone", "What Elixar may change", "Phone tools", "The Phone tab: clean, move files and remove apps on a phone.", "allow", Allow),
             R("sysprep", "What Elixar may change", "Sysprep and golden image tools", "Tools > Sysprep: fixes, answer files, image cleanup.", "allow", Allow),
+            R("installers", "What Elixar may change", "Leftover installer files", "Tools > Leftover installers: old installer copies no program uses, moved to Undo.", "allow", Allow),
             R("wipe", "What Elixar may change", "Secure wipe", "Tools > Secure wipe: wipe free space and shred files (can't be undone).", "allow", Allow),
             R("email", "What Elixar may change", "Email", "Connect an email account, reports and Gmail cleaning.", "allow", Allow),
             R("updates.check", "What Elixar may change", "Check for Elixar updates", "Once a week and when you ask, from GitHub (api.github.com). Not allowed: Elixar never connects for updates; IT updates it.", "allow", Allow),

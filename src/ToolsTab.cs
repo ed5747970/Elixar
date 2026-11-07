@@ -50,9 +50,9 @@ namespace CDriveCleaner
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
             pageLeft = new TabPage("Leftovers") { BackColor = pageTools.BackColor };
             pageSysprep = new TabPage("Sysprep") { BackColor = pageTools.BackColor };
-            BuildSpaceMap(); BuildTweaks(); BuildRepair(); BuildWipe();
+            BuildSpaceMap(); BuildTweaks(); BuildRepair(); BuildWipe(); BuildInstallers();
             if (LinuxUi) toolsTabs.TabPages.AddRange(new[] { pageMap, pageDups });   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
+            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageInst, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => { OnToolsTab(); RefitText(); };

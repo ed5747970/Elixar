@@ -1888,7 +1888,7 @@ namespace CDriveCleaner
             d["Only what has been in the Trash that long."] = "רק מה שנמצא באשפה זמן כזה.";
             d["Keep files you remove (Smart scan, Duplicates) in Undo for"] = "לשמור קבצים שהסרת (סריקה חכמה, כפילויות) בביטול למשך";
             d["Tools > Undo puts them back, also from USB drives (which have no Recycle Bin). After that they are deleted for good. Undo uses your second drive when you have one, so C: gets its space back right away."] = "כלים > ביטול מחזיר אותם, גם מכונני USB (שאין בהם סל מיחזור). אחרי זה הם נמחקים לצמיתות. הביטול משתמש בכונן השני שלך כשיש כזה, כך ש-C: מקבל את המקום בחזרה מיד.";
-            d["When C: drops under the alert limit, run the Safe clean right away (at most once a day)"] = "כש-C: יורד מתחת לסף ההתראה, להריץ מיד את הניקוי הבטוח (לכל היותר פעם ביום)";
+            d["When C: drops under the alert limit, first run the Safe clean by itself; the alert shows only if C: is still low (at most once a day)"] = "כש-C: יורד מתחת לסף ההתראה, להריץ קודם את הניקוי הבטוח לבד; ההתראה מופיעה רק אם C: עדיין כמעט מלא (לכל היותר פעם ביום)";
             d["Empty old Recycle Bin items now..."] = "לרוקן עכשיו פריטים ישנים מסל המיחזור...";
             d["What you deleted more recently stays in the Recycle Bin."] = "מה שמחקת לאחרונה נשאר בסל המיחזור.";
             d["Nothing is ticked for you. What you pick goes to Undo, so you can get it back (Tools > Undo). Windows, apps, games and AppData are never listed."] = "שום דבר לא מסומן בשבילך. מה שתבחרו עובר לביטול, כך שאפשר להחזיר אותו (כלים > ביטול). Windows, אפליקציות, משחקים ו-AppData לעולם לא מוצגים.";
@@ -2066,6 +2066,25 @@ namespace CDriveCleaner
             d["With Google or Microsoft, Elixar can only send email to you, never read your inbox, until you turn on Email cleaning. Emails list categories and sizes (never your file names) and never contain a link: to delete anything, open Elixar. Your sign-in is kept on this PC in a folder only your account can open (and encrypted, when your desktop has a keyring)."] = "עם Google או Microsoft, Elixar יכול רק לשלוח אליך מיילים, אף פעם לא לקרוא את תיבת הדואר, עד שתפעילו את ניקוי המייל. המיילים מפרטים קטגוריות וגדלים (אף פעם לא שמות של קבצים) ואף פעם לא מכילים קישור: כדי למחוק משהו, פתחו את Elixar. ההתחברות שלך נשמרת במחשב הזה בתיקייה שרק החשבון שלך יכול לפתוח (ומוצפנת, כשיש בשולחן העבודה מחזיק מפתחות).";
             d["Alerts: the system disk is almost full (your limit in Automation, or 15%)"] = "התראות: דיסק המערכת כמעט מלא (הגבול שלך באוטומציה, או 15%)";
             d["Follow the system"] = "לפי המערכת";
+            d["Comes back"] = "חוזר";
+            d["What Elixar did for you"] = "מה Elixar עשה בשבילך";
+            d["Click to see everything Elixar did (Logs)."] = "לחצו כדי לראות את כל מה ש-Elixar עשה (יומן).";
+            d["Fix all safe"] = "תיקון כל הבטוחים";
+            d["Leftover installers"] = "קבצי התקנה שנשארו";
+            d["Leftover installer files"] = "קבצי התקנה שנשארו";
+            d["Look for leftover installers"] = "חיפוש קבצי התקנה שנשארו";
+            d["Open the folder"] = "פתיחת התיקייה";
+            d["From"] = "מקור";
+            d["unknown"] = "לא ידוע";
+            d["Windows keeps a copy of every program's installer in C:\\Windows\\Installer, so it can repair or remove the program later. When programs are removed or updated, old copies often stay. Elixar asks Windows itself which copies are still used and offers only the others. Nothing used by a program or update, nothing changed in the last 30 days, and they go to Undo, not deleted."] = "Windows שומר עותק של קובץ ההתקנה של כל תוכנית ב-C:\\Windows\\Installer, כדי שיוכל לתקן או להסיר אותה בהמשך. כשתוכניות מוסרות או מתעדכנות, עותקים ישנים נשארים לעיתים קרובות. Elixar שואל את Windows עצמו באילו עותקים עדיין משתמשים, ומציע רק את האחרים. שום דבר שתוכנית או עדכון משתמשים בו, שום דבר שהשתנה ב-30 הימים האחרונים, והם עוברים לביטול, לא נמחקים.";
+            d["Asking Windows Installer which installer files the programs and updates on this PC still use..."] = "שואל את Windows Installer באילו קבצי התקנה התוכניות והעדכונים במחשב עדיין משתמשים...";
+            d["Elixar checks them once more right before moving. They wait in Undo: if a program ever asks for its installer, Tools > Undo puts it back."] = "Elixar בודק אותם שוב רגע לפני ההעברה. הם ממתינים בביטול: אם תוכנית תבקש אי פעם את קובץ ההתקנה שלה, כלים > ביטול מחזיר אותו.";
+            d["Windows Installer is busy (something is being installed). Try again in a few minutes."] = "Windows Installer עסוק (משהו מותקן עכשיו). נסו שוב בעוד כמה דקות.";
+            d["Windows Installer's list of programs couldn't be read, so nothing is offered."] = "לא ניתן היה לקרוא את רשימת התוכניות של Windows Installer, ולכן לא מוצע כלום.";
+            d["The registry's list of installed programs couldn't be read, so nothing is offered."] = "לא ניתן היה לקרוא את רשימת התוכניות המותקנות ברישום, ולכן לא מוצע כלום.";
+            d["None of the files in the folder matched Windows' list (that isn't normal), so nothing is offered."] = "אף קובץ בתיקייה לא תאם לרשימה של Windows (זה לא רגיל), ולכן לא מוצע כלום.";
+            d["Only on Windows."] = "רק ב-Windows.";
+            d["Tools > Leftover installers: old installer copies no program uses, moved to Undo."] = "כלים > קבצי התקנה שנשארו: עותקי התקנה ישנים ששום תוכנית לא משתמשת בהם, מועברים לביטול.";
             // texts with numbers in them
             Pat(@"Signed in to OneDrive as (.+) \((.+)\)  ·  (.+)", m => "מחובר ל-OneDrive בתור " + m.Groups[1].Value + " (" + T(m.Groups[2].Value) + ")  ·  " + m.Groups[3].Value);
             Pat(@"On this PC: (.+) of OneDrive files \((.+) marked ""Always keep""\)\. Already online-only: (.+)\.", m => "במחשב הזה: " + m.Groups[1].Value + " של קבצי OneDrive (" + m.Groups[2].Value + " מסומנים \"שמור תמיד\"). כבר רק באינטרנט: " + m.Groups[3].Value + ".");

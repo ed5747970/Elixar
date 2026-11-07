@@ -56,7 +56,7 @@ namespace CDriveCleaner
         // ================= sections: which part of Elixar made each change =================
         public static readonly string[] Sections =
         {
-            "Cleaner", "Check & fix", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
+            "Cleaner", "Check & fix", "PC health", "Installer files", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
             "System space", "Space map", "Repair Windows", "Secure wipe", "Keep in check", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
         };
 
@@ -431,6 +431,7 @@ namespace CDriveCleaner
             {
                 if (it == null) return;
                 if (problem == null && freed > 0) Savings.Add(freed, it.Name);
+                if (problem == null) Regrowth.Cleaned(it.Name, it.Size > 0 && !it.SizeUnknown ? it.Size : freed, DateTime.Now);   // how fast it comes back is learned from here
                 Add("Cleaning", "Cleaned: " + it.Name, it.Where ?? "", "", problem != null ? "Problem" : freed > 0 ? "freed " + Fs.Fmt(freed) : "",
                     (how ?? "") + (problem != null ? " - " + problem : ""), problem != null);
             }

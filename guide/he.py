@@ -1635,7 +1635,7 @@ HE = {
 "Only what has been in the Trash that long.":"רק מה שנמצא באשפה זמן כזה.",
 "Keep files you remove (Smart scan, Duplicates) in Undo for":"לשמור קבצים שהסרת (סריקה חכמה, כפילויות) בביטול למשך",
 "Tools > Undo puts them back, also from USB drives (which have no Recycle Bin). After that they are deleted for good. Undo uses your second drive when you have one, so C: gets its space back right away.":"כלים > ביטול מחזיר אותם, גם מכונני USB (שאין בהם סל מיחזור). אחרי זה הם נמחקים לצמיתות. הביטול משתמש בכונן השני שלך כשיש כזה, כך ש-C: מקבל את המקום בחזרה מיד.",
-"When C: drops under the alert limit, run the Safe clean right away (at most once a day)":"כש-C: יורד מתחת לסף ההתראה, להריץ מיד את הניקוי הבטוח (לכל היותר פעם ביום)",
+"When C: drops under the alert limit, first run the Safe clean by itself; the alert shows only if C: is still low (at most once a day)":"כש-C: יורד מתחת לסף ההתראה, להריץ קודם את הניקוי הבטוח לבד; ההתראה מופיעה רק אם C: עדיין כמעט מלא (לכל היותר פעם ביום)",
 "Empty old Recycle Bin items now...":"לרוקן עכשיו פריטים ישנים מסל המיחזור...",
 "What you deleted more recently stays in the Recycle Bin.":"מה שמחקת לאחרונה נשאר בסל המיחזור.",
 "Move selected to Undo...":"העברת הנבחרים לביטול...",
@@ -1742,6 +1742,27 @@ for k, v in list(HE.items()):
     if nk != k and nk not in HE: HE[nk] = nv
 HE.setdefault("Alerts: the system disk is almost full (your limit in Automation, or 15%)", "התראות: דיסק המערכת כמעט מלא (הגבול שלך באוטומציה, או 15%)")
 HE.setdefault("Follow the system", "לפי המערכת")
+HE.setdefault('Comes back', 'חוזר')
+HE.setdefault('What Elixar did for you', 'מה Elixar עשה בשבילך')
+HE.setdefault('Click to see everything Elixar did (Logs).', 'לחצו כדי לראות את כל מה ש-Elixar עשה (יומן).')
+HE.setdefault('Fix all safe', 'תיקון כל הבטוחים')
+HE.setdefault('Fixing...', 'מתקן...')
+HE.setdefault('Leftover installers', 'קבצי התקנה שנשארו')
+HE.setdefault('Leftover installer files', 'קבצי התקנה שנשארו')
+HE.setdefault('Look for leftover installers', 'חיפוש קבצי התקנה שנשארו')
+HE.setdefault('Open the folder', 'פתיחת התיקייה')
+HE.setdefault('From', 'מקור')
+HE.setdefault('unknown', 'לא ידוע')
+HE.setdefault("Windows keeps a copy of every program's installer in C:\\Windows\\Installer, so it can repair or remove the program later. When programs are removed or updated, old copies often stay. Elixar asks Windows itself which copies are still used and offers only the others. Nothing used by a program or update, nothing changed in the last 30 days, and they go to Undo, not deleted.", 'Windows שומר עותק של קובץ ההתקנה של כל תוכנית ב-C:\\Windows\\Installer, כדי שיוכל לתקן או להסיר אותה בהמשך. כשתוכניות מוסרות או מתעדכנות, עותקים ישנים נשארים לעיתים קרובות. Elixar שואל את Windows עצמו באילו עותקים עדיין משתמשים, ומציע רק את האחרים. שום דבר שתוכנית או עדכון משתמשים בו, שום דבר שהשתנה ב-30 הימים האחרונים, והם עוברים לביטול, לא נמחקים.')
+HE.setdefault('Asking Windows Installer which installer files the programs and updates on this PC still use...', 'שואל את Windows Installer באילו קבצי התקנה התוכניות והעדכונים במחשב עדיין משתמשים...')
+HE.setdefault('Elixar checks them once more right before moving. They wait in Undo: if a program ever asks for its installer, Tools > Undo puts it back.', 'Elixar בודק אותם שוב רגע לפני ההעברה. הם ממתינים בביטול: אם תוכנית תבקש אי פעם את קובץ ההתקנה שלה, כלים > ביטול מחזיר אותו.')
+HE.setdefault('Windows Installer is busy (something is being installed). Try again in a few minutes.', 'Windows Installer עסוק (משהו מותקן עכשיו). נסו שוב בעוד כמה דקות.')
+HE.setdefault("Windows Installer's list of programs couldn't be read, so nothing is offered.", 'לא ניתן היה לקרוא את רשימת התוכניות של Windows Installer, ולכן לא מוצע כלום.')
+HE.setdefault("The registry's list of installed programs couldn't be read, so nothing is offered.", 'לא ניתן היה לקרוא את רשימת התוכניות המותקנות ברישום, ולכן לא מוצע כלום.')
+HE.setdefault("None of the files in the folder matched Windows' list (that isn't normal), so nothing is offered.", 'אף קובץ בתיקייה לא תאם לרשימה של Windows (זה לא רגיל), ולכן לא מוצע כלום.')
+HE.setdefault('Only on Windows.', 'רק ב-Windows.')
+HE.setdefault('Tools > Leftover installers: old installer copies no program uses, moved to Undo.', 'כלים > קבצי התקנה שנשארו: עותקי התקנה ישנים ששום תוכנית לא משתמשת בהם, מועברים לביטול.')
+HE.setdefault('Pages', 'דפים')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']

@@ -10,6 +10,21 @@ TWO EDITIONS
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
 
+NEW IN 1.2.66
+- What Elixar did for you: space freed, how much faster Windows starts
+  since you turned off start-up apps, and PC health then and now. On the
+  Dashboard and in the weekly email.
+- Cleaner: a "Comes back" column shows how fast each item fills up again.
+  What's back in a day or two (like a browser cache) isn't worth cleaning
+  often, so the weekly clean leaves it out.
+- When C: is low and the clean by itself is on, the Safe clean runs first;
+  the alert shows only if C: is still low.
+- PC health: "Fix all safe" does the one-click fixes together, after a
+  restore point, and shows the score before and after.
+- Tools > Leftover installers: old installer copies in C:\Windows\Installer
+  that no program or update uses, checked with Windows Installer itself,
+  moved to Undo (not deleted).
+
 NEW IN 1.2.65
 - PC health: Ignore now sticks for an app whose name has a symbol in it
   (like Notepad++).

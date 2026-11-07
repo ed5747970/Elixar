@@ -295,11 +295,47 @@ namespace CDriveCleaner
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");
                 return 0;
             }
+            if (Win.IsWindows && StartLowClean()) return 0;   // the clean says itself how it went, and warns if C: is still low
             Log("Space check: only " + Fs.Fmt(free) + " free. Showing the alert.");
             Notify(Win.IsWindows ? "Drive C: is almost full" : "Your system disk is almost full",
                 "Only " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / total) + "%). Click to open Elixar.",
                 ToolTipIcon.Warning, true);
             return 0;
+        }
+
+        // "Safe clean by itself when C: is low" is on and hasn't run today: the daily tidy (which has administrator rights)
+        // is started now instead of waiting for its time. This check runs without them, so it can't clean itself.
+        public static Func<string, int> RunTaskOverride;   // self-test
+        public static bool StartLowClean()
+        {
+            try
+            {
+                var p = TidyPrefs.Load();
+                if (!p.LowClean || p.LastLowClean == DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) return false;
+                int code;
+                if (RunTaskOverride != null) code = RunTaskOverride(TidyTask);
+                else
+                {
+                    var t = Query(TidyTask);
+                    if (!t.Exists || !Install.IsSafeElevatedTask(t.Command, t.Arguments, "--daily-tidy")) return false;
+                    string o; code = RunSchtasks("/Run /TN " + Quote(TidyTask), out o);
+                }
+                Log(code == 0 ? "Space check: C: is low, so the Safe clean runs first (the daily tidy started now)." : "Space check: the daily tidy didn't start (" + code + "); showing the alert.");
+                return code == 0;
+            }
+            catch (Exception e) { Log("Space check: " + e.Message); return false; }
+        }
+
+        // after the Safe clean that ran because C: was low: what it freed, and a warning only if C: is still low
+        public static string LowCleanNotice(long before, long after, long total, int percent, out bool stillLow)
+        {
+            stillLow = ShouldWarn(after, total, percent);
+            long freed = Math.Max(0, after - before);
+            if (Lang.Hebrew)
+                return stillLow ? "Elixar פינה " + Fs.Fmt(freed) + " (הפריטים הבטוחים), אבל ב-C: עדיין פנויים רק " + Fs.Fmt(after) + ". לחצו כדי לפתוח את Elixar."
+                                : "C: היה כמעט מלא: " + Fs.Fmt(before) + " \u2192 " + Fs.Fmt(after) + " פנויים. שום קובץ שלך לא נגע. ביטול: כלים > ביטול.";
+            return stillLow ? "Elixar freed " + Fs.Fmt(freed) + " (the Safe items), but C: still has only " + Fs.Fmt(after) + " free. Click to open Elixar."
+                            : "C: was low: " + Fs.Fmt(before) + " \u2192 " + Fs.Fmt(after) + " free. Nothing of yours was touched. Undo: Tools > Undo.";
         }
 
         // once a month at most: a nudge to run Smart scan on your other drives (never runs it by itself)
@@ -414,15 +450,24 @@ namespace CDriveCleaner
             return errors;
         }
 
-        public static int AutoClean(bool notify) { using (ChangeLog.In("Weekly clean")) return AutoCleanIn(notify); }
-        static int AutoCleanIn(bool notify)
+        public static int AutoClean(bool notify) { using (ChangeLog.In("Weekly clean")) return AutoCleanIn(notify, true); }
+        // when C: is low every Safe item helps, also what comes back fast (the weekly clean leaves those out)
+        public static int LowClean() { using (ChangeLog.In("Daily tidy")) return AutoCleanIn(false, false); }
+        static int AutoCleanIn(bool notify, bool weekly)
         {
-            if (Win.IsWindows && !Sys.IsAdmin()) { Log("Weekly clean skipped: it needs administrator rights."); return 1; }
-            Log("Weekly clean started.");
+            string what = weekly ? "Weekly clean" : "Safe clean (C: was low)";
+            if (Win.IsWindows && !Sys.IsAdmin()) { Log(what + " skipped: it needs administrator rights."); return 1; }
+            Log(what + " started.");
             long start = Sys.Free();
             var results = new List<MailReports.CleanResult>();
+            var grow = Regrowth.Load();
             foreach (var it in AutoItems())
             {
+                if (weekly && Regrowth.Fast(grow, it.Name))
+                {
+                    Log("  Skipped " + it.Name + ": it comes back in a day or two, so a weekly clean doesn't help (it would only make the app slower).");
+                    continue;
+                }
                 if (it.Procs.Length > 0 && Sys.FindProcesses(it.Procs).Count > 0)
                 {
                     Log("  Skipped " + it.Name + " (the app is open; it is never closed automatically).");
@@ -438,7 +483,7 @@ namespace CDriveCleaner
             }
             long freed = Math.Max(0, Sys.Free() - start);
             Quarantine.PurgeOld(m => Log(m));
-            Log("Weekly clean done. Freed " + Fs.Fmt(freed) + ".");
+            Log(what + " done. Freed " + Fs.Fmt(freed) + ".");
             try { File.AppendAllText(HistoryFile, DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "\t" + freed + Environment.NewLine); } catch { }
             try
             {
@@ -548,7 +593,7 @@ namespace CDriveCleaner
             r6.Controls.AddRange(new Control[] { Lbl("Keep files you remove (Smart scan, Duplicates) in Undo for"), cmbUndoDays });
             var undoNote = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(700), 0), Margin = new Padding(S(2), S(2), 0, S(4)),
                 Text = "Tools > Undo puts them back, also from USB drives (which have no Recycle Bin). After that they are deleted for good. Undo uses your second drive when you have one, so C: gets its space back right away." };
-            chkLowClean = new CheckBox { AutoSize = true, Text = "When C: drops under the alert limit, run the Safe clean right away (at most once a day)", Margin = new Padding(0, S(6), 0, 0) };
+            chkLowClean = new CheckBox { AutoSize = true, Text = "When C: drops under the alert limit, first run the Safe clean by itself; the alert shows only if C: is still low (at most once a day)", Margin = new Padding(0, S(6), 0, 0) };
             lblTidyState = new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(700), 0), Margin = new Padding(S(2), S(8), 0, 0), Text = "Checking..." };
             ft.Controls.AddRange(new Control[] { r5, binNote, r6, undoNote, chkLowClean, lblTidyState });
             gTidy.Controls.Add(ft);

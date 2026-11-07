@@ -1829,6 +1829,8 @@ namespace CDriveCleaner
                         SelfTest1259.All(root, check);
                         // 1.2.62: PC health
                         SelfTest1262.All(root, check);
+                        // 1.2.66: did it help, comes back, low-space clean, Fix all safe, leftover installer files
+                        SelfTest1266.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

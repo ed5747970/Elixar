@@ -86,6 +86,7 @@ namespace CDriveCleaner
         public bool DiskChecked; public HealthLevel Disk = HealthLevel.Unknown; public int DiskCount;
         public DateTime? LastClean; public long LastCleanBytes; public bool LastCleanAuto;
         public long SavedTotal;   // everything Elixar freed on this PC (Savings)
+        public ResultsSummary Did;   // "What Elixar did for you"
         public bool AutoKnown, AutoClean, AutoAlert; public string AutoDay = "";
         public bool TidyOn, TidyLow; public int TidyDays;   // auto-delete (the daily tidy)
         public string MailEmail; public bool MailReports; public int MailLevel;
@@ -821,8 +822,19 @@ namespace CDriveCleaner
                                             HeadFont = new Font("Segoe UI Semibold", 15f), Visible = !LinuxUi, AccessibleName = Lang.T("PC health") };
             new ToolTip().SetToolTip(healthStrip, Lang.T("Security, stability, speed, space, drives and your safety net, scored from what Windows records. Click to see."));
             healthStrip.Click += (o, e) => OpenHealth();
-            t.Controls.Add(hero, 0, 0); t.Controls.Add(healthStrip, 0, 1); t.Controls.Add(tileGrid, 0, 2); t.Controls.Add(bottom, 0, 3);
-            t.Resize += (o, e) => LayoutTiles(tiles.Length == 7 ? (t.ClientSize.Width >= S(1250) ? 7 : 4) : (t.ClientSize.Width >= S(1000) ? 6 : 3));
+            resultsCard = new ResultsCard { Dock = DockStyle.Fill, Margin = new Padding(S(5)), Scale_ = s, CapFont = capFont, BigFont = new Font("Segoe UI Semibold", 15f), SmallFont = new Font("Segoe UI", 8.75f),
+                                            Visible = !LinuxUi, AccessibleName = Lang.T("What Elixar did for you") };
+            var resultsTip = new ToolTip();
+            resultsCard.Click += (o, e) => ShowLogs();
+            healthRow = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), Padding = new Padding(0) };
+            t.Controls.Add(hero, 0, 0); t.Controls.Add(healthRow, 0, 1); t.Controls.Add(tileGrid, 0, 2); t.Controls.Add(bottom, 0, 3);
+            LayoutHealthRow(true);
+            t.Resize += (o, e) =>
+            {
+                LayoutHealthRow(t.ClientSize.Width >= S(1100));
+                LayoutTiles(tiles.Length == 7 ? (t.ClientSize.Width >= S(1250) ? 7 : 4) : (t.ClientSize.Width >= S(1000) ? 6 : 3));
+            };
+            resultsCard.MouseEnter += (o, e) => resultsTip.SetToolTip(resultsCard, resultsCard.Text_.Length > 0 ? resultsCard.Text_ + "\n" + Lang.T("Click to see everything Elixar did (Logs).") : Lang.T("Click to see everything Elixar did (Logs)."));
             FormClosing += (o, e) => { if (!e.Cancel) formClosing = true; };
             FormClosed += (o, e) => { if (!testMode) Adb.StopOwnServer(); };
             dashOverview = t;
@@ -832,6 +844,39 @@ namespace CDriveCleaner
         // all tiles in one row on a wide window; on a narrower one two rows (3 + 3, or 4 + 3 with seven tiles,
         // laid on a 12-column grid so both rows are filled edge to edge)
         int HealthRowH { get { return S(104); } }
+        int ResultsRowH { get { return S(86); } }
+        TableLayoutPanel healthRow; ResultsCard resultsCard; bool? healthWide;
+        // the PC health row's height: one row beside each other, or two rows on a narrow window
+        int HealthBlockH { get { return LinuxUi ? 0 : healthWide == false ? HealthRowH + ResultsRowH : HealthRowH; } }
+
+        // PC health and "What Elixar did for you": side by side on a wide window, one under the other on a narrow one
+        void LayoutHealthRow(bool wide)
+        {
+            if (healthRow == null || healthWide == wide) return;
+            healthWide = wide;
+            healthRow.SuspendLayout();
+            healthRow.Controls.Clear(); healthRow.ColumnStyles.Clear(); healthRow.RowStyles.Clear();
+            if (wide)
+            {
+                healthRow.ColumnCount = 2; healthRow.RowCount = 1;
+                healthRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 63)); healthRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 37));
+                healthRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                healthRow.Controls.Add(healthStrip, 0, 0); healthRow.Controls.Add(resultsCard, 1, 0);
+            }
+            else
+            {
+                healthRow.ColumnCount = 1; healthRow.RowCount = 2;
+                healthRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                healthRow.RowStyles.Add(new RowStyle(SizeType.Absolute, HealthRowH)); healthRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                healthRow.Controls.Add(healthStrip, 0, 0); healthRow.Controls.Add(resultsCard, 0, 1);
+            }
+            healthRow.ResumeLayout();
+            if (dashOverview != null)
+            {
+                dashOverview.RowStyles[1].Height = HealthBlockH;
+                dashOverview.AutoScrollMinSize = new Size(0, S(660) + HealthBlockH + S(130) * (tileGrid.RowCount - 1));
+            }
+        }
 
         void LayoutTiles(int cols)
         {
@@ -855,7 +900,7 @@ namespace CDriveCleaner
             if (dashOverview != null)
             {
                 dashOverview.RowStyles[2].Height = S(130) * rows;
-                dashOverview.AutoScrollMinSize = new Size(0, S(660) + (LinuxUi ? 0 : HealthRowH) + S(130) * (rows - 1));
+                dashOverview.AutoScrollMinSize = new Size(0, S(660) + HealthBlockH + S(130) * (rows - 1));
             }
         }
 
@@ -970,6 +1015,7 @@ namespace CDriveCleaner
                 if (cleans != null) { sum.LastClean = cleans.Item1; sum.LastCleanBytes = cleans.Item2; sum.LastCleanAuto = cleans.Item3; }
                 sum.Recent = Activity.Recent(6, own, runs, undo, MailStatus.LastSent, MailStatus.LastWhat);
                 try { sum.SavedTotal = Savings.Read().Bytes; } catch { }
+                if (!LinuxUi) try { sum.Did = Results.Read(); } catch { }
                 return sum;
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
@@ -1065,6 +1111,8 @@ namespace CDriveCleaner
                 hero.BreakTotal = m.Total;
             }
             hero.Invalidate();
+
+            if (resultsCard != null && m.Did != null) { resultsCard.Data = m.Did; resultsCard.Invalidate(); }
 
             // tiles
             Action<int, string, string, Color> tile = (i, v, sub, c) => { tiles[i].Value = Lang.T(v); tiles[i].Sub = Lang.T(sub); tiles[i].Accent = c; tiles[i].Invalidate(); };
