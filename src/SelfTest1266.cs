@@ -99,7 +99,8 @@ namespace CDriveCleaner
                     {
                         m.Size = new System.Drawing.Size(1400, 860); m.Show(); Pump(() => false, 600);
                         if (m.ResultsCardForTest == null || !m.ResultsCardForTest.Visible) return "no card";
-                        if (!m.HealthWideForTest) return "not side by side on a wide window";
+                        // the test PC's screen may be smaller than 1400 (the window then fits the screen): the rule is what counts
+                        if (m.HealthWideForTest != (m.OverviewWidthForTest >= 1100)) return "side by side " + m.HealthWideForTest + " at " + m.OverviewWidthForTest + " px";
                         m.Size = new System.Drawing.Size(800, 600); Pump(() => false, 500);
                         if (m.HealthWideForTest) return "still side by side on a narrow window";
                         if (m.ResultsCardForTest.Height < 40 || m.ResultsCardForTest.Width < 300) return "too small when stacked: " + m.ResultsCardForTest.Size;
@@ -343,6 +344,7 @@ namespace CDriveCleaner
         // self-test accessors (1.2.66)
         public ResultsCard ResultsCardForTest { get { return resultsCard; } }
         public bool HealthWideForTest { get { return healthWide == true; } }
+        public int OverviewWidthForTest { get { return dashOverview == null ? 0 : dashOverview.ClientSize.Width; } }
         public List<string> CleanerColumnsForTest { get { return list.Columns.Cast<ColumnHeader>().Select(c => c.Text).ToList(); } }
         public List<CleanItem> CleanerItemsForTest { get { return items; } }
         public List<string> ToolsPageNamesForTest { get { return toolsTabs.TabPages.Cast<TabPage>().Select(p => p.Text).ToList(); } }
