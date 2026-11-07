@@ -290,6 +290,7 @@ namespace CDriveCleaner
             if (Win.IsWindows)
                 try { var g = FolderGrowth.DailyRun(DateTime.Now, Log, null); FolderGrowth.Notify(g); if (g.Fast.Count > 0) Log("Growing fast: " + g.Fast.Count + " folder(s)."); }
                 catch (Exception e) { Log("Growing folders: " + e.Message); }
+            if (Win.IsWindows) SecurityAlerts.Run(Log);   // antivirus or firewall off, a blue screen, PC health down 10+
             if (!ShouldWarn(free, total, percent))
             {
                 Log("Space check: " + Fs.Fmt(free) + " free (" + Math.Round(free * 100.0 / Math.Max(1, total)) + "%). No alert needed (limit " + percent + "%).");
@@ -509,7 +510,7 @@ namespace CDriveCleaner
         ComboBox cmbDay;
         Label lblAlertState, lblCleanState, lblAutoItems;
         Button btnSaveAuto, btnTestAlert, btnRunAuto, btnTidyNow;
-        CheckBox chkBin, chkLowClean;
+        CheckBox chkBin, chkLowClean, chkSecAlerts;
         ComboBox cmbBinDays, cmbUndoDays;
         Label lblTidyState, lblSchedCheck, lblSchedClean;
         int alertPercent;   // 0 = not read yet
@@ -547,7 +548,13 @@ namespace CDriveCleaner
             btnTimes1.Click += (o, e) => ShowPolicy();
             r2.Controls.AddRange(new Control[] { lblSchedCheck, timeCheck, chkLogon, btnTimes1 });
             lblAlertState = new Label { AutoSize = true, ForeColor = Color.DimGray, Margin = new Padding(S(22), S(6), 0, 0), Text = "Checking..." };
-            fa.Controls.AddRange(new Control[] { r1, r2, lblAlertState });
+            // security and PC health alerts: saved at once (the low-space check runs them)
+            chkSecAlerts = new CheckBox { AutoSize = true, Text = "Also warn me about security and PC health (antivirus or firewall off, a blue screen, PC health down 10 points or more)",
+                                          Margin = new Padding(0, S(8), 0, 0), Visible = !LinuxUi, Checked = SecurityAlerts.On, Enabled = !Policy.Fixes("sec.alerts") };
+            chkSecAlerts.CheckedChanged += (o, e) => { if (!testMode && !Policy.Fixes("sec.alerts")) SecurityAlerts.SetOn(chkSecAlerts.Checked); };
+            var secNote = new Label { AutoSize = true, ForeColor = Color.DimGray, Visible = !LinuxUi, Margin = new Padding(S(18), 0, 0, 0), MaximumSize = new Size(S(700), 0),
+                                      Text = "Once a day, with the low-space check. One alert per problem, again only if it comes back after being fixed. With email connected, also by email." };
+            fa.Controls.AddRange(new Control[] { r1, r2, lblAlertState, chkSecAlerts, secNote });
             gAlert.Controls.Add(fa);
 
             // --- weekly clean

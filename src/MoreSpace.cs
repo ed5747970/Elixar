@@ -70,11 +70,13 @@ namespace CDriveCleaner
     {
         public static string GetCurrent { get { return SysRoot + "$GetCurrent"; } }
         public static string WinREAgent { get { return SysRoot + "$WinREAgent"; } }
+        public static string Esd { get { return SysRoot + "ESD"; } }                         // the Media Creation Tool's download
+        public static string UpgradeAssistant { get { return SysRoot + "Windows10Upgrade"; } }   // the Windows Update Assistant's folder
         static string SysRoot { get { try { string w = Environment.GetFolderPath(Environment.SpecialFolder.Windows); return string.IsNullOrEmpty(w) ? @"C:\" : Path.GetPathRoot(w); } catch { return @"C:\"; } } }
         public static bool Allowed(string path)
         {
             string p; try { p = Path.GetFullPath(path).TrimEnd('\\'); } catch { return false; }
-            return new[] { GetCurrent, WinREAgent }.Concat(WindowsOld.Folders).Any(x => string.Equals(x.TrimEnd('\\'), p, StringComparison.OrdinalIgnoreCase));
+            return new[] { GetCurrent, WinREAgent, Esd, UpgradeAssistant }.Concat(WindowsOld.Folders).Any(x => string.Equals(x.TrimEnd('\\'), p, StringComparison.OrdinalIgnoreCase));
         }
 
         // pure: whether it is safe to remove them now, and why not

@@ -50,9 +50,9 @@ namespace CDriveCleaner
             pageUndo = new TabPage("Undo") { BackColor = pageTools.BackColor };
             pageLeft = new TabPage("Leftovers") { BackColor = pageTools.BackColor };
             pageSysprep = new TabPage("Sysprep") { BackColor = pageTools.BackColor };
-            BuildSpaceMap(); BuildTweaks(); BuildRepair(); BuildWipe(); BuildInstallers();
+            BuildSpaceMap(); BuildTweaks(); BuildRepair(); BuildWipe(); BuildInstallers(); BuildAccounts();
             if (LinuxUi) toolsTabs.TabPages.AddRange(new[] { pageMap, pageDups });   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageInst, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
+            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageInst, pageAcct, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => { OnToolsTab(); RefitText(); };
@@ -340,7 +340,18 @@ namespace CDriveCleaner
                 say("  Saved " + Fs.Fmt(saved) + ".");
             }, "Shrink WSL and Docker disks?\n\nWSL is stopped first (open Linux windows close). Close Docker Desktop before you continue.");
 
-            flow.Controls.AddRange(new Control[] { gSxs, BuildHibernationBox(), gRes, gShadow, gCompact, gVhd });
+            Label lblIdx;
+            var gIdx = Box("Windows Search index", out lblIdx, "The index Start-menu search uses. Usually under 1-2 GB; when it is damaged it can grow to 10-50 GB. Rebuilding is Windows' own reset: Windows deletes it and builds a new one in the background. Nothing of yours is deleted; until it's done, searching your files is slower.");
+            Button btnIdx = null;
+            SysButton(gIdx, "Check", false, say => { long n = SearchIndex.Size(); string d = SearchIndex.Describe(n); say("  " + d); UI(() => { lblIdx.Text = d; if (btnIdx != null) btnIdx.Visible = SearchIndex.Worth(n); }); });
+            btnIdx = SysButton(gIdx, "Rebuild the index...", true, say =>
+            {
+                string e = SearchIndex.Rebuild(say);
+                if (e != null) say("  " + e);
+            }, "Rebuild the Windows Search index?\n\nWindows deletes the index and builds a new one in the background (an hour or a few). Until then, searching your files in Start is slower. Nothing of yours is deleted.");
+            btnIdx.Visible = false;   // only when it is far too big
+            SysButton(gIdx, "Open Indexing Options", false, say => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Win.SystemExe("control.exe"), "srchadmin.dll") { UseShellExecute = false }); } catch (Exception ex) { say("  " + ex.Message); } });
+            flow.Controls.AddRange(new Control[] { gSxs, BuildHibernationBox(), gRes, gShadow, gCompact, gVhd, gIdx });
             sysOut = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Font = new Font("Consolas", 9f), BackColor = SystemColors.Window };
             t.Controls.Add(Title("System space"), 0, 0); t.Controls.Add(flow, 0, 1); t.Controls.Add(sysOut, 0, 2);
             pageSys.Controls.Add(t);

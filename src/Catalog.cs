@@ -170,6 +170,20 @@ namespace CDriveCleaner
                     Measure = () => WinLeftovers.MeasureProtected(winReAgent),
                     Clean = log => WinLeftovers.Remove("Recovery update leftovers ($WinREAgent)", winReAgent, log) },
 
+                // Windows setup leftovers that stay for years; never ticked for you
+                new CleanItem {
+                    Name = "Windows setup download (Media Creation Tool)", Tier = Tier.Caution, DefaultOn = false, Where = WinLeftovers.Esd,
+                    Info = "Windows setup files the Media Creation Tool downloaded to make an upgrade or a USB stick. Not needed once Windows is installed. Removed only when no update or upgrade is running and nothing waits for a restart. Moved to Undo for 7 days first.",
+                    Measure = () => WinLeftovers.MeasureProtected(WinLeftovers.Esd),
+                    Clean = log => WinLeftovers.Remove("Windows setup download (C:\\ESD)", WinLeftovers.Esd, log) },
+
+                new CleanItem {
+                    Name = "Windows Update Assistant leftovers", Tier = Tier.Caution, DefaultOn = false, Where = WinLeftovers.UpgradeAssistant,
+                    Info = "The folder the Windows Update Assistant leaves behind after an upgrade. If \"Windows 10 Update Assistant\" still shows in Apps, remove it there instead (that also removes its schedules). Removed only when no upgrade is running and nothing waits for a restart. Moved to Undo for 7 days first.",
+                    Procs = new[] { "Windows10UpgraderApp" },
+                    Measure = () => WinLeftovers.MeasureProtected(WinLeftovers.UpgradeAssistant),
+                    Clean = log => WinLeftovers.Remove("Windows Update Assistant leftovers", WinLeftovers.UpgradeAssistant, log) },
+
                 new CleanItem {
                     Name = "Adobe Reader old updates", Tier = Tier.Caution, DefaultOn = false, Where = adobeArm + @"\Reader_*  and  Acrobat_*",
                     Info = "Update packages Adobe Reader already installed. Reader keeps working; its updater downloads again if it needs to. Moved to Undo for 7 days first.",

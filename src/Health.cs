@@ -15,7 +15,7 @@ using System.Text.RegularExpressions;
 namespace CDriveCleaner
 {
     public enum HLevel { Ok, Info, Warn, Bad }
-    public enum HAct { None, RepairWindows, UpdateApps, Restart, Drivers, Startup, Memory, PowerBalanced, RestorePoint, SystemProtection, Backup, BitLocker, Defender, Firewall, Uac, DiskHealth, CheckFix, Growing }
+    public enum HAct { None, RepairWindows, UpdateApps, Restart, Drivers, Startup, Memory, PowerBalanced, RestorePoint, SystemProtection, Backup, BitLocker, Defender, Firewall, Uac, DiskHealth, CheckFix, Growing, SystemSpace }
 
     public class HFind
     {
@@ -47,6 +47,7 @@ namespace CDriveCleaner
         public string PowerScheme = ""; public bool OnBattery;
         // space and drives
         public long Free = -1, Total; public int FastFolders, UnusualFolders; public HealthLevel Disk = HealthLevel.Unknown;
+        public long SearchIndex = -1;   // Windows Search's index, bytes (-1 unknown)
         // safety net
         public bool RestoreKnown; public DateTime? LastRestore; public bool? FileHistory, OneDriveBackup;
         // battery
@@ -431,6 +432,10 @@ namespace CDriveCleaner
                     add(new HFind { Area = "Space", Key = "fast", Level = HLevel.Info, Penalty = 5, Act = HAct.Growing, Button = "Show me",
                                     Title = H(Plural(f.FastFolders, "folder is growing fast", "folders are growing fast"), f.FastFolders == 1 ? "תיקייה אחת גדלה מהר" : f.FastFolders + " תיקיות גדלות מהר"),
                                     Detail = H("Elixar studied each one (Dashboard > Growing fast).", "Elixar בדק כל אחת (לוח בקרה > גדל מהר).") });
+                if (CDriveCleaner.SearchIndex.Worth(f.SearchIndex))
+                    add(new HFind { Area = "Space", Key = "searchindex", Level = HLevel.Warn, Penalty = 10, Act = HAct.SystemSpace, Button = "Show me",
+                                    Title = H("Windows Search's index takes " + Fs.Fmt(f.SearchIndex), "אינדקס החיפוש של Windows תופס " + Fs.Fmt(f.SearchIndex)),
+                                    Detail = H("Usually under 1-2 GB: it is probably damaged. Tools > System space rebuilds it the way Windows does.", "בדרך כלל פחות מ-1-2 GB: כנראה שהוא פגום. כלים > שטח מערכת בונה אותו מחדש כמו ש-Windows עושה.") });
             }
 
             // ---- Drives ----
@@ -529,6 +534,7 @@ namespace CDriveCleaner
             var f = new HealthFacts();
             Action<string> say = s => { if (status != null) status(s); };
             try { f.Free = Sys.Free(); f.Total = Sys.Total(); } catch { }
+            try { f.SearchIndex = CDriveCleaner.SearchIndex.Size(); } catch { }
             if (!Win.IsWindows) return f;
 
             say("Reading Windows Security, updates and error records...");

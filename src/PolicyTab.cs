@@ -437,6 +437,7 @@ namespace CDriveCleaner
                 cmbUndoDays.Enabled = !Policy.Fixes("undo.days");
                 chkBin.Enabled = !Policy.Fixes("bin.days"); if (Policy.Fixes("bin.days")) cmbBinDays.Enabled = false; else cmbBinDays.Enabled = chkBin.Checked;
                 chkLowClean.Enabled = !Policy.Fixes("low.clean");
+                if (chkSecAlerts != null) { chkSecAlerts.Enabled = !Policy.Fixes("sec.alerts"); chkSecAlerts.Checked = SecurityAlerts.On; }
             }
             // Settings: a required PIN can't be switched off
             if (PinSwitch != null && !testMode) PinSwitch.Enabled = !(Policy.Get("pin.open") == "required" && PinLock.IsSet);

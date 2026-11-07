@@ -106,7 +106,7 @@ namespace CDriveCleaner
                 try { items = Catalog.Build(); } catch (Exception ex) { check(false, "Building the list of items: " + ex.Message); }
                 if (items != null)
                 {
-                    check(items.Count(i => i.Drive == null) == 43 && items.Where(i => i.Privacy).All(i => !i.DefaultOn && i.Tier == Tier.Review), "List has 43 items (plus any for other drives); privacy items are never ticked for you" + (items.Count(i => i.Drive == null) == 43 ? "" : "  (" + items.Count(i => i.Drive == null) + ")"));
+                    check(items.Count(i => i.Drive == null) == 45 && items.Where(i => i.Privacy).All(i => !i.DefaultOn && i.Tier == Tier.Review), "List has 45 items (plus any for other drives); privacy items are never ticked for you" + (items.Count(i => i.Drive == null) == 45 ? "" : "  (" + items.Count(i => i.Drive == null) + ")"));
                     bool allOk = true;
                     foreach (var it in items)
                     {
@@ -1831,6 +1831,7 @@ namespace CDriveCleaner
                         SelfTest1262.All(root, check);
                         // 1.2.66: did it help, comes back, low-space clean, Fix all safe, leftover installer files
                         SelfTest1266.All(root, check);
+                        SelfTest1266b.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

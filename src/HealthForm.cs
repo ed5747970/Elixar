@@ -385,6 +385,7 @@ namespace CDriveCleaner
                 case HAct.DiskHealth: ShowDiskHealth(); break;
                 case HAct.CheckFix: OpenCheckFix(); break;
                 case HAct.Growing: OpenGrowing(); break;
+                case HAct.SystemSpace: ShowTools(pageSys); break;
             }
         }
 

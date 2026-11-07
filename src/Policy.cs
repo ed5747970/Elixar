@@ -64,12 +64,15 @@ namespace CDriveCleaner
               "choice", "Your choice (Automation)", "off", "Never", "14", "14 days", "30", "30 days", "60", "60 days", "90", "90 days"),
             R("low.clean", "Undo and Recycle Bin", "Safe clean by itself when C: is low", "At most once a day, when C: drops under the alert limit.", "choice",
               "choice", "Your choice (Automation)", "on", "Always on", "off", "Always off"),
+            R("sec.alerts", "Undo and Recycle Bin", "Security and PC health alerts", "Antivirus or firewall off, a blue screen, PC health down 10 points or more: a notification (and an email when connected), with the daily low-space check.", "choice",
+              "choice", "Your choice (Automation)", "on", "Always on", "off", "Always off"),
             R("apps.remove", "What Elixar may change", "Remove apps", "Apps tab: uninstallers and built-in or Store apps.", "allow", Allow),
             R("apps.update", "What Elixar may change", "Update apps", "Apps > Updates: newer versions through Windows' package manager (winget).", "allow", Allow),
             R("startup.change", "What Elixar may change", "Change startup programs", "Tools > Startup: turn programs on or off, remove leftovers.", "allow", Allow),
             R("drivers.remove", "What Elixar may change", "Remove drivers", "Tools > Drivers: old and unused driver packages.", "allow", Allow),
             R("phone", "What Elixar may change", "Phone tools", "The Phone tab: clean, move files and remove apps on a phone.", "allow", Allow),
             R("sysprep", "What Elixar may change", "Sysprep and golden image tools", "Tools > Sysprep: fixes, answer files, image cleanup.", "allow", Allow),
+            R("profiles", "What Elixar may change", "Old user accounts' files", "Tools > Old accounts: removes the folder of an account nobody used for 6 months (Windows' own profile removal; can't be undone). Off by default on company PCs.", "allow", Allow),
             R("installers", "What Elixar may change", "Leftover installer files", "Tools > Leftover installers: old installer copies no program uses, moved to Undo.", "allow", Allow),
             R("wipe", "What Elixar may change", "Secure wipe", "Tools > Secure wipe: wipe free space and shred files (can't be undone).", "allow", Allow),
             R("email", "What Elixar may change", "Email", "Connect an email account, reports and Gmail cleaning.", "allow", Allow),
@@ -177,7 +180,7 @@ namespace CDriveCleaner
         }
 
         // ---- company PCs ----
-        public static readonly string[] CompanyBlocks = { "phone", "sysprep", "email", "wipe" };   // wipe: destroyed files can't be brought back, on a company PC that's IT's call
+        public static readonly string[] CompanyBlocks = { "phone", "sysprep", "email", "wipe", "profiles" };   // wipe, profiles: what's removed can't be brought back, on a company PC that's IT's call
         public static Func<string> CompanyOverride;   // self-test and previews: the company this PC is joined to (null = none)
         static string companyCache; static bool companyRead;
         // the domain or Entra ID organization this PC is joined to; null on a home PC

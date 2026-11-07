@@ -24,6 +24,15 @@ NEW IN 1.2.66
 - Tools > Leftover installers: old installer copies in C:\Windows\Installer
   that no program or update uses, checked with Windows Installer itself,
   moved to Undo (not deleted).
+- Security and PC health alerts: a notification (and an email, when
+  connected) when the antivirus or firewall is off, after a blue screen,
+  or when PC health drops 10 points. Only reads; on at first.
+- Cleaner: two more Caution items, the Media Creation Tool's download
+  (C:\ESD) and the Windows Update Assistant's folder. Never ticked for you.
+- Tools > System space: the Windows Search index's size, and Windows' own
+  rebuild when it is far too big (over 4 GB).
+- Tools > Old accounts: accounts nobody signed in to for 6 months on a
+  shared PC. Nothing ticked, asks twice, Windows' own profile removal.
 
 NEW IN 1.2.65
 - PC health: Ignore now sticks for an app whose name has a symbol in it

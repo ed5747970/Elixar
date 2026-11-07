@@ -56,7 +56,7 @@ namespace CDriveCleaner
         // ================= sections: which part of Elixar made each change =================
         public static readonly string[] Sections =
         {
-            "Cleaner", "Check & fix", "PC health", "Installer files", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
+            "Cleaner", "Check & fix", "PC health", "Installer files", "Old accounts", "Weekly clean", "Daily tidy", "Duplicates", "Smart scan", "Leftovers", "Startup", "Apps", "App updates", "Windows tweaks", "Drivers", "Phone", "Move folders",
             "System space", "Space map", "Repair Windows", "Secure wipe", "Keep in check", "Restore points", "Privacy", "Sysprep", "Security", "Email", "Policy", "Policy cleaning", "Settings", "Schedules", "Undo", "Install and updates", "OneDrive", "Command line", "Other"
         };
 
