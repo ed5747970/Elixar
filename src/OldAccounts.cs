@@ -155,10 +155,34 @@ namespace CDriveCleaner
         {
             if (string.IsNullOrEmpty(destRoot)) return "no folder";
             string dest = Path.Combine(destRoot, "Elixar account copy - " + Path.GetFileName(p.Folder) + " " + DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            if (Directory.Exists(dest) || File.Exists(dest)) dest += " " + DateTime.Now.ToString("HHmmss", CultureInfo.InvariantCulture);
             if (CopyOverride != null) return CopyOverride(p.Folder, dest);
+            string bad = PrepareCopyFolder(destRoot, dest);
+            if (bad != null) return bad;
             string o = Sys.Run("robocopy.exe", Sys.ArgQuote(p.Folder) + " " + Sys.ArgQuote(dest) + " /E /XJ /R:1 /W:1 /COPY:DAT /DCOPY:T /NP /NFL /NDL", 6 * 3600 * 1000);
             // robocopy says ERROR on a file it couldn't copy; codes 8+ mean failures
             return o.Contains(" ERROR ") ? (Lang.Hebrew ? "חלק מהקבצים לא הועתקו: " : "Some files were not copied: ") + dest : null;
+        }
+
+        // The copy runs as administrator, so it goes into a new folder Elixar makes itself: on NTFS only administrators can
+        // change it (another account can't put a link in it to send the copied files into Windows' folders); a FAT or exFAT
+        // drive (most USB sticks) has no links. Never into a folder that already exists, or under a link.
+        public static string PrepareCopyFolder(string destRoot, string dest)
+        {
+            if (!Win.IsWindows) { Directory.CreateDirectory(dest); return null; }
+            string no = Lang.Hebrew ? "לא ניתן היה ליצור תיקייה בטוחה להעתקה ב-" : "Couldn't make a safe folder for the copy in ";
+            try
+            {
+                if (Directory.Exists(dest) || File.Exists(dest) || !Directory.Exists(destRoot) || !SafeDelete.NoLinks(destRoot)) return no + destRoot;
+                string fs = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(destRoot))).DriveFormat ?? "";
+                if (fs.StartsWith("FAT", StringComparison.OrdinalIgnoreCase) || fs.Equals("exFAT", StringComparison.OrdinalIgnoreCase))
+                {
+                    Directory.CreateDirectory(dest);
+                    return SafeDelete.NoLinks(dest) ? null : no + destRoot;
+                }
+                return Locked.Lock(dest, false) && SafeDelete.NoLinks(dest) ? null : no + destRoot;
+            }
+            catch (Exception e) { return no + destRoot + " (" + e.Message + ")"; }
         }
 
         public static string SameDrive(string destRoot, string folder)

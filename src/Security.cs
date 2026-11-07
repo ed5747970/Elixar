@@ -575,6 +575,40 @@ namespace CDriveCleaner
             return Remove(full, expected, 0);
         }
 
+        // removes a folder only if it is empty, by handle: the folder that is opened is checked to really be the one named
+        // (no link swapped in above or at it since it was looked at), and Windows refuses to delete a folder that isn't empty,
+        // so a file put there a moment ago stays. Path-based "remove this empty folder" could be redirected into Windows'
+        // folders by a link put in place at the right moment (a known way to get administrator rights).
+        public static bool RemoveEmptyDir(string path)
+        {
+            if (!Win.IsWindows) { try { Directory.Delete(path, false); return true; } catch { return false; } }
+            string full = Path.GetFullPath(path).TrimEnd('\\');
+            if (Protect.IsProtected(full)) return false;
+            string parent = Path.GetDirectoryName(full);
+            if (parent == null) return false;
+            if (!NoLinks(parent)) { Blocked++; return false; }
+            string realParent = RealPath(parent);
+            if (realParent == null) return false;
+            string expected = realParent.TrimEnd('\\') + "\\" + Path.GetFileName(full);
+            if (Protect.IsProtected(expected)) return false;
+            using (var h = CreateFileW(Long(full), DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                       IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero))
+            {
+                if (h.IsInvalid) return false;
+                if (!Same(Final(h), expected)) { Blocked++; return false; }
+                FILE_BASIC_INFO bi;
+                if (!GetFileInformationByHandleEx(h, 0, out bi, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO)))) return false;
+                if ((bi.FileAttributes & ATTR_DIRECTORY) == 0 || (bi.FileAttributes & ATTR_REPARSE) != 0) return false;   // a file or a link: not this
+                if ((bi.FileAttributes & 0x7) != 0)   // read-only, hidden, system
+                {
+                    var clear = new FILE_BASIC_INFO { FileAttributes = ATTR_DIRECTORY };
+                    SetFileInformationByHandle(h, 0, ref clear, (uint)Marshal.SizeOf(typeof(FILE_BASIC_INFO)));
+                }
+                var disp = new FILE_DISPOSITION_INFO { DeleteFile = true };
+                return SetFileInformationByHandle(h, 4, ref disp, 1);   // fails when the folder isn't empty
+            }
+        }
+
         static bool Remove(string path, string expected, int depth)
         {
             if (depth > 200) return false;
@@ -678,6 +712,8 @@ namespace CDriveCleaner
     public static class Paths
     {
         static bool ready;
+        static string chosen;
+        public static string DataProblem;   // shown in the log when Elixar's data folder had to move
         public static string Data
         {
             get
@@ -688,14 +724,31 @@ namespace CDriveCleaner
                     if (!ready) { ready = true; try { Locked.Lock(ld); } catch { } }
                     return ld;
                 }
+                if (chosen != null) return chosen;
                 string pd = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                 if (string.IsNullOrEmpty(pd)) pd = @"C:\ProgramData";
                 string d = Path.Combine(pd, "Elixar");
-                if (!ready && Sys.IsAdmin())
+                if (!Sys.IsAdmin()) { chosen = d; return d; }   // without administrator rights nothing written here can harm Windows
+                // Any program may make folders in ProgramData. If C:\ProgramData\Elixar was made by someone else and can't be
+                // set aside (a file in it kept open), files Elixar writes there as administrator could be sent elsewhere by a
+                // link planted inside. Then Elixar keeps its data in Program Files\Elixar\data, which only administrators can make.
+                bool ok = false;
+                try { ok = Locked.Lock(d, true); } catch { }
+                if (!ok)
                 {
-                    ready = true;
-                    try { Locked.Lock(d, true); } catch { }
+                    string why = Locked.LockProblem(d);
+                    string alt = Path.Combine(Install.Dir, "data");
+                    bool altOk = false;
+                    try { altOk = Locked.Lock(Install.Dir, true) && Locked.Lock(alt, true); } catch { }
+                    if (!altOk)
+                    {
+                        alt = Path.Combine(pd, "Elixar-" + Guid.NewGuid().ToString("N").Substring(0, 12));   // a new name nobody could have made first
+                        try { altOk = Locked.Lock(alt, true); } catch { }
+                    }
+                    DataProblem = d + " could not be locked (" + (why ?? "unknown") + "); using " + alt + (altOk ? "" : " (not locked either)");
+                    d = alt;
                 }
+                chosen = d;
                 return d;
             }
         }

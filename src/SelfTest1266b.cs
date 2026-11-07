@@ -95,7 +95,13 @@ namespace CDriveCleaner
                     if (pend.Count != 2 || !pend[0].Contains("\t")) return "for the email: " + pend.Count;
                     var doc = MailReports.SecurityAlert(pend);
                     string html = doc.Html(), text = doc.Text();
-                    if (!html.Contains("firewall is off") || !text.Contains("Nothing is changed from an email") || !doc.Subject.Contains("needs you")) return "email: " + doc.Subject;
+                    if (!html.Contains("firewall is off") || !html.Contains("antivirus is off") || !text.Contains("Nothing is changed from an email") || !doc.Subject.Contains("needs you")) return "email: " + doc.Subject;
+                    // what's kept is only which alert and its numbers: text another program writes there is never emailed
+                    string t0 = DateTime.Now.ToString("s");
+                    var forged = new List<string> { t0 + "\tav\tx\ty", t0 + "\tphish\tClick http://evil.example\t!", t0 + "\tdrop\t90\t<b>evil</b>", t0 + "\tbluescreen\t" + t0 + "\t0x7e; visit evil.example" };
+                    var fd = MailReports.SecurityAlert(forged);
+                    if (fd.Html().Contains("evil") || fd.Text().Contains("evil") || !fd.Text().Contains("antivirus is off") || !fd.Text().Contains("blue screen")) return "forged text reached the email";
+                    if (SecurityAlerts.Describe(t0 + "\tdrop\t86\t71")[0] != "PC health dropped: 86 \u2192 71") return "drop text";
                     SecurityAlerts.Sent();
                     if (SecurityAlerts.Pending().Count != 0) return "sent, still pending";
                     store["SecAlertMail"] = "2020-01-01T00:00:00\tOld alert\tfrom long ago";
@@ -234,6 +240,44 @@ namespace CDriveCleaner
                     string me; using (var id = System.Security.Principal.WindowsIdentity.GetCurrent()) me = id.User.Value;
                     if (s.Old.Any(p => p.Sid == me)) return "offered you";
                     if (s.Old.Any(p => (DateTime.Now - p.LastUse).TotalDays < 180)) return "a recent account";
+                    return null;
+                });
+
+            // ---------- attack review (1.2.66) ----------
+            Run(check, "Attack review: an empty folder is removed by handle, only if still empty; a folder reached through a link is never removed", () =>
+            {
+                string dir = Path.Combine(root, "rmempty-1266"); if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                string a = Path.Combine(dir, "A"), b = Path.Combine(a, "B"), full = Path.Combine(dir, "Full");
+                Directory.CreateDirectory(b); Directory.CreateDirectory(full); File.WriteAllText(Path.Combine(full, "keep.txt"), "x");
+                if (SafeDelete.RemoveEmptyDir(full) || !File.Exists(Path.Combine(full, "keep.txt"))) return "removed a folder with a file";
+                if (Win.IsWindows)
+                {
+                    // J is a link to A: removing "J\B" would really remove A\B (how a planted link redirects a delete)
+                    string j = Path.Combine(dir, "J"); string o = Sys.Run("cmd.exe", "/c mklink /J " + Sys.ArgQuote(j) + " " + Sys.ArgQuote(a), 30000);
+                    if (!Directory.Exists(j)) return "couldn't make the test link: " + o;
+                    if (SafeDelete.RemoveEmptyDir(Path.Combine(j, "B")) || !Directory.Exists(b)) return "removed through a link";
+                    if (SafeDelete.RemoveEmptyDir(j) || !Directory.Exists(a)) return "removed the link's target";
+                    try { Directory.Delete(j, false); } catch { }
+                }
+                if (!SafeDelete.RemoveEmptyDir(b) || Directory.Exists(b)) return "an empty folder stayed";
+                if (!SmartScan.RemoveEmpty(a) || Directory.Exists(a)) return "Smart scan's empty folders";
+                return null;
+            });
+
+            if (Win.IsWindows)
+                Run(check, "Attack review: copies of old accounts go only into a new folder Elixar makes and locks, never into an existing one or through a link", () =>
+                {
+                    string dir = Path.Combine(root, "acctcopy-1266"); if (Directory.Exists(dir)) Directory.Delete(dir, true); Directory.CreateDirectory(dir);
+                    string dest = Path.Combine(dir, "copy1");
+                    var e = OldAccounts.PrepareCopyFolder(dir, dest);
+                    if (e != null || !Directory.Exists(dest)) return "new folder: " + e;
+                    string fs = new DriveInfo(Path.GetPathRoot(dir)).DriveFormat;
+                    if (fs == "NTFS" && !Locked.IsLocked(dest)) return "not locked: " + Locked.LockProblem(dest);
+                    if (OldAccounts.PrepareCopyFolder(dir, dest) == null) return "used a folder that already exists";
+                    string j = Path.Combine(dir, "J"); Sys.Run("cmd.exe", "/c mklink /J " + Sys.ArgQuote(j) + " " + Sys.ArgQuote(dest), 30000);
+                    if (!Directory.Exists(j)) return "couldn't make the test link";
+                    if (OldAccounts.PrepareCopyFolder(j, Path.Combine(j, "copy2")) == null) return "copied through a link";
+                    try { Directory.Delete(j, false); } catch { }
                     return null;
                 });
 

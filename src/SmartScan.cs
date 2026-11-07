@@ -202,7 +202,7 @@ namespace CDriveCleaner
                     }
                     if (all.Count > 5000) return false;
                 }
-                foreach (var d in all.OrderByDescending(x => x.Length)) Directory.Delete(d, false);
+                foreach (var d in all.OrderByDescending(x => x.Length)) if (!SafeDelete.RemoveEmptyDir(d)) return false;   // by handle, checked: a link can't redirect it
                 return !Directory.Exists(dir);
             }
             catch { return false; }

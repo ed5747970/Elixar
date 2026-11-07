@@ -278,7 +278,7 @@ namespace CDriveCleaner
             catch (Exception ex) { if (log != null) log("  Skipped the files in " + src + ": " + ex.Message); }
             try { foreach (var d in di.GetDirectories()) total += MoveTree(d.FullName, Path.Combine(dst, d.Name), log); }
             catch (Exception ex) { if (log != null) log("  Skipped the folders in " + src + ": " + ex.Message); }
-            try { if (Directory.GetFileSystemEntries(src).Length == 0) { di.Attributes = FileAttributes.Directory; if (Win.IsWindows) SafeDelete.Delete(src); else Directory.Delete(src, false); } } catch { }
+            try { if (Directory.GetFileSystemEntries(src).Length == 0) SafeDelete.RemoveEmptyDir(src); } catch { }
             return total;
         }
 

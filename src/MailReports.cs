@@ -301,11 +301,7 @@ namespace CDriveCleaner
         public static Doc SecurityAlert(List<string> pending)
         {
             var d = new Doc(L("Elixar: something on your PC needs you", "Elixar: משהו במחשב שלך צריך אותך"), "#c7362f");
-            d.Table(pending.Select(x => x.Split('\t')).Where(x => x.Length >= 3).Select(x =>
-            {
-                DateTime t; string when = DateTime.TryParse(x[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out t) ? t.ToString("d MMM HH:mm", CultureInfo.InvariantCulture) : "";
-                return new[] { x[1], x[2], when };
-            }));
+            d.Table(pending.Select(SecurityAlerts.Describe).Where(x => x != null));   // Elixar's own words only
             d.P(L("Open Elixar > Dashboard > PC health to see more and fix it. Nothing is changed from an email.", "פתחו את Elixar > לוח בקרה > בריאות המחשב כדי לראות עוד ולתקן. שום דבר לא משתנה ממייל."));
             return d;
         }
@@ -368,7 +364,7 @@ namespace CDriveCleaner
                 }
                 // security and PC health alerts the daily check found (it can't send email itself)
                 var sec = SecurityAlerts.Pending();
-                if (sec.Count > 0)
+                if (sec.Any(x => SecurityAlerts.Describe(x) != null))
                 {
                     string e = SecurityAlert(sec).Send();
                     Automation.Log("Email: security alert " + (e == null ? "sent." : "not sent: " + e));

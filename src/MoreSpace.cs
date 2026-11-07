@@ -373,7 +373,7 @@ namespace CDriveCleaner
             try
             {
                 foreach (var d in Directory.GetDirectories(dir)) RemoveEmptyDirs(d);
-                if (Directory.GetFileSystemEntries(dir).Length == 0 && !Protect.IsProtected(dir)) { if (Win.IsWindows) SafeDelete.Delete(dir); else Directory.Delete(dir, false); }
+                if (Directory.GetFileSystemEntries(dir).Length == 0 && !Protect.IsProtected(dir)) SafeDelete.RemoveEmptyDir(dir);
             }
             catch { }
         }

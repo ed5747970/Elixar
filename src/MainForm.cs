@@ -375,6 +375,7 @@ namespace CDriveCleaner
             {
                 if (!testMode) { var pt = new System.Windows.Forms.Timer { Interval = 1500 }; pt.Tick += (o2, e2) => { pt.Stop(); pt.Dispose(); if (Form.ActiveForm == this) { PolicyPinCheck(); OfferPinOnce(); } }; pt.Start(); }
                 Log("Elixar " + (LinuxUi ? "(running as you; system items ask for your password when you clean them)" : Sys.IsAdmin() ? "(running as administrator)" : "(NOT running as administrator - some items will be skipped)"));
+                if (Win.IsWindows && Paths.Data != null && Paths.DataProblem != null) Log("Security: " + Paths.DataProblem);
                 Log(lastScan == null ? "First scan..." : "Scanning and comparing with the scan from " + ScanSnapshot.FmtWhen(lastScan.Time) + "...");
                 RefreshOverview();
                 StartMeasure(() =>

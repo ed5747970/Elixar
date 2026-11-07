@@ -12,7 +12,7 @@ using System.Linq;
 
 namespace CDriveCleaner
 {
-    public class SecAlert { public string Key = "", Title = "", Text = ""; public bool Bad; }
+    public class SecAlert { public string Key = "", Title = "", Text = "", A = "", B = ""; public bool Bad; }
 
     public static class SecurityAlerts
     {
@@ -55,7 +55,7 @@ namespace CDriveCleaner
                 DateTime told; bool has = DateTime.TryParse(Val(state, "blue"), CultureInfo.InvariantCulture, DateTimeStyles.None, out told);
                 if (blue != null && (now - blue.When).TotalDays <= 2 && (!has || blue.When > told))
                 {
-                    list.Add(new SecAlert { Key = "bluescreen", Bad = true, Title = H("Windows stopped with a blue screen", "Windows נעצר במסך כחול"),
+                    list.Add(new SecAlert { Key = "bluescreen", Bad = true, A = blue.When.ToString("s", CultureInfo.InvariantCulture), B = blue.Code, Title = H("Windows stopped with a blue screen", "Windows נעצר במסך כחול"),
                                             Text = H("At " + blue.When.ToString("d MMM HH:mm", CultureInfo.InvariantCulture) + (blue.Code.Length > 0 ? " (" + blue.Code + ")" : "") + ". PC health shows what usually causes it.",
                                                      "ב-" + blue.When.ToString("d.M HH:mm", CultureInfo.InvariantCulture) + (blue.Code.Length > 0 ? " (" + blue.Code + ")" : "") + ". בריאות המחשב מראה מה בדרך כלל גורם לזה.") });
                     state["blue"] = blue.When.ToString("s", CultureInfo.InvariantCulture);
@@ -67,7 +67,7 @@ namespace CDriveCleaner
             if (before >= 0 && r.Total >= 0 && before - r.Total >= 10 && (!dropped || (now - dropAt).TotalDays >= 7))
             {
                 var why = r.Items.Where(i => !i.Ignored && (i.Level == HLevel.Bad || i.Level == HLevel.Warn)).OrderByDescending(i => (int)i.Level).ThenByDescending(i => i.Penalty).Take(2).Select(i => i.Title).ToList();
-                list.Add(new SecAlert { Key = "drop", Title = H("PC health dropped: " + before + " → " + r.Total, "בריאות המחשב ירדה: " + before + " → " + r.Total),
+                list.Add(new SecAlert { Key = "drop", A = before.ToString(CultureInfo.InvariantCulture), B = r.Total.ToString(CultureInfo.InvariantCulture), Title = H("PC health dropped: " + before + " → " + r.Total, "בריאות המחשב ירדה: " + before + " → " + r.Total),
                                         Text = (why.Count > 0 ? string.Join("; ", why) + ". " : "") + H("Click to see.", "לחצו כדי לראות.") });
                 state["drop"] = now.ToString("s", CultureInfo.InvariantCulture);
             }
@@ -113,12 +113,41 @@ namespace CDriveCleaner
             catch (Exception e) { if (log != null) log("Security alerts: " + e.Message); return 0; }
         }
 
-        // for the email: kept until the daily email task (which has the sign-in) sends them
+        // For the email: kept until the daily email task (which has the sign-in) sends them. Only what happened is kept
+        // (which alert, and its numbers), never text: the list is in your account's settings, where any program you run
+        // can write, and the email task runs as administrator with your email sign-in. The email's words are Elixar's own.
         static void Queue(List<SecAlert> alerts)
         {
             var have = Pending();
-            have.AddRange(alerts.Select(a => DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "\t" + a.Title.Replace("\t", " ") + "\t" + a.Text.Replace("\t", " ")));
+            have.AddRange(alerts.Select(a => DateTime.Now.ToString("s", CultureInfo.InvariantCulture) + "\t" + a.Key + "\t" + a.A.Replace("\t", "") + "\t" + a.B.Replace("\t", "")));
             Set("SecAlertMail", string.Join(Sep.ToString(), have.Skip(Math.Max(0, have.Count - 10))));
+        }
+
+        // one queued alert in Elixar's own words; null when it isn't one Elixar could have written
+        public static string[] Describe(string entry)
+        {
+            var c = (entry ?? "").Split('\t');
+            if (c.Length < 4 || c.Any(x => x.Length > 40)) return null;
+            DateTime at; if (!DateTime.TryParse(c[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out at)) return null;
+            string when = at.ToString("d MMM HH:mm", CultureInfo.InvariantCulture);
+            switch (c[1])
+            {
+                case "av": return new[] { H("Your antivirus is off", "האנטי-וירוס כבוי"), H("Open Windows Security and turn real-time protection back on.", "פתחו את אבטחת Windows והפעילו מחדש את ההגנה בזמן אמת."), when };
+                case "fw": return new[] { H("The firewall is off", "חומת האש כבויה"), H("Open Windows Security > Firewall and turn it back on.", "פתחו את אבטחת Windows > חומת אש והפעילו אותה מחדש."), when };
+                case "bluescreen":
+                {
+                    DateTime b; if (!DateTime.TryParse(c[2], CultureInfo.InvariantCulture, DateTimeStyles.None, out b)) return null;
+                    string code = System.Text.RegularExpressions.Regex.IsMatch(c[3], "^0x[0-9A-Fa-f]{1,16}$") ? " (" + c[3] + ")" : "";
+                    return new[] { H("Windows stopped with a blue screen", "Windows נעצר במסך כחול"), H("At " + b.ToString("d MMM HH:mm", CultureInfo.InvariantCulture) + code + ".", "ב-" + b.ToString("d.M HH:mm", CultureInfo.InvariantCulture) + code + "."), when };
+                }
+                case "drop":
+                {
+                    int a, b;
+                    if (!int.TryParse(c[2], NumberStyles.None, CultureInfo.InvariantCulture, out a) || !int.TryParse(c[3], NumberStyles.None, CultureInfo.InvariantCulture, out b) || a > 100 || b > 100) return null;
+                    return new[] { H("PC health dropped: " + a + " \u2192 " + b, "בריאות המחשב ירדה: " + a + " \u2192 " + b), H("PC health shows why.", "בריאות המחשב מראה למה."), when };
+                }
+            }
+            return null;
         }
         // only alerts from the last 3 days (an old one, say from before email was connected, isn't news)
         public static List<string> Pending()
