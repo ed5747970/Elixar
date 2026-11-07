@@ -322,6 +322,27 @@ namespace CDriveCleaner
                     return null;
                 });
 
+            Run(check, "Attack review: another program can't borrow Elixar's administrator rights through Windows' prompt (quiet uninstall, --purge, command-line changes are confirmed)", () =>
+            {
+                if (Program.ElevationArgs(new[] { "--uninstall", "--quiet", "--purge" }) != "--uninstall") return "elevation passes: " + Program.ElevationArgs(new[] { "--uninstall", "--quiet", "--purge" });
+                if (Program.ElevationArgs(new[] { "--install", "--policy", "x" }) != "--install") return "install";
+                if (Cli.Changes(new[] { "--status" }) || Cli.Changes(new[] { "--help" }) || !Cli.Changes(new[] { "--policy", "a.elixarpolicy" }) || !Cli.Changes(new[] { "--report", "C:\\x.json" }) || !Cli.Changes(new[] { "--tweaks", "on" })) return "which commands change";
+                string asked = null;
+                ParentGuard.AskOverride = t => { asked = t; return false; };
+                try
+                {
+                    ParentGuard.ParentOverride = () => "evil.exe";
+                    if (ParentGuard.Allow("Elixar.exe --policy evil.elixarpolicy") || asked == null || !asked.Contains("evil.exe") || !asked.Contains("--policy evil.elixarpolicy")) return "a program without admin rights wasn't stopped: " + asked;
+                    asked = null; ParentGuard.ParentOverride = () => null;   // an administrator command prompt, Task Scheduler, Windows Installer
+                    if (!ParentGuard.Allow("Elixar.exe --status") || asked != null) return "an administrator's own command was questioned";
+                    ParentGuard.AskOverride = t => true; ParentGuard.ParentOverride = () => "";
+                    if (!ParentGuard.Allow("Elixar.exe --clean")) return "you said yes";
+                }
+                finally { ParentGuard.AskOverride = null; ParentGuard.ParentOverride = null; }
+                if (Win.IsWindows && Sys.IsAdmin() && ParentGuard.NonAdminParent() != null) return "this self-test was started with administrator rights, but its starter looked like it had none: '" + ParentGuard.NonAdminParent() + "'";
+                return null;
+            });
+
             Run(check, "Old accounts and alerts in the window: the Tools page lists old accounts with nothing ticked; Automation has the alerts box, fixed when the policy sets it", () =>
             {
                 string me = Dom + "1001";

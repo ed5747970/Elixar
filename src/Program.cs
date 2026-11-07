@@ -22,6 +22,14 @@ namespace CDriveCleaner
     static class Program
     {
         [STAThread]
+        // What Elixar passes on when it asks Windows for administrator rights: only --install or --uninstall, which then ask
+        // you on screen. Never --quiet or --purge: any program, even one without administrator rights, can start Elixar, and
+        // Windows would then show Elixar's usual prompt, so one "Yes" would remove Elixar and its Undo backups unseen.
+        public static string ElevationArgs(string[] args)
+        {
+            return string.Join(" ", (args ?? new string[0]).Where(x => x == "--install" || x == "--uninstall").Distinct());
+        }
+
         static int Main(string[] args)
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
@@ -48,6 +56,8 @@ namespace CDriveCleaner
             if (args.Length > 0 && args[0] == "--fake-adb" && Environment.GetEnvironmentVariable("ELIXAR_SELFTEST") == "1") return FakeAdb.Run(args.Skip(1).ToArray());
             if (args.Contains("--selftest"))
             {
+                // made for testing Elixar on a test PC; started by a program without administrator rights, it is confirmed first
+                if (!ParentGuard.Allow(Lang.Hebrew ? "להריץ את הבדיקה העצמית של Elixar (מיועדת למחשבי בדיקה; יוצרת ומוחקת קבצים והגדרות בדיקה)" : "run Elixar's self-test (made for test PCs; it makes and removes test files and settings)")) return 1;
                 Sys.TryDpiAware();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
@@ -110,6 +120,7 @@ namespace CDriveCleaner
             if (Cli.IsCli(args))
             {
                 if (droppedEnv.Count > 0) { Console.WriteLine("Elixar: started with .NET settings that load extra code; not running."); return 1; }
+                if (Cli.Changes(args) && !ParentGuard.Allow("Elixar.exe " + string.Join(" ", args))) { Console.WriteLine("Elixar: not allowed."); return 2; }
                 return Cli.Run(args);
             }
             bool testUi = args.Contains("--test");
@@ -146,7 +157,7 @@ namespace CDriveCleaner
                     }
                     catch { }
                     // keep --install / --uninstall when asking for admin rights
-                    string pass = string.Join(" ", args.Where(x => x == "--install" || x == "--uninstall" || x == "--quiet" || x == "--purge"));
+                    string pass = ElevationArgs(args);
                     Process.Start(new ProcessStartInfo(self, pass) { UseShellExecute = true, Verb = "runas" });
                 }
                 catch (Win32Exception)
@@ -170,8 +181,19 @@ namespace CDriveCleaner
             }
 
             int au = Array.IndexOf(args, "--apply-update");
-            if (au >= 0 && au + 2 < args.Length) { int pid; int.TryParse(args[au + 2], out pid); return Updates.Apply(args[au + 1], pid); }
-            if (args.Contains("--uninstall")) { Application.EnableVisualStyles(); return Setup.Uninstall(args.Contains("--quiet"), args.Contains("--msi"), args.Contains("--purge")); }
+            if (au >= 0 && au + 2 < args.Length)
+            {
+                if (!ParentGuard.Allow(Lang.Hebrew ? "להתקין את העותק הזה של Elixar (" + Application.ExecutablePath + ") בתיקיית Program Files" : "install this copy of Elixar (" + Application.ExecutablePath + ") into Program Files")) return 1;
+                int pid; int.TryParse(args[au + 2], out pid); return Updates.Apply(args[au + 1], pid);
+            }
+            if (args.Contains("--uninstall"))
+            {
+                Application.EnableVisualStyles();
+                bool quiet = args.Contains("--quiet"), msi = args.Contains("--msi"), purge = args.Contains("--purge");
+                // a quiet removal shows nothing, so a program without administrator rights that started it must be confirmed
+                if (quiet && !ParentGuard.Allow(Lang.Hebrew ? "להסיר את Elixar מהמחשב בלי שאלות" + (purge ? ", כולל גיבויי הביטול" : "") : "remove Elixar from this PC without questions" + (purge ? ", with its Undo backups" : ""))) return 1;
+                return Setup.Uninstall(quiet, msi, purge);
+            }
             if (args.Contains("--install"))
             {
                 Application.EnableVisualStyles();

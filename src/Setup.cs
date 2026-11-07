@@ -73,6 +73,8 @@ namespace CDriveCleaner
         }
 
         // removes the schedules, Start menu entry, apps-list entry and the Program Files copy; your Undo backups stay until they expire
+        public static bool QuietPurgeOkForTest;   // self-test
+        static bool RunsAsSystem() { try { using (var id = System.Security.Principal.WindowsIdentity.GetCurrent()) return id.IsSystem; } catch { return false; } }
         public static int Uninstall(bool quiet) { return Uninstall(quiet, false, false); }
         public static int Uninstall(bool quiet, bool msi) { return Uninstall(quiet, msi, false); }
         // msi: run by the MSI while it uninstalls; Windows Installer removes the files and the Start menu entry itself
@@ -81,6 +83,11 @@ namespace CDriveCleaner
         {
             if (!quiet && Lang.Box(null, "Remove Elixar from this PC?\n\nThe schedules, the email sign-in, the Start menu entry and the copy in Program Files are removed.",
                     "Elixar", System.Windows.Forms.MessageBoxButtons.OKCancel, System.Windows.Forms.MessageBoxIcon.Question) != System.Windows.Forms.DialogResult.OK) return 1;
+            // Deleting the Undo backups (copies of your files) is asked on screen, unless Windows Installer or IT's tools run it
+            // (as SYSTEM, where nobody sees a question). Someone else's program could start a quiet --purge through Windows'
+            // prompt for Elixar; then it is asked here too.
+            if (quiet && purge && !msi && !RunsAsSystem() && Environment.UserInteractive && !QuietPurgeOkForTest)
+                purge = Lang.BoxNo(null, "Elixar is being removed without questions, and was asked to also delete its Undo backups (copies of the files it removed) and its logs.\n\nDelete them too?", "Elixar") == System.Windows.Forms.DialogResult.Yes;
             // without Elixar nothing deletes old Undo backups any more, so ask what to do with them
             if (!quiet && !purge)
                 purge = Lang.Box(null, "Also delete Elixar's Undo backups (copies of the files it removed) and its logs?\n\nYes: nothing of Elixar stays on this PC.\nNo: they stay in C:\\ProgramData\\Elixar and \"Elixar Undo\" folders until you delete them.",

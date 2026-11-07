@@ -1797,6 +1797,7 @@ HE.setdefault('To keep a copy, press Cancel and use Copy to another drive first.
 HE.setdefault("Are you sure? This is the last question: the files can't be brought back.", 'בטוחים? זו השאלה האחרונה: אי אפשר להחזיר את הקבצים.')
 HE.setdefault("Windows is removing the accounts' files...", 'Windows מסיר את הקבצים של החשבונות...')
 HE.setdefault("Windows didn't say which accounts have a folder on this PC, so nothing is offered.", 'Windows לא אמר לאילו חשבונות יש תיקייה במחשב הזה, ולכן לא מוצע כלום.')
+HE.setdefault('Elixar is being removed without questions, and was asked to also delete its Undo backups (copies of the files it removed) and its logs.\n\nDelete them too?', 'Elixar מוסר בלי שאלות, והתבקש למחוק גם את גיבויי הביטול שלו (עותקים של הקבצים שהסיר) ואת היומנים.\n\nלמחוק גם אותם?')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']

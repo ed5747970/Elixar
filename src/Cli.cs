@@ -15,6 +15,13 @@ namespace CDriveCleaner
         public static readonly string[] Commands = { "--help", "/?", "--status", "--clean", "--clean-item", "--report", "--policy", "--tweaks", "--update-apps", "--list-items", "--admx" };
 
         public static bool IsCli(string[] args) { return args.Length > 0 && Commands.Contains(args[0], StringComparer.OrdinalIgnoreCase); }
+        // the commands that change something (or write a file): confirmed when a program without administrator rights started them
+        public static bool Changes(string[] args)
+        {
+            if (args.Length == 0) return false;
+            string c = args[0].ToLowerInvariant();
+            return !(c == "--help" || c == "/?" || c == "--admx" || c == "--status" || c == "--list-items");
+        }
 
         [DllImport("kernel32.dll")] static extern bool AttachConsole(int pid);
 

@@ -2118,6 +2118,7 @@ namespace CDriveCleaner
             d["Are you sure? This is the last question: the files can't be brought back."] = "בטוחים? זו השאלה האחרונה: אי אפשר להחזיר את הקבצים.";
             d["Windows is removing the accounts' files..."] = "Windows מסיר את הקבצים של החשבונות...";
             d["Windows didn't say which accounts have a folder on this PC, so nothing is offered."] = "Windows לא אמר לאילו חשבונות יש תיקייה במחשב הזה, ולכן לא מוצע כלום.";
+            d["Elixar is being removed without questions, and was asked to also delete its Undo backups (copies of the files it removed) and its logs.\n\nDelete them too?"] = "Elixar מוסר בלי שאלות, והתבקש למחוק גם את גיבויי הביטול שלו (עותקים של הקבצים שהסיר) ואת היומנים.\n\nלמחוק גם אותם?";
             // texts with numbers in them
             Pat(@"Signed in to OneDrive as (.+) \((.+)\)  ·  (.+)", m => "מחובר ל-OneDrive בתור " + m.Groups[1].Value + " (" + T(m.Groups[2].Value) + ")  ·  " + m.Groups[3].Value);
             Pat(@"On this PC: (.+) of OneDrive files \((.+) marked ""Always keep""\)\. Already online-only: (.+)\.", m => "במחשב הזה: " + m.Groups[1].Value + " של קבצי OneDrive (" + m.Groups[2].Value + " מסומנים \"שמור תמיד\"). כבר רק באינטרנט: " + m.Groups[3].Value + ".");

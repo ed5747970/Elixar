@@ -831,6 +831,13 @@ namespace CDriveCleaner
                 if (!Locked.IsLocked(Dir)) return "Could not protect " + Dir + ".";
                 if (!Matches)
                 {
+                    // never an older Elixar over a newer one (an old copy, say in Downloads, would bring back what was fixed since)
+                    try
+                    {
+                        if (File.Exists(Exe) && Updates.Compare(new Version(System.Diagnostics.FileVersionInfo.GetVersionInfo(Exe).FileVersion), Updates.Current) > 0)
+                            return "A newer Elixar (" + System.Diagnostics.FileVersionInfo.GetVersionInfo(Exe).FileVersion + ") is already installed; this older copy was not put over it.";
+                    }
+                    catch { }
                     string tmp = Exe + ".new";
                     if (File.Exists(tmp)) File.Delete(tmp);
                     File.WriteAllBytes(tmp, SelfImage.Bytes());
