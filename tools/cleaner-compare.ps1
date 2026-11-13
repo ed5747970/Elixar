@@ -3,7 +3,7 @@
 # settings and the script measures what went, what stayed, and how long it took.
 # The junk is 30 days old (so no tool skips it for being new). Results: one RESULT line (JSON) in the log and a table in
 # the job summary.
-param([Parameter(Mandatory = $true)][ValidateSet("none", "elixar", "diskcleanup", "bleachbit", "ccleaner")][string]$Tool)
+param([Parameter(Mandatory = $true)][ValidateSet("none", "elixar", "elixar-ticked", "diskcleanup", "bleachbit", "ccleaner")][string]$Tool)
 
 $ErrorActionPreference = "Continue"
 $work = Join-Path $env:RUNNER_TEMP "cmp"
@@ -69,6 +69,21 @@ switch ($Tool) {
             $exe = Get-ChildItem "$work\elixar" -Recurse -Filter Elixar.exe | Select-Object -First 1
             $version = (Get-Item $exe.FullName).VersionInfo.FileVersion
             $run = { $p = Start-Process -FilePath $exe.FullName -ArgumentList "--clean" -Wait -PassThru; "exit " + $p.ExitCode }
+        } else { $problem = "download failed" }
+    }
+    "elixar-ticked" {
+        # the automatic Safe clean, plus what you'd tick by hand for these places: browser caches and the Recycle Bin
+        if (Get-File @("https://github.com/ed5747970/Elixar/releases/latest/download/Elixar.zip") "$work\elixar.zip") {
+            Expand-Archive "$work\elixar.zip" "$work\elixar" -Force
+            $exe = Get-ChildItem "$work\elixar" -Recurse -Filter Elixar.exe | Select-Object -First 1
+            $version = (Get-Item $exe.FullName).VersionInfo.FileVersion
+            $run = {
+                $o = ""
+                foreach ($a in @(@("--clean"), @("--clean-item", '"Chrome cache"'), @("--clean-item", '"Edge cache"'), @("--clean-item", '"Recycle Bin"'))) {
+                    $p = Start-Process -FilePath $exe.FullName -ArgumentList $a -Wait -PassThru; $o += ($a -join " ") + ": exit " + $p.ExitCode + "; "
+                }
+                $o
+            }
         } else { $problem = "download failed" }
     }
     "diskcleanup" {
