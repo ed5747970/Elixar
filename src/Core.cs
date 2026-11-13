@@ -249,7 +249,26 @@ namespace CDriveCleaner
         public static void EmptyRecycleBin()
         {
             // no confirmation, no progress window, no sound
-            SHEmptyRecycleBin(IntPtr.Zero, "C:\\", 0x7);
+            int hr = SHEmptyRecycleBin(IntPtr.Zero, "C:\\", 0x7);
+            // Windows sometimes says no (no desktop, as in a scheduled task or a remote session) and empties nothing, which
+            // went unnoticed: then your own bin's files (C:\$Recycle.Bin\<your account>) are removed directly, link-safe
+            string mine = MyRecycleBin();
+            if (mine != null && Directory.Exists(mine) && Directory.GetFileSystemEntries(mine, "$R*").Length + Directory.GetFileSystemEntries(mine, "$I*").Length > 0)
+            {
+                foreach (var e in Directory.GetFileSystemEntries(mine))
+                {
+                    string n = Path.GetFileName(e);
+                    if (!n.StartsWith("$R") && !n.StartsWith("$I")) continue;   // desktop.ini and the like stay
+                    try { SafeDelete.Delete(e); } catch { }
+                }
+            }
+            if (hr != 0 && hr != 1 && mine != null && Directory.Exists(mine) && Directory.GetFileSystemEntries(mine, "$R*").Length > 0)
+                throw new IOException("Windows didn't empty the Recycle Bin (code 0x" + hr.ToString("X8") + ").");
+        }
+
+        static string MyRecycleBin()
+        {
+            try { using (var id = System.Security.Principal.WindowsIdentity.GetCurrent()) return Path.Combine(@"C:\$Recycle.Bin", id.User.Value); } catch { return null; }
         }
 
         public static long Free() { try { return new DriveInfo(Win.IsWindows ? "C" : "/").AvailableFreeSpace; } catch { return 0; } }

@@ -10,6 +10,16 @@ TWO EDITIONS
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
 
+NEW IN 1.2.67
+- Startup > Also starts by itself: scheduled tasks and services that apps
+  added, flagged when they look like unwanted software. Tasks can be
+  turned off and on again; services are only shown.
+- PC health: battery health on laptops (charge it still holds, cycles,
+  6-month trend).
+- Cleaner > Cookies to keep: clearing cookies keeps you signed in
+  to the sites you choose; the original file goes to Undo.
+- The Recycle Bin item now empties the bin even where Windows refuses.
+
 NEW IN 1.2.66
 - What Elixar did for you: space freed, how much faster Windows starts
   since you turned off start-up apps, and PC health then and now. On the

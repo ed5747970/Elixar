@@ -15,7 +15,7 @@ using System.Text.RegularExpressions;
 namespace CDriveCleaner
 {
     public enum HLevel { Ok, Info, Warn, Bad }
-    public enum HAct { None, RepairWindows, UpdateApps, Restart, Drivers, Startup, Memory, PowerBalanced, RestorePoint, SystemProtection, Backup, BitLocker, Defender, Firewall, Uac, DiskHealth, CheckFix, Growing, SystemSpace }
+    public enum HAct { None, RepairWindows, UpdateApps, Restart, Drivers, Startup, Memory, PowerBalanced, RestorePoint, SystemProtection, Backup, BitLocker, Defender, Firewall, Uac, DiskHealth, CheckFix, Growing, SystemSpace, Battery }
 
     public class HFind
     {
@@ -48,6 +48,9 @@ namespace CDriveCleaner
         // space and drives
         public long Free = -1, Total; public int FastFolders, UnusualFolders; public HealthLevel Disk = HealthLevel.Unknown;
         public long SearchIndex = -1;   // Windows Search's index, bytes (-1 unknown)
+        public BatteryInfo Battery;     // null: no battery (or unknown)
+        public int AutostartsBad = -1;  // tasks and services apps added that look like unwanted software (-1 unknown)
+        public List<KeyValuePair<string, int>> BatteryHistory = new List<KeyValuePair<string, int>>();
         // safety net
         public bool RestoreKnown; public DateTime? LastRestore; public bool? FileHistory, OneDriveBackup;
         // battery
@@ -438,6 +441,18 @@ namespace CDriveCleaner
                                     Detail = H("Usually under 1-2 GB: it is probably damaged. Tools > System space rebuilds it the way Windows does.", "בדרך כלל פחות מ-1-2 GB: כנראה שהוא פגום. כלים > שטח מערכת בונה אותו מחדש כמו ש-Windows עושה.") });
             }
 
+            // tasks and services that start by themselves and look like unwanted software
+            if (f.AutostartsBad > 0)
+                add(new HFind { Area = "Security", Key = "autostarts", Level = HLevel.Warn, Penalty = 10, Act = HAct.Startup, Button = "Show me", CanIgnore = true,
+                                Title = H(f.AutostartsBad == 1 ? "1 hidden autostart looks like unwanted software" : f.AutostartsBad + " hidden autostarts look like unwanted software",
+                                          f.AutostartsBad == 1 ? "הפעלה אוטומטית נסתרת אחת נראית כמו תוכנה לא רצויה" : f.AutostartsBad + " הפעלות אוטומטיות נסתרות נראות כמו תוכנה לא רצויה"),
+                                Detail = H("A scheduled task or service that isn't signed and runs from your folders, or runs a hidden script. Startup > Also starts by itself shows it.",
+                                           "משימה מתוזמנת או שירות שאינם חתומים ורצים מהתיקיות שלך, או מריצים סקריפט נסתר. הפעלה > מופעל גם מעצמו מציג אותם.") });
+
+            // battery wear (laptops): a little in Stability, only when it is worth replacing
+            var bat = CDriveCleaner.Battery.Finding(f.Battery, f.BatteryHistory, now);
+            if (bat != null) add(bat);
+
             // ---- Drives ----
             if (f.Disk != HealthLevel.Unknown)
             {
@@ -535,6 +550,8 @@ namespace CDriveCleaner
             Action<string> say = s => { if (status != null) status(s); };
             try { f.Free = Sys.Free(); f.Total = Sys.Total(); } catch { }
             try { f.SearchIndex = CDriveCleaner.SearchIndex.Size(); } catch { }
+            try { f.Battery = CDriveCleaner.Battery.Read(); f.BatteryHistory = CDriveCleaner.Battery.History(); } catch { }
+            try { f.AutostartsBad = Autostarts.Suspicious(Autostarts.Read(true, true)); } catch { }
             if (!Win.IsWindows) return f;
 
             say("Reading Windows Security, updates and error records...");
@@ -716,6 +733,7 @@ namespace CDriveCleaner
             var f = Collect(withAppUpdates, freshApps, status);
             var r = Evaluate(f, DateTime.Now, IgnoredKeys());
             Remember(r);
+            try { CDriveCleaner.Battery.Remember(f.Battery, DateTime.Now); } catch { }
             return r;
         }
 

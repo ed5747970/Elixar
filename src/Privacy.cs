@@ -57,6 +57,13 @@ namespace CDriveCleaner
             return list;
         }
 
+        static string KeepNote(List<string> keep) { return keep.Count == 0 ? "" : (Lang.Hebrew ? " · שומר " + keep.Count + " אתרים" : " · keeps " + keep.Count + (keep.Count == 1 ? " site" : " sites")); }
+        static string KeepInfo(List<string> keep)
+        {
+            string few = string.Join(", ", keep.Take(4)) + (keep.Count > 4 ? (Lang.Hebrew ? " ועוד " : " and ") + (keep.Count - 4) + (Lang.Hebrew ? "" : " more") : "");
+            return Lang.Hebrew ? "מסיר את העוגיות של כל שאר האתרים (עוקבים, אתרים שביקרת בהם פעם). נשארים מחוברים ל: " + few + ". הקובץ המקורי עובר לביטול ל-7 ימים."
+                               : "Removes the cookies of every other site (trackers, sites you visited once). You stay signed in to: " + few + ". The original file goes to Undo for 7 days.";
+        }
         static long Sum(IEnumerable<string> files) { long t = 0; foreach (var f in files) { try { t += new FileInfo(f).Length; } catch { } } return t; }
         static void DeleteAll(IEnumerable<string> files) { foreach (var f in files) Fs.Delete(f); }
 
@@ -117,6 +124,7 @@ namespace CDriveCleaner
             string recent = Path.Combine(R, "Microsoft", "Windows", "Recent");
             string ff = Path.Combine(R, "Mozilla", "Firefox", "Profiles");
             var chromium = new[] { "chrome", "msedge", "brave" };
+            var keep = Win.IsWindows || CookieKeep.ListFileOverride != null ? CookieKeep.Load() : new List<string>();
             Func<List<string>> history = () => ProfileFiles(BrowserRoots(), HistoryFiles);
             Func<List<string>> cookies = () => ProfileFiles(BrowserRoots(), CookieFiles);
             Func<List<string>> recentFiles = () =>
@@ -132,12 +140,14 @@ namespace CDriveCleaner
                 new CleanItem { Name = "Browsing history (Chrome, Edge, Brave)", Tier = Tier.Review, Privacy = true, Where = "Browser profiles", Procs = chromium,
                     Info = "Sites you visited, the address-bar suggestions and the most-visited tiles. Passwords, bookmarks and saved logins are not touched. Close the browser first.",
                     Measure = () => Sum(history()), Clean = log => DeleteAll(history()) },
-                new CleanItem { Name = "Cookies (Chrome, Edge, Brave)", Tier = Tier.Review, Privacy = true, Where = "Browser profiles", Procs = chromium,
-                    Info = "Remove trackers and site data. You will be signed out of websites. Close the browser first.",
-                    Measure = () => Sum(cookies()), Clean = log => DeleteAll(cookies()) },
-                new CleanItem { Name = "Cookies (Firefox)", Tier = Tier.Review, Privacy = true, Where = ff, Procs = new[] { "firefox" },
-                    Info = "Remove trackers and site data. You will be signed out of websites. Your Firefox history and bookmarks are not touched.",
-                    Measure = () => Sum(FirefoxCookies(ff)), Clean = log => DeleteAll(FirefoxCookies(ff)) },
+                new CleanItem { Name = "Cookies (Chrome, Edge, Brave)", Tier = Tier.Review, Privacy = true, Where = "Browser profiles" + KeepNote(keep), Procs = chromium,
+                    Info = keep.Count > 0 ? KeepInfo(keep) + " Close the browser first."
+                                          : "Remove trackers and site data. You will be signed out of websites. Close the browser first. (Cookies to keep... keeps you signed in to the sites you choose.)",
+                    Measure = () => Sum(cookies()), Clean = log => { var k = CookieKeep.Load(); if (k.Count > 0) CookieKeep.Clean(CookieKeep.Dbs().Where(d => d.Browser != "Firefox"), k, log); else DeleteAll(cookies()); } },
+                new CleanItem { Name = "Cookies (Firefox)", Tier = Tier.Review, Privacy = true, Where = ff + KeepNote(keep), Procs = new[] { "firefox" },
+                    Info = keep.Count > 0 ? KeepInfo(keep) + " Your Firefox history and bookmarks are not touched."
+                                          : "Remove trackers and site data. You will be signed out of websites. Your Firefox history and bookmarks are not touched.",
+                    Measure = () => Sum(FirefoxCookies(ff)), Clean = log => { var k = CookieKeep.Load(); if (k.Count > 0) CookieKeep.Clean(CookieKeep.Dbs().Where(d => d.Browser == "Firefox"), k, log); else DeleteAll(FirefoxCookies(ff)); } },
                 new CleanItem { Name = "Recent files and jump lists", Tier = Tier.Review, Privacy = true, Where = recent,
                     Info = "The lists of files you opened lately (Explorer Quick access, taskbar right-click lists). Also clears items you pinned in those lists. The files themselves are not touched.",
                     Measure = () => Sum(recentFiles()), Clean = log => DeleteAll(recentFiles()) },

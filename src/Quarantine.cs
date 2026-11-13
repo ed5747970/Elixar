@@ -295,6 +295,20 @@ namespace CDriveCleaner
                     if ((File.Exists(from) || Directory.Exists(from)) && SafeTarget(it[1])) { MoveTree(from, it[1], log); ok++; }
                 }
             }
+            else if (b.Kind == "cookies")
+            {
+                // the cookie file was edited in place of the original: the edited one goes, the original comes back
+                foreach (var it in b.Items)
+                {
+                    string from = Path.Combine(b.Dir, it[0]);
+                    if (!File.Exists(from)) continue;
+                    if (!SafeTarget(it[1])) { if (log != null) log("  Not restored (unsafe place): " + it[1]); continue; }
+                    try { if (File.Exists(it[1])) { if (Win.IsWindows) SafeDelete.Delete(it[1]); else File.Delete(it[1]); } } catch { }
+                    if (File.Exists(it[1])) { if (log != null) log("  Not restored (the browser has it open?): " + it[1]); continue; }
+                    MoveTree(from, it[1], log); ok++;
+                    if (log != null) log("  Restored " + it[1]);
+                }
+            }
             else if (b.Kind == "drivers")
             {
                 foreach (var it in b.Items)
@@ -341,6 +355,7 @@ namespace CDriveCleaner
         }
 
         public static void Delete(UndoBatch b) { Delete(b, true); }
+        public static void Discard(UndoBatch b) { Delete(b, false); }   // an empty batch nobody needs
         static void Delete(UndoBatch b, bool record)
         {
             try { Fs.Delete(b.Dir); } catch { }

@@ -386,6 +386,13 @@ namespace CDriveCleaner
                 case HAct.CheckFix: OpenCheckFix(); break;
                 case HAct.Growing: OpenGrowing(); break;
                 case HAct.SystemSpace: ShowTools(pageSys); break;
+                case HAct.Battery:
+                    System.Threading.Tasks.Task.Factory.StartNew(() => Battery.OpenFullReport()).ContinueWith(t => UI(() =>
+                    {
+                        string e = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result;
+                        if (e != null) Lang.Box(this, e, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }));
+                    break;
             }
         }
 

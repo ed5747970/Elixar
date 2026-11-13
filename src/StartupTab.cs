@@ -22,9 +22,11 @@ namespace CDriveCleaner
 
         void BuildStartup()
         {
-            var t = Page(4);
+            var t = Page(8);
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            t.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.RowStyles.Add(new RowStyle(SizeType.Percent, 55)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.RowStyles.Add(new RowStyle(SizeType.AutoSize)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.RowStyles.Add(new RowStyle(SizeType.Percent, 45)); t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             startStatus = Note("Everything that starts by itself when you sign in. Elixar checks who signed each program and where it runs from. " +
                                "Turning one off works like Task Manager's Startup tab and can be turned back on any time.");
             startList = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, Dock = DockStyle.Fill, ShowItemToolTips = true };
@@ -39,6 +41,7 @@ namespace CDriveCleaner
             btnStartRefresh = MakeButton("Check again");
             row.Controls.AddRange(new Control[] { btnStartOff, btnStartOn, btnStartLeft, btnStartScan, btnStartOpen, btnStartRefresh });
             t.Controls.Add(Title("Startup programs"), 0, 0); t.Controls.Add(startStatus, 0, 1); t.Controls.Add(startList, 0, 2); t.Controls.Add(row, 0, 3);
+            BuildAutostarts(t, 4);
             pageStartup.Controls.Add(t);
             btnStartOff.Click += (o, e) => SwitchStartup(false);
             btnStartOn.Click += (o, e) => SwitchStartup(true);
@@ -69,6 +72,7 @@ namespace CDriveCleaner
 
         public void RefreshStartup()
         {
+            RefreshAutostarts();
             if (startBusy) return;
             startBusy = true; startLoaded = true; UpdateStartButtons();
             startStatus.Text = "Reading startup programs and checking their signatures...";

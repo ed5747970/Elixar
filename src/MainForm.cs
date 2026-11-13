@@ -185,8 +185,10 @@ namespace CDriveCleaner
             btnCleanApps.Click += (o, e) => ShowStoreTab();
             btnPlan = MakeButton("Free space for me...");
             btnPlan.Click += (o, e) => OnPlan();
-            flow.Controls.AddRange(new Control[] { btnPlan, btnMeasure, btnSafe, btnNone, btnScan, btnCleanApps });
-            if (LinuxUi) { btnPlan.Visible = false; btnCleanApps.Visible = false; }   // the Dashboard's "Free ... safely" does this on Linux; apps are removed with the App Center
+            var btnKeep = MakeButton("Cookies to keep...");
+            btnKeep.Click += (o, e) => ShowCookieKeep();
+            flow.Controls.AddRange(new Control[] { btnPlan, btnMeasure, btnSafe, btnNone, btnScan, btnCleanApps, btnKeep });
+            if (LinuxUi) { btnPlan.Visible = false; btnCleanApps.Visible = false; btnKeep.Visible = false; }   // the Dashboard's "Free ... safely" does this on Linux; apps are removed with the App Center
             btnClean = MakeButton("Clean selected");
             btnClean.Font = new Font("Segoe UI Semibold", 9.5f);
             btnClean.Padding = new Padding(S(18), S(4), S(18), S(4));
@@ -204,8 +206,9 @@ namespace CDriveCleaner
                 h += flow.Padding.Bottom + flow.Margin.Vertical;
                 if (h <= 0) return;
                 if (btnRow.MinimumSize.Height != h) btnRow.MinimumSize = new Size(0, h);
-                int fixedRows = bottom.Padding.Vertical + S(44) + (chkRestore.Visible ? chkRestore.Height + chkRestore.Margin.Vertical : 0) + Math.Max(h, btnRow.Height) + S(22) + S(4);
-                int want = fixedRows + S(150);   // the log's usual height
+                int fixedRows = bottom.Padding.Vertical + S(44) + (chkRestore.Visible ? chkRestore.Height + chkRestore.Margin.Vertical : 0) + Math.Max(h, btnRow.Height) + S(22) + S(4)
+                                + logBox.Margin.Vertical + S(48);   // the log always keeps about two lines (with 3 rows of buttons it was squeezed out)
+                int want = fixedRows + S(102);   // the log's usual height (150 with its 48 above)
                 int room = pageClean.ClientSize.Height - lblTop.Height - lblScan.Height - S(110);   // keep about 4 lines of the list
                 int to = Math.Max(fixedRows, Math.Min(want, room));
                 if (bottom.Height != to) bottom.Height = to;
@@ -528,6 +531,31 @@ namespace CDriveCleaner
         }
 
         public void Rescan() { StartMeasure(null); }
+
+        // Cleaner > Sites to keep (cookies)
+        public CookieKeepForm CookieKeepForTest;   // self-test: the window, while open
+        public void ShowCookieKeep()
+        {
+            using (var f = new CookieKeepForm(s))
+            {
+                CookieKeepForTest = f;
+                if (f.ShowDialog(this) == DialogResult.OK) { Log("Cookies: sites to keep saved (" + CookieKeep.Load().Count + ")."); CookieTexts(); }
+                CookieKeepForTest = null;
+            }
+        }
+        // the Cookies rows say how many sites they keep
+        void CookieTexts()
+        {
+            var fresh = Catalog.Build();
+            foreach (var kv in rows)
+            {
+                if (!kv.Key.Name.StartsWith("Cookies (")) continue;
+                var f = fresh.FirstOrDefault(x => x.Name == kv.Key.Name);
+                if (f == null) continue;
+                kv.Key.Where = f.Where; kv.Key.Info = f.Info;
+                kv.Value.SubItems[5].Text = f.Where;
+            }
+        }
 
         public bool ChangeColumnFilled()
         {

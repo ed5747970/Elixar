@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.66</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.67</p></div>
 </div></header>
 <main class="wrap">
 
@@ -87,7 +87,7 @@
 <h2 id="dashboard">Dashboard</h2>
 <p>The Dashboard opens first. It tells you at a glance how your drives are doing and what you can do about it. Looking never deletes anything; every clean asks first.</p>
 <h3>PC health</h3>
-<p>Under the drive picture, <strong>PC health</strong> gives this PC one score from 0 to 100 and a score for each of six areas. It is worked out from what Windows already records, so checking changes nothing and sends nothing anywhere. It is checked when the Dashboard opens (at most every 30 minutes); click it to see what Elixar found.</p>
+<p>Under the drive picture, <strong>PC health</strong> gives this PC one score from 0 to 100 and a score for each of six areas. It is worked out from what Windows already records, so checking changes nothing and sends nothing anywhere. It is checked when the Dashboard opens (at most every 30 minutes); click it to see what Elixar found. On a laptop, Stability includes the battery&rsquo;s health: how much charge it still holds compared with when it was new (from Windows&rsquo; own battery report), the charge cycles and the trend over 6 months; under 60% it is worth replacing. <strong>Open the full battery report</strong> shows Windows&rsquo; report.</p>
 <table>
   <tr><th>Area</th><th>What Elixar looks at</th><th>What the button does</th></tr>
   <tr><td><strong>Security</strong></td><td>Microsoft Defender (or your other antivirus) on and up to date; the firewall; when Windows Update last installed something and whether it keeps failing; apps with updates waiting; Secure Boot, TPM, User Account Control; BitLocker on C:</td><td>Repair Windows (fixes the store updates come from), Update apps (winget / Microsoft Store, a restore point first), or Windows' own settings page. Elixar never switches the firewall, User Account Control or BitLocker itself</td></tr>
@@ -191,6 +191,7 @@
   <li><strong>Rescan (F5):</strong> measures again. The Change column shows how much each item grew (orange) or shrank (green) since the last scan.</li>
   <li><strong>Comes back:</strong> after you clean an item, Elixar learns from the next scans how fast it fills up again (&ldquo;in ~2 days&rdquo;, &ldquo;slowly (weeks)&rdquo;). Something that is back in a day or two, like a browser&rsquo;s cache, isn&rsquo;t worth cleaning often: it only makes the app slower until it has refilled. Those are shown in orange, the clean asks about them, and the weekly clean leaves them out (a clean because C: is low still includes them).</li>
   <li><strong>Privacy items</strong> never touch saved passwords, bookmarks or logins, and are never part of the weekly clean.</li>
+  <li><strong>Cookies to keep...</strong> chooses the sites whose cookies stay when you clean the Cookies items, so you stay signed in there; every other site&rsquo;s cookies go (trackers, sites you visited once). Sites where you look signed in are ticked first. Elixar edits a copy of each browser&rsquo;s cookie file and puts the original in Undo for 7 days. The browser must be closed, as before.</li>
 </ul>
 
 <h2 id="apps">Apps</h2>
@@ -239,6 +240,8 @@
 <p>Drivers a device uses, drivers Windows needs to start, and printer and extension drivers are never offered. Each removed driver is backed up to Undo first.</p>
 <h3>Startup</h3>
 <p>Everything that starts with Windows, checked for who signed it and where it runs from. <strong>Slows startup by</strong> shows what Windows itself measured each time a program made startup slower than usual (its Diagnostics-Performance log, the last 90 days), and the line above the list says how long the last startups took. &ldquo;Needs a look&rdquo; flags hidden scripts, programs in Temp or Downloads, and broken or missing signatures. Turn entries off or on (the same switch as Task Manager), remove leftovers whose program is gone (kept in Undo), or scan any of them with Microsoft Defender. Not signed doesn't mean harmful; many small tools aren't signed.</p>
+<h3>Also starts by itself</h3>
+<p>Under the Startup list: scheduled tasks and services that apps added. Programs can start themselves this way without showing in the Startup list, which is where unwanted software often hides. Each one shows when it runs, who signed it and where it runs from; &ldquo;Needs a look&rdquo; flags programs that aren&rsquo;t signed and run from your user folders or ProgramData, hidden scripts, and tasks whose program is gone. Windows&rsquo; own are hidden (tick <strong>Show Windows&rsquo; own</strong> to see them). <strong>Turn off selected tasks</strong> uses Task Scheduler&rsquo;s own switch and can be turned back on; Windows&rsquo; and Elixar&rsquo;s own tasks are never changed. Services are only shown, because turning one off can break the app or Windows: <strong>Open Services</strong> opens Windows&rsquo; own window. PC health mentions it when something looks like unwanted software.</p>
 <h3>System space</h3>
 <ul>
   <li>Hibernation file: hiberfil.sys is often 6-16 GB. &ldquo;Make smaller&rdquo; keeps Fast Startup but drops Hibernate; &ldquo;Turn off&rdquo; frees all of it; &ldquo;Turn back on&rdquo; restores it.</li>
@@ -567,6 +570,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-11-13</td><td>1.2.67</td><td>Startup: Also starts by itself (scheduled tasks and services apps added, flagged when they look like unwanted software; tasks can be turned off). PC health: battery health on laptops. Cleaner: Cookies to keep keeps you signed in to the sites you choose. The Recycle Bin item empties the bin even where Windows refuses. Security: another program can't borrow Elixar's administrator rights through Windows' prompt; Move off C: only into folders that are yours.</td></tr>
   <tr><td>2026-11-07</td><td>1.2.66</td><td>What Elixar did for you (space freed, Windows starting faster, PC health then and now) on the Dashboard and in the weekly email; the Cleaner&apos;s Comes back column (how fast each item fills up again, and the weekly clean leaves out what&apos;s back in a day or two); the clean when C: is low runs before the alert, which shows only if C: is still low; Fix all safe in PC health; Tools &gt; Leftover installers; security and PC health alerts; the Media Creation Tool and Update Assistant leftovers in the Cleaner; the search index in System space; Tools &gt; Old accounts</td></tr>
   <tr><td>2026-11-01</td><td>1.2.65</td><td>Fixes from a review of the last releases: Ignore in PC health now sticks for an app whose name has a symbol in it (like Notepad++); a window you move half onto another monitor stays where you put it (only a title bar you can&apos;t reach is brought back); the Cure Server counts wrong enrollment tokens per IPv6 network, not per address; the cloud check also records connections Windows blocked</td></tr>
   <tr><td>2026-10-31</td><td>1.2.64</td><td>The top bar works from the keyboard: Tab reaches it, the arrows and Enter open a page, Ctrl+Tab and Ctrl+1&hellip;9 switch pages, and screen readers read it as tabs. Arabic, Russian and Spanish now cover every page&apos;s title and button, PC health and Check &amp; fix. Each release is checked on a Windows PC in the cloud for every network connection Elixar makes (only this PC, and the Cure Server for Business)</td></tr>

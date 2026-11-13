@@ -1839,6 +1839,7 @@ namespace CDriveCleaner
                         // 1.2.66: did it help, comes back, low-space clean, Fix all safe, leftover installer files
                         SelfTest1266.All(root, check);
                         SelfTest1266b.All(root, check);
+                        SelfTest1267.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {
