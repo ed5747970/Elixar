@@ -713,7 +713,15 @@ namespace CDriveCleaner
                     if (why != null) { if (log != null) log("Keep in check: skipped " + r.Path + " (" + why + ")"); continue; }
                     freed += RunRule(r, now, log);
                 }
-            SaveRules(rules);
+            // a run can take minutes: a choice you saved or stopped meanwhile stays as you left it (only the counts of the
+            // rules that ran are written back)
+            var latest = Rules();
+            foreach (var m in latest)
+            {
+                var ran = rules.FirstOrDefault(r => string.Equals(r.Path, m.Path, StringComparison.OrdinalIgnoreCase) && r.Mode == m.Mode && r.Since == m.Since && r.Cap == m.Cap && r.Days == m.Days);
+                if (ran != null) { m.Runs = ran.Runs; m.Blocked = ran.Blocked; }
+            }
+            SaveRules(latest);
             return freed;
         }
 

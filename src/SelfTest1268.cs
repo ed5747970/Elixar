@@ -234,6 +234,11 @@ namespace CDriveCleaner
                     var ar = FolderGrowth.Rules().First(x => x.Path == old);
                     var files = FolderGrowth.RuleFiles(ar, DateTime.Now);
                     if (ar.Mode != "all" || files.Count != 4 || files.Any(x => x.EndsWith(".dll"))) return "older than: " + ar.Mode + " " + files.Count;
+                    // a choice saved while the daily run is busy isn't lost when the run writes its counts back
+                    string later = Path.Combine(place, "LaterApp", "logs"); Files(later, "l", ".dat", 2, 10 * KB, DateTime.Now.AddDays(-1));
+                    bool added = false;
+                    FolderGrowth.RunRules(DateTime.Now, m => { if (!added) { added = true; FolderGrowth.AddChoice(new FolderStudy { Path = later, Kind = GrowKind.Look }, "cap", 14, 5 * GB, 1 * GB); } });
+                    if (!added || !FolderGrowth.Rules().Any(x => x.Path == later) || FolderGrowth.Rules().First(x => x.Path == old).Runs != 1) return "a choice saved during the run was lost: " + string.Join(", ", FolderGrowth.Rules().Select(x => x.Path + " " + x.Runs));
                     // the same choice for a "safe" folder stays the log, cache and temp kind
                     if (FolderGrowth.AddChoice(new FolderStudy { Path = old, Kind = GrowKind.Safe }, "age", 14, 0, 0) != null || FolderGrowth.Rules().First(x => x.Path == old).Mode != "age") return "safe folder";
                     return null;
