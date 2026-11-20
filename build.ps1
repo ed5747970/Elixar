@@ -69,7 +69,11 @@ if ($SelfTest) {
                 [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
                 $bmp.Save((Join-Path (Split-Path $e) "selftest-hang.png"))
             } catch { Write-Host "No screen picture: $_" }
-            if (Test-Path $progress) { Get-Content $progress -Tail 8 }
+            if (Test-Path $progress) {
+                $all = Get-Content $progress
+                $stuck = [Array]::IndexOf($all, ($all | Where-Object { $_ -like 'STUCK*' } | Select-Object -First 1))
+                if ($stuck -ge 0) { $all[[Math]::Max(0, $stuck - 3)..([Math]::Min($all.Count - 1, $stuck + 40))] } else { $all | Select-Object -Last 8 }
+            }
             try { $p.Kill() } catch { }
             $failed += 1000
             continue

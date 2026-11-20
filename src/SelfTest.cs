@@ -34,6 +34,20 @@ namespace CDriveCleaner
             }
         }
 
+        // where another thread is right now (the self-test's watchdog only)
+#pragma warning disable 618
+        static string StackOf(System.Threading.Thread t)
+        {
+            try
+            {
+                t.Suspend();
+                try { return string.Join("\r\n", new System.Diagnostics.StackTrace(t, false).GetFrames().Take(40).Select(f => "  at " + (f.GetMethod() == null ? "?" : f.GetMethod().DeclaringType + "." + f.GetMethod().Name))); }
+                finally { t.Resume(); }
+            }
+            catch (Exception e) { return "  (couldn't read it: " + e.Message + ")"; }
+        }
+#pragma warning restore 618
+
         public static int Run(bool showResult)
         {
             Sounds.Quiet = true;   // the self-test records which sound would play; it never plays one
@@ -44,11 +58,31 @@ namespace CDriveCleaner
             // each finished check is also written at once (a test PC's run that gets stuck still shows how far it got)
             string progress = null;
             try { progress = Win.IsWindows ? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "selftest-progress.txt") : null; if (progress != null) File.WriteAllText(progress, ""); } catch { progress = null; }
+            var lastCheck = DateTime.Now;
             Action<bool, string> check = (ok, what) =>
             {
+                lastCheck = DateTime.Now;
                 rep.AppendLine((ok ? "PASS  " : "FAIL  ") + what); if (!ok) { fails++; failed.Add(what); }
                 if (progress != null) try { File.AppendAllText(progress, (ok ? "PASS  " : "FAIL  ") + what + "\r\n"); } catch { }
             };
+            // a check stuck for 4 minutes (a window waiting for a click, a wait that never ends): where the test thread is,
+            // written to the progress file, so a test PC's report says which check and which line
+            if (progress != null)
+            {
+                var testThread = System.Threading.Thread.CurrentThread; string prog = progress;
+                new System.Threading.Thread(() =>
+                {
+                    bool told = false;
+                    while (true)
+                    {
+                        System.Threading.Thread.Sleep(15000);
+                        if ((DateTime.Now - lastCheck).TotalMinutes < 4) { told = false; continue; }
+                        if (told) continue;
+                        told = true;
+                        try { File.AppendAllText(prog, "STUCK  for 4 minutes after the check above; the test is at:\r\n" + StackOf(testThread) + "\r\n"); } catch { }
+                    }
+                }) { IsBackground = true, Name = "self-test watchdog" }.Start();
+            }
             rep.AppendLine("Elixar self-test  " + DateTime.Now.ToString("s") + "   (Elixar " + typeof(SelfTest).Assembly.GetName().Version + ", made by Elisar)");
             rep.AppendLine("System: " + OsInfo.Current.Name + "   (" + Environment.OSVersion + ")   .NET: " + Environment.Version + "   64-bit process: " + Environment.Is64BitProcess + "   admin: " + Sys.IsAdmin());
             rep.AppendLine();
