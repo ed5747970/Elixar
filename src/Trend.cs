@@ -71,11 +71,13 @@ namespace CDriveCleaner
         {
             days = 0;
             var now = pts.FirstOrDefault(p => p.Day == today.Date); if (now == null) return 0;
+            // only when it matters: C: under a quarter free, or at this pace full within about 3 months
+            Func<long, int, bool> matters = (lost, d) => now.Free * 4 < now.Total || now.Free < lost / Math.Max(1, d) * 90;
             foreach (var w in new[] { new[] { 1, 3, 2 }, new[] { 5, 9, 7 } })
             {
                 var past = pts.Where(p => (today.Date - p.Day).TotalDays >= w[0] && (today.Date - p.Day).TotalDays <= w[1] && p.Total == now.Total)
                               .OrderBy(p => Math.Abs((today.Date - p.Day).TotalDays - w[2])).FirstOrDefault();
-                if (past != null && past.Free - now.Free >= DropBytes) { days = (int)(today.Date - past.Day).TotalDays; return past.Free - now.Free; }
+                if (past != null && past.Free - now.Free >= DropBytes && matters(past.Free - now.Free, (int)(today.Date - past.Day).TotalDays)) { days = (int)(today.Date - past.Day).TotalDays; return past.Free - now.Free; }
             }
             return 0;
         }
@@ -105,7 +107,8 @@ namespace CDriveCleaner
             }
             catch { return null; }
             return "C: lost " + Fs.Fmt(lost) + " in " + days + " day" + (days == 1 ? "" : "s") + "." +
-                   (biggest != null ? " Most of it: " + biggest + " (+" + Fs.Fmt(biggestGrew) + ")." : " Dashboard > Growing fast shows where it went.") + " Click to open Elixar.";
+                   (biggest != null && biggestGrew * 2 >= lost ? " Most of it: " + biggest + " (+" + Fs.Fmt(biggestGrew) + ")." :
+                    biggest != null ? " The folder that grew most: " + biggest + " (+" + Fs.Fmt(biggestGrew) + ")." : " Dashboard > Growing fast shows where it went.") + " Click to open Elixar.";
         }
 
         public class Forecast { public double GbPerMonth; public DateTime? FullOn; public int Days; public string Text = ""; }

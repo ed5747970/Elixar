@@ -1883,11 +1883,13 @@ HE.setdefault('Nothing: your protection stays on and SecureAPlus makes a new one
 HE.setdefault("Update or repair SecureAPlus. Dashboard > Growing fast can cap this folder's size.", 'עדכנו או תקנו את SecureAPlus. לוח בקרה > גדל מהר יכול להגביל את גודל התיקייה.')
 HE.setdefault("Elixar couldn't write it down (it needs administrator rights).", 'Elixar לא הצליח לרשום את זה (צריך הרשאות מנהל).')
 HE.setdefault('Start Elixar as administrator to save a choice.', 'הפעילו את Elixar כמנהל כדי לשמור בחירה.')
+HE.setdefault('Only choose this for a folder that just piles up (uploads, logs, caches): the app may lose data it keeps there.', 'בחרו בזה רק לתיקייה שפשוט מצטברת (העלאות, לוגים, מטמון): האפליקציה עלולה לאבד נתונים שהיא שומרת שם.')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']
 for k,v in HE.items(): out.append('            d[%s] = %s;' % (cs(k), cs(v)))
 out += ['            // texts with numbers in them',
+ '            Pat(@"C: lost (.+) in (\\d+) days?\\. The folder that grew most: (.+) \\(\\+(.+)\\)\\. Click to open Elixar\\.", m => "C: איבד " + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים. התיקייה שגדלה הכי הרבה: " + m.Groups[3].Value + " (+" + m.Groups[4].Value + "). לחצו כדי לפתוח את Elixar.");',
  '            Pat(@"over (.+): oldest files deleted until under (.+), daily", m => "מעל " + m.Groups[1].Value + ": הקבצים הישנים ביותר נמחקים עד מתחת ל-" + m.Groups[2].Value + ", כל יום");',
  '            Pat(@"files older than (\\d+) days deleted, daily", m => "קבצים ישנים מ-" + m.Groups[1].Value + " ימים נמחקים, כל יום");',
  '            Pat(@"Your rule freed (.+)", m => "הכלל שלך פינה " + m.Groups[1].Value);',

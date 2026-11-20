@@ -292,6 +292,7 @@ namespace CDriveCleaner
                 try { g = FolderGrowth.DailyRun(DateTime.Now, Log, null); FolderGrowth.Notify(g); if (g.Fast.Count > 0) Log("Growing fast: " + g.Fast.Count + " folder(s)."); }
                 catch (Exception e) { Log("Growing folders: " + e.Message); }
             // C: lost 10 GB or more in a week: said at once, with the folder that took it when the check found one
+            if (Win.IsWindows)
             try
             {
                 var top = g == null ? null : g.Fast.OrderByDescending(x => x.Grew).FirstOrDefault();

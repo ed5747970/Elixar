@@ -114,6 +114,7 @@ namespace CDriveCleaner
                 Func<int, long, SpaceHistory.Point> pt = (ago, free) => new SpaceHistory.Point { Day = today.AddDays(-ago), Free = free, Total = 500 * GB };
                 int days;
                 if (SpaceHistory.Drop(new List<SpaceHistory.Point> { pt(7, 100 * GB), pt(0, 85 * GB) }, today, out days) != 15 * GB || days != 7) return "a week: " + days;
+                if (SpaceHistory.Drop(new List<SpaceHistory.Point> { pt(7, 480 * GB), pt(0, 460 * GB) }, today, out days) != 0) return "lots still free and years to go: told anyway";
                 if (SpaceHistory.Drop(new List<SpaceHistory.Point> { pt(2, 60 * GB), pt(0, 49 * GB) }, today, out days) != 11 * GB || days != 2) return "2 days";
                 if (SpaceHistory.Drop(new List<SpaceHistory.Point> { pt(7, 100 * GB), pt(0, 95 * GB) }, today, out days) != 0) return "5 GB isn't fast";
                 var other = pt(7, 100 * GB); other.Total = 900 * GB;
@@ -125,7 +126,10 @@ namespace CDriveCleaner
                 try
                 {
                     string n = SpaceHistory.DropNotice(today, @"Whitelist\to be transferred", 54 * GB);
-                    if (n == null || !n.Contains("lost 54") || !n.Contains("to be transferred") || !n.Contains("in 7 days")) return "notice: " + n;
+                    if (n == null || !n.Contains("lost 54") || !n.Contains("Most of it: Whitelist") || !n.Contains("in 7 days")) return "notice: " + n;
+                    File.Delete(hf + ".drop-alerted");
+                    string n2 = SpaceHistory.DropNotice(today, "Zoom\\logs", 2 * GB);
+                    if (n2 == null || n2.Contains("Most of it") || !n2.Contains("grew most")) return "a small folder called most of it: " + n2;
                     if (SpaceHistory.DropNotice(today.AddDays(1), null, 0) != null) return "told again the next day";
                     if (SpaceHistory.DropNotice(today.AddDays(3), null, 0) == null && SpaceHistory.Drop(SpaceHistory.Read(), today.AddDays(3), out days) > 0) return "not told after 3 days";
                 }
@@ -173,7 +177,7 @@ namespace CDriveCleaner
                         if (FolderGrowth.PlaceProblem(bad, places) == null) return "allowed: " + bad;
                     // your own kinds of files stay even inside an app's folder
                     string mix = Path.Combine(place, "MailApp", "store"); Files(mix, "m", ".pst", 2, 100 * KB, DateTime.Now.AddDays(-60)); Files(mix, "k", ".kdbx", 1, 100 * KB, DateTime.Now.AddDays(-60)); Files(mix, "t", ".tmp", 3, 100 * KB, DateTime.Now.AddDays(-60));
-                    long tt; var md = FolderGrowth.CapFiles(new KeepRule { Path = mix, Mode = "cap", Cap = 1, Down = 0 }, out tt);
+                    long tt; var md = FolderGrowth.CapFiles(new KeepRule { Path = mix, Mode = "cap", Cap = 400 * KB, Down = 0 }, out tt);
                     if (md.Count != 2 || md.Any(x => !x.EndsWith(".tmp"))) return "your files in an app's folder: " + string.Join(",", md.Select(Path.GetFileName));
                     if (FolderGrowth.RuleFiles(new KeepRule { Path = mix, Mode = "all", Days = 3 }, DateTime.Now).Any(x => !x.EndsWith(".tmp"))) return "older than: your files";
                     if (FolderGrowth.AddChoice(new FolderStudy { Path = app, Kind = GrowKind.Unusual }, "cap", 14, 2 * GB, 1 * GB) == null) return "a rule for an unusual folder";
@@ -199,6 +203,9 @@ namespace CDriveCleaner
                     del = FolderGrowth.CapFiles(new KeepRule { Path = app, Mode = "cap", Cap = 600 * KB, Down = 300 * KB }, out total);
                     if (del.Count != 8 || !del[0].EndsWith("u00.dat") || del.Any(x => x.EndsWith("u08.dat") || x.EndsWith("u09.dat"))) return "oldest first, down to the limit: " + string.Join(",", del.Select(Path.GetFileName));
                     if (FolderGrowth.CapFiles(new KeepRule { Path = app, Mode = "cap", Cap = 2 * MB, Down = 300 * KB }, out total).Count != 0) return "under the limit";
+                    // over the limit only because of your own files: nothing deleted
+                    string pics = Path.Combine(place, "PhotoApp", "store"); Files(pics, "p", ".jpg", 3, 400 * KB, DateTime.Now.AddDays(-30)); Files(pics, "c", ".cache", 3, 100 * KB, DateTime.Now.AddDays(-30));
+                    if (FolderGrowth.CapFiles(new KeepRule { Path = pics, Mode = "cap", Cap = 1 * MB, Down = 0 }, out total).Count != 0) return "deleted because your own files are big";
 
                     // the daily run: deleted for good, in Logs, and you're told
                     FolderGrowth.RemoveRule(app);
@@ -258,7 +265,7 @@ namespace CDriveCleaner
                         cb.Cap.Checked = true; cb.CapGb.Value = 2; cb.DownGb.Value = 1;
                         if (cb.Tell.Checked || !cb.Cap.Checked) return "the choices aren't one group";
                         gf.SaveChoice(look, cb, new Panel());
-                        if (asked == null || !asked.Contains("Cap this folder at 2") || !asked.Contains("nothing is deleted today") || FolderGrowth.Rules().Count != 0) return "asked: " + asked;
+                        if (asked == null || !asked.Contains("Cap this folder at 2") || !asked.Contains("nothing is deleted today") || !asked.Contains("may lose data") || FolderGrowth.Rules().Count != 0) return "asked: " + asked;
                         answer = true; bool capDone = false; gf.CapDone += () => capDone = true;
                         gf.SaveChoice(look, cb, new Panel());
                         Pump(() => capDone, 10000);
@@ -379,7 +386,7 @@ namespace CDriveCleaner
                         Lang.Init(lang);
                         foreach (var w in words) if (Lang.T(w) == w) return "not in " + lang + ": " + w;
                         foreach (var w in new[] { "over 20 GB: oldest files deleted until under 2 GB, daily", "Your rule freed 52 GB", "Cap this folder at 20 GB?", "C: lost 54 GB in 7 days. Most of it: Whitelist\\to be transferred (+54 GB). Click to open Elixar.",
-                                                  "Every day, when it's over 20 GB, Elixar deletes its oldest files until it's under 2 GB. The newest file always stays, and programs are never deleted.", "Right now this deletes 40 files (52 GB). They can't be put back." })
+                                                  "Every day, when it's over 20 GB, Elixar deletes its oldest files until it's under 2 GB. The newest file always stays, and programs are never deleted.", "Right now this deletes 40 files (52 GB). They can't be put back.", "C: lost 12 GB in 7 days. The folder that grew most: Zoom\\logs (+2 GB). Click to open Elixar." })
                             if (Lang.T(w) == w && lang == "he") return "pattern not in Hebrew: " + w;
                     }
                 }

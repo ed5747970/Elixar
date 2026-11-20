@@ -252,14 +252,16 @@ namespace CDriveCleaner
                 long bytes = now.Sum(f => { try { return new FileInfo(f).Length; } catch { return 0L; } });
                 if (!Ask(Lang.T("Cap this folder at " + Fs.Fmt(cap) + "?") + "\n\n" + s.Path + "\n\n" +
                          Lang.T("Every day, when it's over " + Fs.Fmt(cap) + ", Elixar deletes its oldest files until it's under " + Fs.Fmt(down) + ". The newest file always stays, and programs are never deleted.") + "\n\n" +
-                         Lang.T(now.Count > 0 ? "Right now this deletes " + now.Count + " files (" + Fs.Fmt(bytes) + "). They can't be put back." : "Right now it's under the limit: nothing is deleted today."))) return;
+                         Lang.T(now.Count > 0 ? "Right now this deletes " + now.Count + " files (" + Fs.Fmt(bytes) + "). They can't be put back." : "Right now it's under the limit: nothing is deleted today.") + "\n\n" +
+                         Lang.T("Only choose this for a folder that just piles up (uploads, logs, caches): the app may lose data it keeps there."))) return;
                 err = Try(() => FolderGrowth.AddChoice(s, "cap", 14, cap, down));
             }
             else
             {
                 int days = int.Parse((string)cb.Days.SelectedItem ?? "14");
                 if (!Ask(Lang.T(s.Kind == GrowKind.Safe ? "Every day, delete old log, cache and temp files older than " + days + " days in this folder?" : "Every day, delete files older than " + days + " days in this folder?") + "\n\n" + s.Path + "\n\n" +
-                         Lang.T("Programs are never deleted. The first two times they go to Undo (Tools > Undo puts them back), then they're deleted. Change it here any time."))) return;
+                         Lang.T("Programs are never deleted. The first two times they go to Undo (Tools > Undo puts them back), then they're deleted. Change it here any time.") +
+                         (s.Kind == GrowKind.Safe ? "" : "\n\n" + Lang.T("Only choose this for a folder that just piles up (uploads, logs, caches): the app may lose data it keeps there.")))) return;
                 err = Try(() => FolderGrowth.AddChoice(s, "age", days, 0, 0));
             }
             if (err == null && !testMode) err = Try(() => FolderGrowth.Schedule(Install.Exe));

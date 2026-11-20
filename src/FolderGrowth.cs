@@ -684,6 +684,9 @@ namespace CDriveCleaner
             }
             var l = new List<string>();
             if (total <= r.Cap || all.Count < 2) return l;
+            // over the limit because of files no rule deletes (your own kinds, programs): deleting the rest wouldn't bring it
+            // back down, so nothing is deleted
+            if (total - all.Sum(x => x.Item2) >= r.Cap) return l;
             var newest = all.OrderByDescending(x => x.Item3).First();
             long left = total;
             foreach (var f in all.Where(x => x != newest).OrderBy(x => x.Item3))
