@@ -70,6 +70,7 @@ namespace CDriveCleaner
                 btnCheck.Enabled = true;
                 if (t.IsFaulted) { status.Text = Lang.T("Couldn't measure: " + t.Exception.GetBaseException().Message); return; }
                 ShowStudies(t.Result.Fast.Select((f, i) => Tuple.Create(f, t.Result.Studies[i])).ToList());
+                if (t.Result.CheckProblem != null) status.Text = Lang.T(t.Result.CheckProblem);
             }));
         }
 
@@ -212,8 +213,16 @@ namespace CDriveCleaner
             cb.Saved = new Label { AutoSize = true, ForeColor = Green, Margin = new Padding(S(6), S(8), 0, 0), Text = rule != null ? Lang.T("Saved:") + " " + Lang.T(FolderGrowth.RuleText(rule)) : "" };
             cb.Save.Click += (o, e) => SaveChoice(s, cb, card);
             var openB = new Button { Text = Lang.T("Open"), AutoSize = true }; openB.Click += (o, e) => { if (open != null) open(s.Path); };
-            acts.Controls.AddRange(new Control[] { cb.Save, openB, cb.Saved });
+            acts.Controls.AddRange(new Control[] { cb.Save, openB });
+            if (s.Kind == GrowKind.Safe) { var once = new Button { Text = Lang.T("Clean once now"), AutoSize = true }; once.Click += (o, e) => CleanOnce(s); acts.Controls.Add(once); }
+            acts.Controls.Add(cb.Saved);
             box.Controls.Add(acts);
+            // the choices are kept where only administrators can write: without those rights they can't be saved
+            if (Win.IsWindows && !Sys.IsAdmin() && !testMode)
+            {
+                cb.Save.Enabled = false;
+                box.Controls.Add(note("Start Elixar as administrator to save a choice."));
+            }
             ChoiceBoxes[s.Path] = cb;
             return box;
         }
@@ -262,10 +271,18 @@ namespace CDriveCleaner
             if (rule.Mode == "cap")
             {
                 status.Text = Lang.T("Cleaning...");
-                Task.Factory.StartNew(() => { using (ChangeLog.In("Keep in check")) return FolderGrowth.RunRule(rule, DateTime.Now, null); })
+                rule.Blocked = DateTime.MinValue;   // told here, at once, if the app keeps its files
+                Task.Factory.StartNew(() =>
+                {
+                    lock (FolderGrowth.RunNotes) FolderGrowth.RunNotes.Clear();
+                    long freed; using (ChangeLog.In("Keep in check")) freed = FolderGrowth.RunRule(rule, DateTime.Now, null);
+                    string kept; lock (FolderGrowth.RunNotes) kept = FolderGrowth.RunNotes.Where(n => n[0] == "An app kept its files").Select(n => n[1]).FirstOrDefault();
+                    return Tuple.Create(freed, kept);
+                })
                     .ContinueWith(t => UI(() =>
                     {
-                        status.Text = Lang.T(t.IsFaulted ? "Couldn't clean: " + t.Exception.GetBaseException().Message : t.Result > 0 ? "Freed " + Fs.Fmt(t.Result) : "Nothing to delete today.");
+                        status.Text = t.IsFaulted ? Lang.T("Couldn't clean: " + t.Exception.GetBaseException().Message)
+                                    : (t.Result.Item1 > 0 ? Lang.T("Freed " + Fs.Fmt(t.Result.Item1)) : Lang.T("Nothing to delete today.")) + (t.Result.Item2 != null ? "  " + Lang.T(t.Result.Item2) : "");
                         if (CapDone != null) CapDone();
                     }));
             }

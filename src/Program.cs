@@ -92,7 +92,7 @@ namespace CDriveCleaner
             {
                 Application.EnableVisualStyles();
                 FolderGrowth.RunRules(DateTime.Now, m => Automation.Log(m));
-                foreach (var n in FolderGrowth.RunNotes.ToList()) Automation.Notify(n[0], n[1] + " Click to open Elixar.", ToolTipIcon.Info, true);
+                foreach (var n in FolderGrowth.RunNotes.Take(3).ToList()) Automation.Notify(n[0], n[1] + " Click to open Elixar.", ToolTipIcon.Info, true);
                 return 0;
             }
 #if BUSINESS

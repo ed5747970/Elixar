@@ -221,6 +221,7 @@ namespace CDriveCleaner
             new[] { "Nothing: your protection stays on and SecureAPlus makes a new one.", "لا شيء: تبقى الحماية تعمل وينشئ SecureAPlus قائمة جديدة.", "Ничего: защита остаётся включённой, SecureAPlus создаст новый список.", "Nada: tu protección sigue activa y SecureAPlus crea una nueva." },
             new[] { "Update or repair SecureAPlus. Dashboard > Growing fast can cap this folder's size.", "حدّث SecureAPlus أو أصلحه. لوحة التحكم > يكبر بسرعة يمكنه تحديد حجم هذا المجلد.", "Обновите или восстановите SecureAPlus. Панель > Быстро растёт может ограничить размер этой папки.", "Actualiza o repara SecureAPlus. Panel > Crece rápido puede limitar el tamaño de esta carpeta." },
             new[] { "Elixar couldn't write it down (it needs administrator rights).", "تعذّر على Elixar تسجيل ذلك (يحتاج إلى صلاحيات المسؤول).", "Elixar не смог это записать (нужны права администратора).", "Elixar no pudo guardarlo (necesita permisos de administrador)." },
+            new[] { "Start Elixar as administrator to save a choice.", "شغّل Elixar كمسؤول لحفظ اختيار.", "Запустите Elixar от имени администратора, чтобы сохранить выбор.", "Abre Elixar como administrador para guardar una elección." },
             new[] { "Dashboard", "لوحة التحكم", "Панель", "Panel" },
             new[] { "Apps", "التطبيقات", "Приложения", "Aplicaciones" },
             new[] { "Cleaner", "التنظيف", "Очистка", "Limpieza" },

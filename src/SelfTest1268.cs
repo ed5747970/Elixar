@@ -164,6 +164,9 @@ namespace CDriveCleaner
                     foreach (var k in new[] { GrowKind.Unusual, GrowKind.Windows, GrowKind.Yours })
                         if (FolderGrowth.ChoiceProblem(new FolderStudy { Path = app, Kind = k }) == null) return "offered for " + k;
                     if (FolderGrowth.ChoiceProblem(new FolderStudy { Path = Path.Combine(R, "elsewhere", "x"), Kind = GrowKind.Look }) == null) return "offered outside ProgramData and AppData";
+                    FolderGrowth.ChoicePlaceOverride = null;
+                    if (FolderGrowth.ChoiceProblem(new FolderStudy { Path = app + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + "uploads", Kind = GrowKind.Look }) == null) return "a path with .. was allowed";
+                    FolderGrowth.ChoicePlaceOverride = placeOk;
                     var places = new[] { place, Path.Combine(R, "Local") };
                     if (FolderGrowth.PlaceProblem(Path.Combine(place, "App", "logs"), places) != null) return "an app's folder";
                     foreach (var bad in new[] { place, Path.Combine(R, "Local", "Microsoft", "Protect"), Path.Combine(place, "microsoft", "Windows Defender"), Path.Combine(R, "Local", "Elixar", "growing"), Path.Combine(R, "Localx", "App") })

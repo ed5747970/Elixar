@@ -2203,6 +2203,7 @@ namespace CDriveCleaner
             d["Nothing: your protection stays on and SecureAPlus makes a new one."] = "כלום: ההגנה נשארת פעילה ו-SecureAPlus יוצר חדשה.";
             d["Update or repair SecureAPlus. Dashboard > Growing fast can cap this folder's size."] = "עדכנו או תקנו את SecureAPlus. לוח בקרה > גדל מהר יכול להגביל את גודל התיקייה.";
             d["Elixar couldn't write it down (it needs administrator rights)."] = "Elixar לא הצליח לרשום את זה (צריך הרשאות מנהל).";
+            d["Start Elixar as administrator to save a choice."] = "הפעילו את Elixar כמנהל כדי לשמור בחירה.";
             // texts with numbers in them
             Pat(@"over (.+): oldest files deleted until under (.+), daily", m => "מעל " + m.Groups[1].Value + ": הקבצים הישנים ביותר נמחקים עד מתחת ל-" + m.Groups[2].Value + ", כל יום");
             Pat(@"files older than (\d+) days deleted, daily", m => "קבצים ישנים מ-" + m.Groups[1].Value + " ימים נמחקים, כל יום");
@@ -2215,7 +2216,7 @@ namespace CDriveCleaner
             Pat(@"C: lost (.+) in (\d+) days?\. Most of it: (.+) \(\+(.+)\)\. Click to open Elixar\.", m => "C: איבד " + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים. רובו: " + m.Groups[3].Value + " (+" + m.Groups[4].Value + "). לחצו כדי לפתוח את Elixar.");
             Pat(@"C: lost (.+) in (\d+) days?\. Dashboard > Growing fast shows where it went\. Click to open Elixar\.", m => "C: איבד " + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים. לוח בקרה > גדל מהר מראה לאן זה הלך. לחצו כדי לפתוח את Elixar.");
             Pat(@"(.+) passed (.+), so Elixar deleted its (\d+) oldest files\. Click to open Elixar\.", m => m.Groups[1].Value + " עברה " + m.Groups[2].Value + ", אז Elixar מחק " + m.Groups[3].Value + " מהקבצים הישנים ביותר שלה. לחצו כדי לפתוח את Elixar.");
-            Pat(@"(\d+) files in (.+) couldn't be deleted: the app that owns them doesn't allow it \(an antivirus guards its own folder\)\. Update or repair that app, or turn off its self-protection\. Click to open Elixar\.", m => m.Groups[1].Value + " קבצים ב-" + m.Groups[2].Value + " לא נמחקו: האפליקציה שהם שלה לא מרשה (אנטי-וירוס שומר על התיקייה שלו). עדכנו או תקנו את האפליקציה, או כבו את ההגנה העצמית שלה. לחצו כדי לפתוח את Elixar.");
+            Pat(@"(\d+) files in (.+) couldn't be deleted: the app that owns them doesn't allow it \(an antivirus guards its own folder\)\. Update or repair that app, or turn off its self-protection\.( Click to open Elixar\.)?", m => m.Groups[1].Value + " קבצים ב-" + m.Groups[2].Value + " לא נמחקו: האפליקציה שהם שלה לא מרשה (אנטי-וירוס שומר על התיקייה שלו). עדכנו או תקנו את האפליקציה, או כבו את ההגנה העצמית שלה." + (m.Groups[3].Success ? " לחצו כדי לפתוח את Elixar." : ""));
             Pat(@"The growing-folders check ran out of time 2 days in a row \((.+)\)\. The other places were still checked\.( Click to open Elixar\.)?", m => "לבדיקת התיקיות שגדלות נגמר הזמן יומיים ברציפות (" + m.Groups[1].Value + "). שאר המקומות עדיין נבדקו." + (m.Groups[2].Success ? " לחצו כדי לפתוח את Elixar." : ""));
             Pat(@"Not possible here: (.+)\.", m => "לא אפשרי כאן: " + T(m.Groups[1].Value) + ".");
             Pat(@"Signed in to OneDrive as (.+) \((.+)\)  ·  (.+)", m => "מחובר ל-OneDrive בתור " + m.Groups[1].Value + " (" + T(m.Groups[2].Value) + ")  ·  " + m.Groups[3].Value);

@@ -555,6 +555,7 @@ namespace CDriveCleaner
             string why = RuleProblem(path); if (why != null) return "Not possible here: " + why + ".";
             Func<Environment.SpecialFolder, string> sf = f => { try { return Environment.GetFolderPath(f); } catch { return ""; } };
             string full; try { full = System.IO.Path.GetFullPath(path).TrimEnd('\\', '/'); } catch { return "Not possible here."; }
+            if (!string.Equals(full, path.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return "Not possible here.";   // only a plain, full path (no "..")
             string la = sf(Environment.SpecialFolder.LocalApplicationData);
             var places = new List<string> { sf(Environment.SpecialFolder.CommonApplicationData), la, sf(Environment.SpecialFolder.ApplicationData) };
             if (!string.IsNullOrEmpty(la)) places.Add(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(la), "LocalLow"));
@@ -761,11 +762,14 @@ namespace CDriveCleaner
             string name = ShortPath(r.Path);
             ChangeLog.Add("Cleaning", "Capped a fast-growing folder (your choice)", r.Path, Fs.Fmt(total), Fs.Fmt(done) + " deleted", gone + " of " + files.Count + " oldest files; " + RuleText(r), false);
             if (log != null) log("Keep in check: " + r.Path + ": " + Fs.Fmt(done) + " deleted (" + gone + " of " + files.Count + " files)");
+            lock (RunNotes)
+            {
             if (gone > 0) RunNotes.Add(new[] { "Your rule freed " + Fs.Fmt(done), name + " passed " + Fs.Fmt(r.Cap) + ", so Elixar deleted its " + gone + " oldest files." });
             if (kept > 0 && (now.Date - r.Blocked).TotalDays >= 7)
             {
                 r.Blocked = now.Date;
                 RunNotes.Add(new[] { "An app kept its files", kept + " files in " + name + " couldn't be deleted: the app that owns them doesn't allow it (an antivirus guards its own folder). Update or repair that app, or turn off its self-protection." });
+            }
             }
             return done;
         }

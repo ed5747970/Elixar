@@ -156,7 +156,7 @@ namespace CDriveCleaner
             {
                 if (!((RadioButton)o).Checked || chosen() == Sounds.Choice) return;
                 Sounds.Choice = chosen(); SoundOnOpen.Enabled = Sounds.Choice == Sounds.Potion; play.Enabled = Sounds.Choice != Sounds.Off;
-                if (!testMode) Sounds.Play(Snd.Done);
+                if (!testMode) Sounds.Play(Sounds.Choice == Sounds.WindowsOwn ? Snd.Info : Snd.Done);   // a sample of what you picked
             };
             foreach (var rb in new[] { SoundPotion, SoundWindows, SoundOff }) rb.CheckedChanged += save;
             SoundOnOpen.CheckedChanged += (o, e) => { Sounds.OnOpen = SoundOnOpen.Checked; if (SoundOnOpen.Checked && !testMode) Sounds.Play(Snd.Open); };

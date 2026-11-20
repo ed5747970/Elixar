@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Media;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace CDriveCleaner
@@ -29,7 +30,11 @@ namespace CDriveCleaner
         public static bool Quiet;                                     // self-test and scheduled runs: record, never play
 
         static readonly Dictionary<Snd, byte[]> cache = new Dictionary<Snd, byte[]>();
-        static SoundPlayer current;
+        // each sound copied once into memory that never moves or goes away: Windows plays it from there in the background
+        // (a .NET array can be moved by the garbage collector while it plays)
+        static readonly Dictionary<Snd, IntPtr> fixedCopy = new Dictionary<Snd, IntPtr>();
+        [DllImport("winmm.dll", SetLastError = false)] static extern bool PlaySound(IntPtr sound, IntPtr module, uint flags);
+        const uint SND_ASYNC = 0x1, SND_NODEFAULT = 0x2, SND_MEMORY = 0x4;
 
         public static string ResourceName(Snd s) { return "Elixar.sounds.potion-" + s.ToString().ToLowerInvariant() + ".wav"; }
 
@@ -82,10 +87,15 @@ namespace CDriveCleaner
                 }
                 var b = Data(s);
                 if (b == null) return;
-                var p = new SoundPlayer(new MemoryStream(b, false));
-                p.Load();
-                lock (cache) current = p;   // kept while it plays
-                p.Play();   // in the background: never holds up the window
+                IntPtr mem;
+                lock (cache)
+                    if (!fixedCopy.TryGetValue(s, out mem))
+                    {
+                        mem = Marshal.AllocHGlobal(b.Length);   // kept for as long as Elixar runs (13 short sounds, about 600 KB)
+                        Marshal.Copy(b, 0, mem, b.Length);
+                        fixedCopy[s] = mem;
+                    }
+                PlaySound(mem, IntPtr.Zero, SND_MEMORY | SND_ASYNC | SND_NODEFAULT);   // in the background: never holds up the window
             }
             catch { }
         }
