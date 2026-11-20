@@ -47,6 +47,12 @@ namespace CDriveCleaner
         public static Func<string, string> KindRootOverride;       // self-test: "windows" / "yours" / null for a path
         // the findings are kept in your own profile: the daily check runs with your normal rights. They only ever lead to
         // a fresh look (every folder is studied again before anything is offered), never to a deletion by themselves.
+        // Elixar's small text files here are read only up to 16 MB: a file another program blew up can't fill the memory
+        static string[] Lines(string path)
+        {
+            try { return new FileInfo(path).Length > (16L << 20) ? new string[0] : File.ReadAllLines(path); } catch { return new string[0]; }
+        }
+
         static string F(string n)
         {
             if (OverrideDir != null) return System.IO.Path.Combine(OverrideDir, n);
@@ -140,7 +146,7 @@ namespace CDriveCleaner
             try
             {
                 if (!File.Exists(SnapFile)) return all;
-                foreach (var line in File.ReadAllLines(SnapFile))
+                foreach (var line in Lines(SnapFile))
                 {
                     var p = line.Split('\t'); DateTime d; long b;
                     if (p.Length != 3 || !DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) || !long.TryParse(p[1], out b)) continue;
@@ -177,7 +183,7 @@ namespace CDriveCleaner
             try
             {
                 if (!File.Exists(SnapFile)) return all;
-                foreach (var line in File.ReadAllLines(SnapFile))
+                foreach (var line in Lines(SnapFile))
                 {
                     var p = line.Split('\t'); DateTime d;
                     if (p.Length != 3 || p[1] != "-1" || !DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d)) continue;
@@ -471,7 +477,7 @@ namespace CDriveCleaner
             try
             {
                 if (File.Exists(RulesFile))
-                    foreach (var line in File.ReadAllLines(RulesFile))
+                    foreach (var line in Lines(RulesFile))
                     {
                         var p = line.Split('\t'); int d, r; DateTime since;
                         if ((p.Length == 4 || p.Length == 8) && int.TryParse(p[0], out d) && int.TryParse(p[1], out r) && DateTime.TryParseExact(p[2], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out since))
@@ -791,7 +797,7 @@ namespace CDriveCleaner
         public static HashSet<string> Ignored()
         {
             var h = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            try { if (File.Exists(IgnoreFile)) foreach (var l in File.ReadAllLines(IgnoreFile)) if (l.Trim().Length > 0) h.Add(l.Trim()); } catch { }
+            try { if (File.Exists(IgnoreFile)) foreach (var l in Lines(IgnoreFile)) if (l.Trim().Length > 0) h.Add(l.Trim()); } catch { }
             return h;
         }
         public static void Ignore(string path) { var h = Ignored(); h.Add(path); SafeFile.Save(IgnoreFile, string.Join("\n", h) + "\n"); }
@@ -844,7 +850,7 @@ namespace CDriveCleaner
             {
                 var keep = new List<string>();
                 if (File.Exists(MissedFile))
-                    foreach (var line in File.ReadAllLines(MissedFile))
+                    foreach (var line in Lines(MissedFile))
                     {
                         var p = line.Split('\t'); DateTime d;
                         if (p.Length == 2 && DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (now.Date - d).TotalDays < 14 && d != now.Date) keep.Add(line);
@@ -863,7 +869,7 @@ namespace CDriveCleaner
             {
                 if (!File.Exists(MissedFile)) return null;
                 var days = new Dictionary<DateTime, List<string>>();
-                foreach (var line in File.ReadAllLines(MissedFile))
+                foreach (var line in Lines(MissedFile))
                 {
                     var p = line.Split('\t'); DateTime d;
                     if (p.Length != 2 || !DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) || (now.Date - d).TotalDays > 7) continue;
@@ -893,7 +899,7 @@ namespace CDriveCleaner
             try
             {
                 DateTime d;
-                if (File.Exists(CheckAlertedFile) && DateTime.TryParseExact(File.ReadAllText(CheckAlertedFile).Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (now.Date - d).TotalDays < 7) return false;
+                if (File.Exists(CheckAlertedFile) && DateTime.TryParseExact(string.Join("\n", Lines(CheckAlertedFile)).Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (now.Date - d).TotalDays < 7) return false;
                 SafeFile.Save(CheckAlertedFile, now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                 return true;
             }
@@ -906,7 +912,7 @@ namespace CDriveCleaner
             try
             {
                 if (File.Exists(AlertedFile))
-                    foreach (var l in File.ReadAllLines(AlertedFile))
+                    foreach (var l in Lines(AlertedFile))
                     {
                         var p = l.Split('\t'); DateTime t; GrowKind k;
                         if (p.Length == 3 && DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out t) && Enum.TryParse(p[1], out k)) d[p[2]] = Tuple.Create(t, k);
@@ -933,7 +939,7 @@ namespace CDriveCleaner
                 Func<string, bool> inside = path => roots.Any(r => path.StartsWith(r + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) && path.IndexOf("..", StringComparison.Ordinal) < 0
                     && Directory.Exists(path) && RealFolder(path);
                 if (File.Exists(NowFile) && (DateTime.Now - File.GetLastWriteTime(NowFile)).TotalDays < 3)
-                    foreach (var line in File.ReadAllLines(NowFile))
+                    foreach (var line in Lines(NowFile))
                     {
                         var p = line.Split('\t'); long g, n; int d; GrowKind k;
                         if (p.Length == 5 && long.TryParse(p[0], out g) && long.TryParse(p[1], out n) && int.TryParse(p[2], out d) && Enum.TryParse(p[3], out k) && inside(p[4]) && !Ignored().Contains(p[4]))

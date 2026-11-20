@@ -101,7 +101,7 @@ namespace CDriveCleaner
             try
             {
                 DateTime d;
-                if (File.Exists(DropAlertedFile) && DateTime.TryParseExact(File.ReadAllText(DropAlertedFile).Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (today.Date - d).TotalDays < 3) return null;
+                if (File.Exists(DropAlertedFile) && new FileInfo(DropAlertedFile).Length < 1024 && DateTime.TryParseExact(File.ReadAllText(DropAlertedFile).Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (today.Date - d).TotalDays < 3) return null;
                 Directory.CreateDirectory(Path.GetDirectoryName(DropAlertedFile));
                 SafeFile.Save(DropAlertedFile, today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
             }
