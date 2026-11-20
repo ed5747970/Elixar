@@ -151,12 +151,22 @@ namespace CDriveCleaner
         public void StartCheck()
         {
             btnAgain.Enabled = false; head.Text = Lang.T("Checking this PC...");
+            var before = Health.Remembered();
             Task.Factory.StartNew(() => Health.Check(true, true, s => UI(() => sub.Text = Lang.T(s))), TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 btnAgain.Enabled = true;
                 if (t.IsFaulted) { head.Text = Lang.T("Couldn't finish the check"); sub.Text = t.Exception.GetBaseException().Message; return; }
                 ShowReport(t.Result);
+                Sounds.Play(CheckSound(before, t.Result));
             }));
+        }
+
+        // the sound when a check you started finishes: a security problem, a better score than last time, or just done
+        public static Snd CheckSound(HealthReport before, HealthReport now)
+        {
+            if (now.Items.Any(i => i.Area == "Security" && !i.Ignored && (i.Level == HLevel.Warn || i.Level == HLevel.Bad))) return Snd.Alert;
+            if (before != null && now.Total > before.Total) return Snd.Better;
+            return Snd.Scan;
         }
 
         public void ShowReport(HealthReport r)

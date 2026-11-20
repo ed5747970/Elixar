@@ -120,7 +120,7 @@ jobs:
             New-Item -ItemType Directory -Force $pkg, "$pkg\source" | Out-Null
             Copy-Item $files $pkg
             Copy-Item package\README.txt, "package\Run self-test (safe).bat", guide\UserGuide.html, LICENSE $pkg
-            Copy-Item -Recurse src, guide, tools, package, cure, audit-reports, app.ico, app.manifest, brand.png, build.ps1, README.md, LICENSE, SECURITY.md, ANTIVIRUS.md, update-key.pub.xml "$pkg\source"
+            Copy-Item -Recurse src, guide, tools, package, cure, sounds, audit-reports, app.ico, app.manifest, brand.png, build.ps1, README.md, LICENSE, SECURITY.md, ANTIVIRUS.md, update-key.pub.xml "$pkg\source"
             $exe = Join-Path $pkg "Elixar.exe"
             # the Group Policy / Intune template, made by this build (both editions have Policy manager)
             $p = Start-Process $exe -ArgumentList '--admx', "`"$((Resolve-Path $pkg).Path)\PolicyDefinitions`"" -Wait -PassThru

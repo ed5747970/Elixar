@@ -316,7 +316,7 @@ namespace CDriveCleaner
             {
                 string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result;
                 UpdateMailUi();
-                if (err == null) { mailStatus.Text = Lang.T(done); Log("Email reports: " + done); }
+                if (err == null) { mailStatus.Text = Lang.T(done); Log("Email reports: " + done); Sounds.Play(Snd.Mail); }
                 else Lang.Box(this, "The email wasn't sent: " + err, "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }));
         }

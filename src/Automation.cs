@@ -287,9 +287,18 @@ namespace CDriveCleaner
             long total = Sys.Total(), free = Sys.Free();
             SpaceHistory.Record(free, total);   // one reading a day for the space trend
             if (Win.IsWindows) { CheckDisks(); CheckOtherDrives(percent); SmartReminder(DateTime.Today); } else CheckSnaps(total);
+            FolderGrowth.DayResult g = null;
             if (Win.IsWindows)
-                try { var g = FolderGrowth.DailyRun(DateTime.Now, Log, null); FolderGrowth.Notify(g); if (g.Fast.Count > 0) Log("Growing fast: " + g.Fast.Count + " folder(s)."); }
+                try { g = FolderGrowth.DailyRun(DateTime.Now, Log, null); FolderGrowth.Notify(g); if (g.Fast.Count > 0) Log("Growing fast: " + g.Fast.Count + " folder(s)."); }
                 catch (Exception e) { Log("Growing folders: " + e.Message); }
+            // C: lost 10 GB or more in a week: said at once, with the folder that took it when the check found one
+            try
+            {
+                var top = g == null ? null : g.Fast.OrderByDescending(x => x.Grew).FirstOrDefault();
+                string drop = SpaceHistory.DropNotice(DateTime.Today, top == null ? null : FolderGrowth.ShortPath(top.Path), top == null ? 0 : top.Grew);
+                if (drop != null) { Log("Space dropped fast: " + drop); Notify("C: is filling up fast", drop, ToolTipIcon.Warning, true); }
+            }
+            catch (Exception e) { Log("Space drop: " + e.Message); }
             if (Win.IsWindows) SecurityAlerts.Run(Log);   // antivirus or firewall off, a blue screen, PC health down 10+
             if (!ShouldWarn(free, total, percent))
             {

@@ -50,6 +50,7 @@ namespace CDriveCleaner
         public long SearchIndex = -1;   // Windows Search's index, bytes (-1 unknown)
         public BatteryInfo Battery;     // null: no battery (or unknown)
         public int AutostartsBad = -1;  // tasks and services apps added that look like unwanted software (-1 unknown)
+        public bool GrowthCheckStuck;   // the daily growing-folders reading ran out of time 2 days in a row
         public List<KeyValuePair<string, int>> BatteryHistory = new List<KeyValuePair<string, int>>();
         // safety net
         public bool RestoreKnown; public DateTime? LastRestore; public bool? FileHistory, OneDriveBackup;
@@ -435,6 +436,11 @@ namespace CDriveCleaner
                     add(new HFind { Area = "Space", Key = "fast", Level = HLevel.Info, Penalty = 5, Act = HAct.Growing, Button = "Show me",
                                     Title = H(Plural(f.FastFolders, "folder is growing fast", "folders are growing fast"), f.FastFolders == 1 ? "תיקייה אחת גדלה מהר" : f.FastFolders + " תיקיות גדלות מהר"),
                                     Detail = H("Elixar studied each one (Dashboard > Growing fast).", "Elixar בדק כל אחת (לוח בקרה > גדל מהר).") });
+                if (f.GrowthCheckStuck)
+                    add(new HFind { Area = "Space", Key = "growcheck", Level = HLevel.Info, Penalty = 0, Act = HAct.Growing, Button = "Show me", CanIgnore = true,
+                                    Title = H("The growing-folders check can't finish", "בדיקת התיקיות שגדלות לא מצליחה להסתיים"),
+                                    Detail = H("It ran out of time 2 days in a row, so a folder that fills C: could be missed in that place. The other places are still checked.",
+                                               "נגמר לה הזמן יומיים ברציפות, אז תיקייה שממלאת את C: עלולה להתפספס במקום הזה. שאר המקומות עדיין נבדקים.") });
                 if (CDriveCleaner.SearchIndex.Worth(f.SearchIndex))
                     add(new HFind { Area = "Space", Key = "searchindex", Level = HLevel.Warn, Penalty = 10, Act = HAct.SystemSpace, Button = "Show me",
                                     Title = H("Windows Search's index takes " + Fs.Fmt(f.SearchIndex), "אינדקס החיפוש של Windows תופס " + Fs.Fmt(f.SearchIndex)),
@@ -596,6 +602,7 @@ namespace CDriveCleaner
             say("Checking the drives and backups...");
             try { f.Disk = DiskHealth.Read().Worst; } catch { }
             try { var cur = FolderGrowth.Current(); f.FastFolders = cur.Count; f.UnusualFolders = cur.Count(x => x.Item2 == GrowKind.Unusual); } catch { }
+            try { f.GrowthCheckStuck = FolderGrowth.Problem(DateTime.Now) != null; } catch { }
             f.FileHistory = FileHistoryOn();
             f.OneDriveBackup = OneDriveBacksUp();
 

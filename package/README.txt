@@ -10,6 +10,19 @@ TWO EDITIONS
   the Domain PCs tab with Cure Agent + Cure Server, no Sysprep tools
   (business license, see LICENSE).
 
+NEW IN 1.2.68
+- Growing fast (Elixar for Private): you choose what happens to an app's
+  folder that keeps growing: just tell me, cap its size (for example
+  over 20 GB, delete the oldest files down to 2 GB), delete files older
+  than N days, or ignore it. Never your files or Windows' folders, and
+  never programs.
+- The daily growing-folders check measures ProgramData and Windows first
+  and tells you when it can't finish.
+- A notice when C: loses 10 GB or more in a week, naming the folder.
+- SecureAPlus's stuck uploads (ProgramData\SecureAge Technology) are
+  recognised and explained.
+- Settings > Sounds: Elixar's own sounds (Potion), Windows' own, or none.
+
 NEW IN 1.2.67
 - Startup > Also starts by itself: scheduled tasks and services that apps
   added, flagged when they look like unwanted software. Tasks can be

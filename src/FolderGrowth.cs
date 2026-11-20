@@ -28,9 +28,13 @@ namespace CDriveCleaner
         public string Path = ""; public GrowKind Kind = GrowKind.Look;
         public string Owner = "", Inside = "", Verdict = "", Reason = "";
         public bool OwnerKnown, Hidden, RandomName, RansomLike; public int NewPrograms, Unsigned, Files; public double TidyShare; public long Bytes;
+        public string Known = "";   // a folder Elixar knows by name ("secureaplus"), for its own advice and suggested choice
     }
 
-    public class KeepRule { public string Path = ""; public int Days = 14; public DateTime Since; public int Runs; }
+    // Mode "age": old log, cache and temp files (the original rule, any edition)
+    //      "all": every file older than Days, except programs (Elixar for Private, a choice you make)
+    //      "cap": when the folder passes Cap bytes, its oldest files until it is under Down (Elixar for Private, a choice you make)
+    public class KeepRule { public string Path = ""; public int Days = 14; public DateTime Since; public int Runs; public string Mode = "age"; public long Cap, Down; public DateTime Blocked; }
 
     public static class FolderGrowth
     {
@@ -67,9 +71,11 @@ namespace CDriveCleaner
             var l = new List<string[]>();
             Func<Environment.SpecialFolder, string> sf = f => { try { return Environment.GetFolderPath(f); } catch { return ""; } };
             string home = UserDirs.Home, pd = sf(Environment.SpecialFolder.CommonApplicationData), win = sf(Environment.SpecialFolder.Windows);
-            if (!string.IsNullOrEmpty(home)) l.Add(new[] { home, "5" });
+            // ProgramData and Windows' folders first: they are measured in a minute or two. Your profile can hold millions of
+            // files; if it runs out of time, the readings of the places already measured are still kept.
             if (!string.IsNullOrEmpty(pd)) l.Add(new[] { pd, "4" });
             if (!string.IsNullOrEmpty(win)) { l.Add(new[] { System.IO.Path.Combine(win, "Temp"), "3" }); l.Add(new[] { System.IO.Path.Combine(win, "Logs"), "3" }); }
+            if (!string.IsNullOrEmpty(home)) l.Add(new[] { home, "5" });
             return l.Where(r => Directory.Exists(r[0])).ToList();
         }
 
@@ -83,18 +89,29 @@ namespace CDriveCleaner
         }
 
         // the size of every folder (with what's under it), down to a depth; links are never followed
-        // null when it ran out of time: half a reading would make folders look new or shrunk the next day
-        public static Dictionary<string, long> Measure(TimeSpan budget)
+        // null when nothing could be measured in time
+        public static Dictionary<string, long> Measure(TimeSpan budget) { return MeasureAll(budget).Sizes; }
+
+        // one reading: the sizes, the places measured completely, and the ones that ran out of time. A place that ran out of
+        // time is left out completely (half of it would make its folders look new or shrunk the next day).
+        public class Reading { public Dictionary<string, long> Sizes; public List<string> Done = new List<string>(), Missed = new List<string>(); }
+        public static Func<string, bool> SlowRootForTest;   // self-test: this place "runs out of time"
+        public static Reading MeasureAll(TimeSpan budget)
         {
+            var rd = new Reading();
             var sizes = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var sw = Stopwatch.StartNew();
             foreach (var r in Roots())
             {
                 int depth; int.TryParse(r[1], out depth);
-                Walk(r[0], 0, Math.Max(1, depth), sizes, sw, budget);
+                var part = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                Walk(r[0], 0, Math.Max(1, depth), part, sw, budget);
+                if (sw.Elapsed > budget || (SlowRootForTest != null && SlowRootForTest(r[0]))) { rd.Missed.Add(r[0]); continue; }
+                foreach (var kv in part) sizes[kv.Key] = kv.Value;
+                rd.Done.Add(r[0]);
             }
-            if (sw.Elapsed > budget) return null;
-            return sizes.Where(kv => kv.Value >= MinTracked).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+            if (rd.Done.Count > 0) rd.Sizes = sizes.Where(kv => kv.Value >= MinTracked).ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+            return rd;
         }
 
         static long Walk(string dir, int level, int depth, Dictionary<string, long> sizes, Stopwatch sw, TimeSpan budget)
@@ -127,6 +144,7 @@ namespace CDriveCleaner
                 {
                     var p = line.Split('\t'); DateTime d; long b;
                     if (p.Length != 3 || !DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) || !long.TryParse(p[1], out b)) continue;
+                    if (b < 0) continue;   // a "measured completely" mark (ReadDone)
                     Dictionary<string, long> m; if (!all.TryGetValue(d, out m)) all[d] = m = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
                     m[p[2]] = b;
                 }
@@ -135,18 +153,55 @@ namespace CDriveCleaner
             return all;
         }
 
-        public static void SaveSnap(DateTime day, Dictionary<string, long> sizes)
+        public static void SaveSnap(DateTime day, Dictionary<string, long> sizes) { SaveSnap(day, sizes, null); }
+
+        // done: the places measured completely that day (null: all of them). Kept as "date, -1, place" lines.
+        public static void SaveSnap(DateTime day, Dictionary<string, long> sizes, List<string> done)
         {
-            var all = ReadSnaps();
+            var all = ReadSnaps(); var marks = ReadDone();
             all[day.Date] = sizes;
-            var lines = all.Where(kv => (day.Date - kv.Key).TotalDays < KeepDays).OrderBy(kv => kv.Key)
-                           .SelectMany(kv => kv.Value.Select(x => kv.Key.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\t" + x.Value.ToString(CultureInfo.InvariantCulture) + "\t" + x.Key.Replace("\t", " ")));
+            if (done != null) marks[day.Date] = new HashSet<string>(done, StringComparer.OrdinalIgnoreCase); else marks.Remove(day.Date);
+            Func<DateTime, string> ds = d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            // (a day can have marks and no folder big enough to write down)
+            var lines = all.Keys.Union(marks.Keys).Distinct().Where(d => (day.Date - d).TotalDays < KeepDays).OrderBy(d => d)
+                           .SelectMany(d => (all.ContainsKey(d) ? all[d].Select(x => ds(d) + "\t" + x.Value.ToString(CultureInfo.InvariantCulture) + "\t" + x.Key.Replace("\t", " ")) : new string[0])
+                                                .Concat(marks.ContainsKey(d) ? marks[d].Select(r => ds(d) + "\t-1\t" + r.Replace("\t", " ")) : new string[0]));
             SafeFile.Save(SnapFile, string.Join("\n", lines) + "\n");
         }
 
-        // ---------- which folders grow fast ----------
-        public static List<FastFolder> Detect(Dictionary<DateTime, Dictionary<string, long>> snaps, DateTime today)
+        // the places measured completely on each day; a day without marks had all of them measured (readings before 1.2.68
+        // were only kept when everything was measured)
+        public static Dictionary<DateTime, HashSet<string>> ReadDone()
         {
+            var all = new Dictionary<DateTime, HashSet<string>>();
+            try
+            {
+                if (!File.Exists(SnapFile)) return all;
+                foreach (var line in File.ReadAllLines(SnapFile))
+                {
+                    var p = line.Split('\t'); DateTime d;
+                    if (p.Length != 3 || p[1] != "-1" || !DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d)) continue;
+                    HashSet<string> h; if (!all.TryGetValue(d, out h)) all[d] = h = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    h.Add(p[2]);
+                }
+            }
+            catch { }
+            return all;
+        }
+
+        static bool Under(string path, string root)
+        {
+            string r = root.TrimEnd('\\', '/');
+            return path.Equals(r, StringComparison.OrdinalIgnoreCase) || path.StartsWith(r + "\\", StringComparison.OrdinalIgnoreCase) || path.StartsWith(r + "/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ---------- which folders grow fast ----------
+        public static List<FastFolder> Detect(Dictionary<DateTime, Dictionary<string, long>> snaps, DateTime today) { return Detect(snaps, today, null); }
+
+        // done (ReadDone): a folder is only compared with a day when its place was measured completely that day
+        public static List<FastFolder> Detect(Dictionary<DateTime, Dictionary<string, long>> snaps, DateTime today, Dictionary<DateTime, HashSet<string>> done)
+        {
+            Func<DateTime, string, bool> measured = (d, path) => { HashSet<string> h; return done == null || !done.TryGetValue(d.Date, out h) || h.Any(r => Under(path, r)); };
             var res = new List<FastFolder>();
             Dictionary<string, long> now; if (!snaps.TryGetValue(today.Date, out now)) return res;
             Func<int, int, int, KeyValuePair<DateTime, Dictionary<string, long>>?> pick = (min, max, target) =>
@@ -161,13 +216,13 @@ namespace CDriveCleaner
             {
                 if (ign.Contains(kv.Key)) continue;
                 FastFolder f = null;
-                if (two != null)
+                if (two != null && measured(two.Value.Key, kv.Key))
                 {
                     long b; bool had = two.Value.Value.TryGetValue(kv.Key, out b);
                     long grew = kv.Value - (had ? b : 0);
                     if (grew >= FastBytes) f = new FastFolder { Path = kv.Key, Now = kv.Value, Grew = grew, Days = (int)(today.Date - two.Value.Key).TotalDays, New = !had };
                 }
-                if (f == null && week != null)
+                if (f == null && week != null && measured(week.Value.Key, kv.Key))
                 {
                     long b; bool had = week.Value.Value.TryGetValue(kv.Key, out b);
                     long grew = kv.Value - (had ? b : 0);
@@ -202,6 +257,16 @@ namespace CDriveCleaner
             return inCacheDir || TidyName.IsMatch(fileName);
         }
         static readonly string[] Programs = { ".exe", ".dll", ".scr", ".com", ".ps1", ".bat", ".cmd", ".vbs", ".js", ".jse", ".msi", ".hta" };
+        // what no rule ever deletes: programs, drivers, scripts, installers and shortcuts
+        // (and your own kinds of files - documents, photos, videos, mail archives, password vaults - even inside an app's folder)
+        static HashSet<string> neverDelete;
+        static HashSet<string> NeverDelete
+        {
+            get
+            {
+                return neverDelete ?? (neverDelete = new HashSet<string>(Programs.Concat(new[] { ".sys", ".drv", ".ocx", ".cpl", ".msp", ".msix", ".appx", ".psm1", ".psd1", ".wsf", ".vbe", ".jar", ".lnk", ".reg" }).Concat(UserTypes), StringComparer.OrdinalIgnoreCase));
+            }
+        }
         static readonly HashSet<string> Known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             ".log", ".etl", ".tmp", ".dmp", ".txt", ".json", ".xml", ".db", ".sqlite", ".dat", ".bin", ".cache", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".mp4", ".mkv", ".mov", ".avi",
@@ -275,6 +340,8 @@ namespace CDriveCleaner
         }
 
         static string Ago(TimeSpan t) { int d = (int)t.TotalDays; return d >= 60 ? (d / 30) + " months" : d >= 2 ? d + " days" : "today"; }
+
+        static readonly Regex StuckUploads = new Regex(@"[\\/]ProgramData[\\/]SecureAge Technology[\\/]SecureAge[\\/]Whitelist[\\/]to be transferred$", RegexOptions.IgnoreCase);
 
         public static FolderStudy Study(string path, List<string> names, DateTime now)
         {
@@ -378,10 +445,21 @@ namespace CDriveCleaner
                 s.Kind = GrowKind.Safe; s.Owner = owner;
                 s.Verdict = owner + " keeps old log, cache or temp files here. Deleting old ones doesn't affect " + owner + " or Windows.";
             }
+            else if (StuckUploads.IsMatch(path))
+            {
+                // SecureAPlus (an antivirus) writes a list of your programs here to send to SecureAge, and removes it once sent:
+                // when its upload is stuck, a new 1-2 GB file is added every day or even every hour, and none are removed
+                s.Kind = GrowKind.Look; s.Known = "secureaplus"; s.Owner = "SecureAPlus (an antivirus, by SecureAge Technology)";
+                s.Verdict = "SecureAPlus's uploads to SecureAge are stuck: it keeps making new ones and never removes the old ones. Update or repair SecureAPlus. Deleting old ones doesn't turn off your protection.";
+            }
             else
             {
                 s.Kind = GrowKind.Look; s.Owner = s.OwnerKnown ? owner : "Not sure who writes here";
+#if BUSINESS
                 s.Verdict = "Elixar can't tell for sure what this is, so it won't offer to delete anything here. Open it and look.";
+#else
+                s.Verdict = "Elixar can't tell for sure what this is. Open it and look before you choose what to do.";
+#endif
             }
             return s;
         }
@@ -396,8 +474,22 @@ namespace CDriveCleaner
                     foreach (var line in File.ReadAllLines(RulesFile))
                     {
                         var p = line.Split('\t'); int d, r; DateTime since;
-                        if (p.Length == 4 && int.TryParse(p[0], out d) && int.TryParse(p[1], out r) && DateTime.TryParseExact(p[2], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out since))
-                            l.Add(new KeepRule { Days = Math.Max(3, Math.Min(365, d)), Runs = r, Since = since, Path = p[3] });
+                        if ((p.Length == 4 || p.Length == 8) && int.TryParse(p[0], out d) && int.TryParse(p[1], out r) && DateTime.TryParseExact(p[2], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out since))
+                        {
+                            var k = new KeepRule { Days = Math.Max(3, Math.Min(365, d)), Runs = r, Since = since, Path = p[3] };
+                            if (p.Length == 8)
+                            {
+                                long cap, down; DateTime b;
+                                k.Mode = p[4] == "all" || p[4] == "cap" ? p[4] : "age";
+                                if (long.TryParse(p[5], out cap) && long.TryParse(p[6], out down)) { k.Cap = cap; k.Down = Math.Max(0, Math.Min(down, cap)); }
+                                if (k.Mode == "cap" && k.Cap < MinCap) continue;   // a broken line deletes nothing
+                                if (DateTime.TryParseExact(p[7], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out b)) k.Blocked = b;
+                            }
+#if BUSINESS
+                            if (k.Mode != "age") continue;   // the choices are Elixar for Private's; a company sets its rules in Policy manager
+#endif
+                            l.Add(k);
+                        }
                     }
             }
             catch { }
@@ -406,7 +498,9 @@ namespace CDriveCleaner
 
         static void SaveRules(List<KeepRule> l)
         {
-            SafeFile.Save(RulesFile, string.Join("\n", l.Select(r => r.Days + "\t" + r.Runs + "\t" + r.Since.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\t" + r.Path)) + "\n");
+            Func<DateTime, string> ds = d => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            SafeFile.Save(RulesFile, string.Join("\n", l.Select(r => r.Days + "\t" + r.Runs + "\t" + ds(r.Since) + "\t" + r.Path +
+                                                                     (r.Mode == "age" && r.Blocked == DateTime.MinValue ? "" : "\t" + r.Mode + "\t" + r.Cap + "\t" + r.Down + "\t" + (r.Blocked == DateTime.MinValue ? "-" : ds(r.Blocked))))) + "\n");
         }
 
         // a rule is only ever made for a folder Elixar studied as "Safe to keep in check"
@@ -426,6 +520,80 @@ namespace CDriveCleaner
             var l = Rules(); int n = l.RemoveAll(r => string.Equals(r.Path, path, StringComparison.OrdinalIgnoreCase));
             if (n > 0) { SaveRules(l); ChangeLog.Add("Settings", "Stopped keeping a folder in check", path, "", "", "", false); }
         }
+
+        public const long MinCap = 1L << 30;   // a cap under 1 GB isn't offered
+
+        // the rule as a short sentence
+        public static string RuleText(KeepRule r)
+        {
+            if (r.Mode == "cap") return "over " + Fs.Fmt(r.Cap) + ": oldest files deleted until under " + Fs.Fmt(r.Down) + ", daily";
+            if (r.Mode == "all") return "files older than " + r.Days + " days deleted, daily";
+            return "older than " + r.Days + " days, daily";
+        }
+
+        // Elixar for Private: you choose what happens to a folder that grows fast. Only an app's folder in ProgramData or
+        // AppData can get a rule that deletes (never your own files, Windows' folders, or a folder that looks unusual), and
+        // programs are never deleted by any rule. null when the choices may be offered, else why not.
+        public static string ChoiceProblem(FolderStudy s)
+        {
+#if BUSINESS
+            return "Your company sets these rules in Policy manager.";
+#else
+            if (s == null) return "nothing to choose";
+            if (s.Kind == GrowKind.Unusual) return "This folder looks unusual: scan it with Microsoft Defender first.";
+            if (s.Kind == GrowKind.Windows) return "Windows' own folder: Elixar doesn't delete here.";
+            if (s.Kind == GrowKind.Yours) return "Your own files: Elixar never deletes them on a timer.";
+            return ChoicePlace(s.Path);
+#endif
+        }
+
+        // an app's folder: below ProgramData or AppData\Local, Roaming or LocalLow (never one of them itself, nor Elixar's own)
+        public static Func<string, string> ChoicePlaceOverride;   // self-test
+        static string ChoicePlace(string path)
+        {
+            if (ChoicePlaceOverride != null) return ChoicePlaceOverride(path);
+            string why = RuleProblem(path); if (why != null) return "Not possible here: " + why + ".";
+            Func<Environment.SpecialFolder, string> sf = f => { try { return Environment.GetFolderPath(f); } catch { return ""; } };
+            string full; try { full = System.IO.Path.GetFullPath(path).TrimEnd('\\', '/'); } catch { return "Not possible here."; }
+            string la = sf(Environment.SpecialFolder.LocalApplicationData);
+            var places = new List<string> { sf(Environment.SpecialFolder.CommonApplicationData), la, sf(Environment.SpecialFolder.ApplicationData) };
+            if (!string.IsNullOrEmpty(la)) places.Add(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(la), "LocalLow"));
+            if (Skip(full)) return "This is Elixar's own folder.";
+            return PlaceProblem(full, places);
+        }
+
+        // below one of the places (never one of them itself); not Windows' own per-user data (its keys and saved passwords
+        // are in AppData\Roaming\Microsoft) and not Elixar's own
+        public static string PlaceProblem(string full, IEnumerable<string> places)
+        {
+            char sep = System.IO.Path.DirectorySeparatorChar;
+            var under = places.FirstOrDefault(p => !string.IsNullOrEmpty(p) && full.StartsWith(p.TrimEnd('\\', '/') + sep, StringComparison.OrdinalIgnoreCase));
+            if (under == null) return "Elixar only deletes on a schedule in an app's folder (in ProgramData or AppData).";
+            string first = full.Substring(under.TrimEnd('\\', '/').Length + 1).Split('\\', '/')[0];
+            if (first.Equals("Microsoft", StringComparison.OrdinalIgnoreCase)) return "Windows' own folder: Elixar doesn't delete here.";
+            if (first.Equals("Elixar", StringComparison.OrdinalIgnoreCase)) return "This is Elixar's own folder.";
+            return null;
+        }
+
+#if !BUSINESS
+        // saves your choice for a folder: "cap" (cap, down in bytes) or "age" (days). Asks nothing: the window asks first.
+        public static string AddChoice(FolderStudy s, string mode, int days, long cap, long down)
+        {
+            string why = ChoiceProblem(s); if (why != null) return why;
+            var r = new KeepRule { Path = s.Path, Days = Math.Max(3, Math.Min(365, days)), Since = DateTime.Today };
+            if (mode == "cap")
+            {
+                if (cap < MinCap || down < 0 || down >= cap) return "The size to go back down to must be smaller than the limit.";
+                r.Mode = "cap"; r.Cap = cap; r.Down = down;
+            }
+            else if (mode == "age") r.Mode = s.Kind == GrowKind.Safe ? "age" : "all";
+            else return "unknown choice";
+            var l = Rules().Where(x => !string.Equals(x.Path, s.Path, StringComparison.OrdinalIgnoreCase)).ToList();
+            l.Add(r); SaveRules(l);
+            ChangeLog.Add("Settings", "Your choice for a fast-growing folder", s.Path, "", RuleText(r), r.Mode == "cap" ? "Allowed by you; deleted for good" : "Allowed by you; the first two runs go to Undo", false);
+            return null;
+        }
+#endif
 
         // the daily task that runs the rules (as administrator, through Elixar's launcher): there while a rule exists
         public const string Task = Automation.Folder + "Keep in check";
@@ -472,9 +640,9 @@ namespace CDriveCleaner
                         try
                         {
                             if ((f.Attributes & (FileAttributes.ReparsePoint | FileAttributes.System)) != 0) continue;
-                            if (Programs.Contains(f.Extension.ToLowerInvariant())) continue;
+                            if (NeverDelete.Contains(f.Extension)) continue;
                             if ((now - f.LastWriteTime).TotalDays < r.Days) continue;
-                            if (Tidy(f.Name, cur.Item2)) l.Add(f.FullName);
+                            if (r.Mode == "all" || Tidy(f.Name, cur.Item2)) l.Add(f.FullName);
                         }
                         catch { }
                     foreach (var d in di.EnumerateDirectories())
@@ -484,6 +652,49 @@ namespace CDriveCleaner
             }
             return l;
         }
+
+        // "cap": the folder's oldest files (never programs, never the newest file) until it is under r.Down; nothing while it
+        // is under r.Cap. total: the folder's size now.
+        public static List<string> CapFiles(KeepRule r, out long total)
+        {
+            total = 0;
+            var all = new List<Tuple<string, long, DateTime>>();
+            var st = new Stack<string>(); st.Push(r.Path); int seen = 0;
+            while (st.Count > 0 && seen < 200000)
+            {
+                var cur = st.Pop();
+                try
+                {
+                    var di = new DirectoryInfo(cur);
+                    foreach (var f in di.EnumerateFiles())
+                        try
+                        {
+                            seen++;
+                            if ((f.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                            total += f.Length;
+                            if ((f.Attributes & FileAttributes.System) != 0 || NeverDelete.Contains(f.Extension)) continue;
+                            all.Add(Tuple.Create(f.FullName, f.Length, f.LastWriteTimeUtc));
+                        }
+                        catch { }
+                    foreach (var d in di.EnumerateDirectories())
+                        try { if ((d.Attributes & FileAttributes.ReparsePoint) == 0) st.Push(d.FullName); } catch { }
+                }
+                catch { }
+            }
+            var l = new List<string>();
+            if (total <= r.Cap || all.Count < 2) return l;
+            var newest = all.OrderByDescending(x => x.Item3).First();
+            long left = total;
+            foreach (var f in all.Where(x => x != newest).OrderBy(x => x.Item3))
+            {
+                if (left < r.Down) break;
+                l.Add(f.Item1); left -= f.Item2;
+            }
+            return l;
+        }
+
+        // what the daily run told you about (a cap rule that deleted something, or an app that wouldn't let it)
+        public static List<string[]> RunNotes = new List<string[]>();
 
         // runs every rule once (daily); the first two runs of a rule go to Undo; returns the bytes freed
         public static long RunRules(DateTime now, Action<string> log)
@@ -505,7 +716,12 @@ namespace CDriveCleaner
         public static long RunRule(KeepRule r, DateTime now, Action<string> log)
         {
             string why = RuleProblem(r.Path);   // checked again on every run, whoever asks for it
+            if (why == null && r.Mode != "age") why = ChoicePlace(r.Path);   // a choice rule: still an app's folder in ProgramData or AppData
+#if BUSINESS
+            if (r.Mode != "age") why = "not in Elixar for Business";
+#endif
             if (why != null) { if (log != null) log("Keep in check: skipped " + r.Path + " (" + why + ")"); return 0; }
+            if (r.Mode == "cap") return RunCap(r, now, log);
             var files = RuleFiles(r, now);
             if (files.Count == 0) { r.Runs++; return 0; }
             long bytes = files.Sum(f => { try { return new FileInfo(f).Length; } catch { return 0L; } });
@@ -520,10 +736,37 @@ namespace CDriveCleaner
                     bool gone; if (Win.IsWindows) gone = SafeDelete.Delete(f); else { Fs.Delete(f); gone = !File.Exists(f); }
                     if (gone) done += len;
                 }
-                ChangeLog.Add("Cleaning", "Kept a folder in check", r.Path, Fs.Fmt(bytes), Fs.Fmt(done) + " deleted", files.Count + " old log, cache or temp files older than " + r.Days + " days", false);
+                ChangeLog.Add("Cleaning", "Kept a folder in check", r.Path, Fs.Fmt(bytes), Fs.Fmt(done) + " deleted", files.Count + (r.Mode == "all" ? " files" : " old log, cache or temp files") + " older than " + r.Days + " days", false);
             }
             r.Runs++;
             if (log != null) log("Keep in check: " + r.Path + ": " + Fs.Fmt(done) + (r.Runs <= 2 ? " moved to Undo" : " deleted"));
+            return done;
+        }
+
+        // a cap rule: deleted for good (copies in Undo would take the same space). An app that refuses (an antivirus guarding
+        // its folder) is told to you once a week, never fought.
+        static long RunCap(KeepRule r, DateTime now, Action<string> log)
+        {
+            long total; var files = CapFiles(r, out total);
+            r.Runs++;
+            if (files.Count == 0) return 0;
+            long done = 0; int gone = 0, kept = 0;
+            foreach (var f in files)
+            {
+                if (!File.Exists(f)) continue;   // already gone (the app removed it, or another run did)
+                long len = 0; try { len = new FileInfo(f).Length; } catch { }
+                bool ok; if (Win.IsWindows) ok = SafeDelete.Delete(f); else { try { Fs.Delete(f); } catch { } ok = !File.Exists(f); }
+                if (ok) { done += len; gone++; } else if (File.Exists(f)) kept++;
+            }
+            string name = ShortPath(r.Path);
+            ChangeLog.Add("Cleaning", "Capped a fast-growing folder (your choice)", r.Path, Fs.Fmt(total), Fs.Fmt(done) + " deleted", gone + " of " + files.Count + " oldest files; " + RuleText(r), false);
+            if (log != null) log("Keep in check: " + r.Path + ": " + Fs.Fmt(done) + " deleted (" + gone + " of " + files.Count + " files)");
+            if (gone > 0) RunNotes.Add(new[] { "Your rule freed " + Fs.Fmt(done), name + " passed " + Fs.Fmt(r.Cap) + ", so Elixar deleted its " + gone + " oldest files." });
+            if (kept > 0 && (now.Date - r.Blocked).TotalDays >= 7)
+            {
+                r.Blocked = now.Date;
+                RunNotes.Add(new[] { "An app kept its files", kept + " files in " + name + " couldn't be deleted: the app that owns them doesn't allow it (an antivirus guards its own folder). Update or repair that app, or turn off its self-protection." });
+            }
             return done;
         }
 
@@ -537,20 +780,27 @@ namespace CDriveCleaner
         public static void Ignore(string path) { var h = Ignored(); h.Add(path); SafeFile.Save(IgnoreFile, string.Join("\n", h) + "\n"); }
 
         // ---------- the daily run (the low-space check, a few minutes after sign-in or at its time) ----------
-        public class DayResult { public List<FastFolder> Fast = new List<FastFolder>(); public List<FolderStudy> Studies = new List<FolderStudy>(); public List<FolderStudy> Alert = new List<FolderStudy>(); public long Freed; }
+        public class DayResult { public List<FastFolder> Fast = new List<FastFolder>(); public List<FolderStudy> Studies = new List<FolderStudy>(); public List<FolderStudy> Alert = new List<FolderStudy>(); public long Freed;
+                                 public List<string> Missed = new List<string>(); public string CheckProblem; }
 
         public static DayResult DailyRun(DateTime now, Action<string> log, Func<Dictionary<string, long>> measureOverride)
         {
             var res = new DayResult();
             var snaps = ReadSnaps();
-            if (!snaps.ContainsKey(now.Date))
+            if (!snaps.ContainsKey(now.Date) && !ReadDone().ContainsKey(now.Date))
             {
-                var sizes = measureOverride != null ? measureOverride() : Measure(TimeSpan.FromMinutes(8));
-                if (sizes == null) { if (log != null) log("Growing folders: the reading took too long and wasn't kept."); return res; }
-                SaveSnap(now, sizes);
+                Reading rd = measureOverride != null ? new Reading { Sizes = measureOverride() } : MeasureAll(Budget);
+                if (rd.Sizes == null) rd.Missed = rd.Missed.Count > 0 ? rd.Missed : Roots().Select(r => r[0]).ToList();
+                res.Missed = rd.Missed;
+                NoteMissed(now, rd.Missed);
+                if (rd.Missed.Count > 0 && log != null) log("Growing folders: ran out of time measuring " + string.Join(", ", rd.Missed) + (rd.Sizes == null ? "; nothing was kept." : "; the other places were kept."));
+                // told once a week when it couldn't finish 2 days in a row (a check that silently never works helps nobody)
+                res.CheckProblem = Problem(now);
+                if (rd.Sizes == null) return res;
+                SaveSnap(now, rd.Sizes, measureOverride != null || rd.Missed.Count == 0 ? null : rd.Done);
                 snaps = ReadSnaps();
             }
-            res.Fast = Detect(snaps, now);
+            res.Fast = Detect(snaps, now, ReadDone());
             var names = res.Fast.Count > 0 ? OwnerNames() : new List<string>();
             foreach (var f in res.Fast) res.Studies.Add(Study(f.Path, names, now));
             SaveNow(res.Fast, res.Studies);
@@ -564,6 +814,73 @@ namespace CDriveCleaner
             }
             SafeFile.Save(AlertedFile, string.Join("\n", alerted.Where(kv => (now - kv.Value.Item1).TotalDays < 60).Select(kv => kv.Value.Item1.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "\t" + kv.Value.Item2 + "\t" + kv.Key)) + "\n");
             return res;
+        }
+
+        public static TimeSpan Budget = TimeSpan.FromMinutes(12);
+        static string MissedFile { get { return F("growing-missed.txt"); } }
+        static string CheckAlertedFile { get { return F("growing-check-alerted.txt"); } }
+
+        // "date, place" for each place that ran out of time, and "date, ok" for a day that finished: kept 14 days
+        static void NoteMissed(DateTime now, List<string> missed)
+        {
+            try
+            {
+                var keep = new List<string>();
+                if (File.Exists(MissedFile))
+                    foreach (var line in File.ReadAllLines(MissedFile))
+                    {
+                        var p = line.Split('\t'); DateTime d;
+                        if (p.Length == 2 && DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (now.Date - d).TotalDays < 14 && d != now.Date) keep.Add(line);
+                    }
+                string ds = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                if (missed.Count == 0) keep.Add(ds + "\tok"); else keep.AddRange(missed.Select(m => ds + "\t" + m.Replace("\t", " ")));
+                SafeFile.Save(MissedFile, string.Join("\n", keep) + "\n");
+            }
+            catch { }
+        }
+
+        // a plain sentence when the last 2 readings both ran out of time somewhere, else null
+        public static string Problem(DateTime now)
+        {
+            try
+            {
+                if (!File.Exists(MissedFile)) return null;
+                var days = new Dictionary<DateTime, List<string>>();
+                foreach (var line in File.ReadAllLines(MissedFile))
+                {
+                    var p = line.Split('\t'); DateTime d;
+                    if (p.Length != 2 || !DateTime.TryParseExact(p[0], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) || (now.Date - d).TotalDays > 7) continue;
+                    List<string> l; if (!days.TryGetValue(d, out l)) days[d] = l = new List<string>();
+                    if (p[1] != "ok") l.Add(p[1]);
+                }
+                var last = days.OrderByDescending(kv => kv.Key).Take(2).ToList();
+                if (last.Count < 2 || last.Any(kv => kv.Value.Count == 0)) return null;
+                var places = last.SelectMany(kv => kv.Value).Distinct(StringComparer.OrdinalIgnoreCase).Select(PlaceName).ToList();
+                return "The growing-folders check ran out of time 2 days in a row (" + string.Join(", ", places) + "). The other places were still checked.";
+            }
+            catch { return null; }
+        }
+
+        static string PlaceName(string root)
+        {
+            Func<Environment.SpecialFolder, string> sf = f => { try { return Environment.GetFolderPath(f); } catch { return ""; } };
+            string r = root.TrimEnd('\\', '/');
+            if (r.Equals((UserDirs.Home ?? "").TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return "your user folder";
+            if (r.Equals(sf(Environment.SpecialFolder.CommonApplicationData).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return "ProgramData";
+            return r;
+        }
+
+        // the notice about a check that can't finish: at most once a week
+        public static bool CheckAlertDue(DateTime now)
+        {
+            try
+            {
+                DateTime d;
+                if (File.Exists(CheckAlertedFile) && DateTime.TryParseExact(File.ReadAllText(CheckAlertedFile).Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (now.Date - d).TotalDays < 7) return false;
+                SafeFile.Save(CheckAlertedFile, now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                return true;
+            }
+            catch { return false; }
         }
 
         static Dictionary<string, Tuple<DateTime, GrowKind>> ReadAlerted()
@@ -617,13 +934,18 @@ namespace CDriveCleaner
 
         public static string GrewText(FastFolder f) { return "+" + Fs.Fmt(f.Grew) + (f.Days <= 3 ? " in " + f.Days + " day" + (f.Days == 1 ? "" : "s") : " this week"); }
 
+        // the last two folders of a path, for a notice ("Zoom\\logs")
+        public static string ShortPath(string p) { var segs = p.Split('\\', '/').Where(x => x.Length > 0).ToList(); return segs.Count <= 2 ? p : string.Join("\\", segs.Skip(segs.Count - 2)); }
+
         // the notification text for the daily run
         public static void Notify(DayResult r)
         {
+            if (r.CheckProblem != null && CheckAlertDue(DateTime.Now))
+                Automation.Notify("The growing-folders check couldn't finish", r.CheckProblem + " Click to open Elixar.", System.Windows.Forms.ToolTipIcon.Warning, true);
             if (r.Alert.Count == 0) return;
             var odd = r.Alert.FirstOrDefault(s => s.Kind == GrowKind.Unusual);
             Func<FolderStudy, FastFolder> fastOf = s => r.Fast.FirstOrDefault(f => f.Path == s.Path) ?? new FastFolder { Path = s.Path };
-            Func<string, string> shortP = p => { var segs = p.Split('\\', '/').Where(x => x.Length > 0).ToList(); return segs.Count <= 2 ? p : string.Join("\\", segs.Skip(segs.Count - 2)); };
+            Func<string, string> shortP = ShortPath;
             if (odd != null)
                 Automation.Notify("Unusual growth on C:", shortP(odd.Path) + " grew " + GrewText(fastOf(odd)).TrimStart('+') + ". " + odd.Reason + " Nothing was deleted. Click to open Elixar.", System.Windows.Forms.ToolTipIcon.Warning, true);
             else

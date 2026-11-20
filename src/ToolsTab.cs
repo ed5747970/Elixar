@@ -560,6 +560,7 @@ namespace CDriveCleaner
                 {
                     int n = t2.IsFaulted ? 0 : t2.Result;
                     Log("Undo: restored " + n + " of " + b.Items.Count + " from \"" + b.Label + "\".");
+                    if (n > 0) { Sounds.Play(Snd.Undo); NiceBox.NoSoundOnce = true; }
                     Lang.Box(this, "Restored " + n + " of " + b.Items.Count + ".", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     RefreshUndo();
                 }));

@@ -65,6 +65,49 @@ namespace CDriveCleaner
             return Parse(lines);
         }
 
+        // C: lost a lot of space quickly: 10 GB or more in a week, or in 2 days. Returns the bytes lost and the days, or 0.
+        public const long DropBytes = 10L << 30;
+        public static long Drop(List<Point> pts, DateTime today, out int days)
+        {
+            days = 0;
+            var now = pts.FirstOrDefault(p => p.Day == today.Date); if (now == null) return 0;
+            foreach (var w in new[] { new[] { 1, 3, 2 }, new[] { 5, 9, 7 } })
+            {
+                var past = pts.Where(p => (today.Date - p.Day).TotalDays >= w[0] && (today.Date - p.Day).TotalDays <= w[1] && p.Total == now.Total)
+                              .OrderBy(p => Math.Abs((today.Date - p.Day).TotalDays - w[2])).FirstOrDefault();
+                if (past != null && past.Free - now.Free >= DropBytes) { days = (int)(today.Date - past.Day).TotalDays; return past.Free - now.Free; }
+            }
+            return 0;
+        }
+
+        static string DropAlertedFile
+        {
+            get
+            {
+                if (OverrideFile != null) return OverrideFile + ".drop-alerted";
+                string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                return Path.Combine(Path.Combine(string.IsNullOrEmpty(la) ? Path.GetTempPath() : la, "Elixar"), "space-drop-alerted.txt");
+            }
+        }
+
+        // the notice text when C: dropped fast and no notice went out in the last 3 days, else null.
+        // biggest: the folder that grew most (from the growing-folders check), if any
+        public static string DropNotice(DateTime today, string biggest, long biggestGrew)
+        {
+            int days; long lost = Drop(Read(), today, out days);
+            if (lost <= 0) return null;
+            try
+            {
+                DateTime d;
+                if (File.Exists(DropAlertedFile) && DateTime.TryParseExact(File.ReadAllText(DropAlertedFile).Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out d) && (today.Date - d).TotalDays < 3) return null;
+                Directory.CreateDirectory(Path.GetDirectoryName(DropAlertedFile));
+                SafeFile.Save(DropAlertedFile, today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            }
+            catch { return null; }
+            return "C: lost " + Fs.Fmt(lost) + " in " + days + " day" + (days == 1 ? "" : "s") + "." +
+                   (biggest != null ? " Most of it: " + biggest + " (+" + Fs.Fmt(biggestGrew) + ")." : " Dashboard > Growing fast shows where it went.") + " Click to open Elixar.";
+        }
+
         public class Forecast { public double GbPerMonth; public DateTime? FullOn; public int Days; public string Text = ""; }
 
         // a straight line through the last 90 days of readings

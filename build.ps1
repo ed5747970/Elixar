@@ -29,6 +29,8 @@ $src = Get-ChildItem (Join-Path $root "src\*.cs") | ForEach-Object { $_.FullName
 $common = @("/nologo", "/optimize+", "/win32icon:$root\app.ico", "/win32manifest:$root\app.manifest",
             "/resource:$root\app.ico,Elixar.app.ico", "/resource:$root\brand.png,Elixar.brand.png",
             "/resource:$root\guide\UserGuide.html,Elixar.guide.html", "/resource:$cfg,Elixar.update-config.txt") + $refs
+# Elixar's own sounds (Settings > Sounds), built into the exe so no sound file on the disk is ever played
+$common += Get-ChildItem (Join-Path $root "sounds\*.wav") | ForEach-Object { "/resource:$($_.FullName),Elixar.sounds.$($_.Name)" }
 
 # Elixar for Private -> out\Elixar.exe
 $exe = Join-Path $outDir "Elixar.exe"

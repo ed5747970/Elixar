@@ -52,8 +52,8 @@ namespace CDriveCleaner
             pageSettings = new TabPage("Settings") { BackColor = Color.FromArgb(246, 248, 251) };
             // the page is as tall as what it holds, inside a panel that scrolls: a table that fills the window squeezes
             // itself to the window's height and never shows a scroll bar, so the bottom of the page couldn't be reached
-            var t = Page(14);
-            for (int i = 0; i < 14; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var t = Page(16);
+            for (int i = 0; i < 16; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.Dock = DockStyle.Top; t.AutoSize = true; t.AutoSizeMode = AutoSizeMode.GrowAndShrink;
             Func<string, Label> head = text => new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 11f), Text = text, Margin = new Padding(0, S(10), 0, S(4)) };
             Func<string, RadioButton> radio = text => new RadioButton { Text = text, AutoSize = true, Margin = new Padding(S(4), S(4), S(22), S(4)) };
@@ -103,10 +103,11 @@ namespace CDriveCleaner
             t.Controls.Add(head("Language"), 0, 2); t.Controls.Add(langRow, 0, 3);
             t.Controls.Add(head("Theme"), 0, 4); t.Controls.Add(themeRow, 0, 5);
             t.Controls.Add(btnApplySettings, 0, 6);
-            t.Controls.Add(head("Email account"), 0, 7); t.Controls.Add(BuildEmailBox(), 0, 8);
-            t.Controls.Add(head("Security and protection"), 0, 9); t.Controls.Add(BuildPinBox(), 0, 10);
-            t.Controls.Add(head("This PC"), 0, 11); t.Controls.Add(pcButtons, 0, 12);
-            var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 13);
+            t.Controls.Add(head("Sounds"), 0, 7); t.Controls.Add(BuildSoundsBox(), 0, 8);
+            t.Controls.Add(head("Email account"), 0, 9); t.Controls.Add(BuildEmailBox(), 0, 10);
+            t.Controls.Add(head("Security and protection"), 0, 11); t.Controls.Add(BuildPinBox(), 0, 12);
+            t.Controls.Add(head("This PC"), 0, 13); t.Controls.Add(pcButtons, 0, 14);
+            var last = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Top, Margin = new Padding(0) }; last.Controls.Add(pcInfo); t.Controls.Add(last, 0, 15);
             settingsScroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = pageSettings.BackColor };
             settingsScroll.Controls.Add(t);
             pageSettings.Controls.Add(settingsScroll);
@@ -132,6 +133,36 @@ namespace CDriveCleaner
                 if (err == null) btnInstall.Text = Lang.T("Repair the installation");
             };
             btnUpdate.Click += (o, e) => CheckForUpdates(true);
+        }
+
+        // ---------- Sounds: Elixar's own (Potion), Windows' own, or none. Saved at once: no restart ----------
+        public RadioButton SoundPotion, SoundWindows, SoundOff; public CheckBox SoundOnOpen;   // self-test
+        Control BuildSoundsBox()
+        {
+            var box = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Margin = new Padding(0) };
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = true, Margin = new Padding(0) };
+            Func<string, RadioButton> radio = text => new RadioButton { Text = Lang.T(text), AutoSize = true, Margin = new Padding(S(4), S(4), S(22), S(4)) };
+            SoundPotion = radio("Elixar's own (Potion)"); SoundWindows = radio("Windows' own sounds"); SoundOff = radio("No sounds");
+            var play = MakeButton("Play"); play.Margin = new Padding(S(4), S(1), 0, 0);
+            row.Controls.AddRange(new Control[] { SoundPotion, SoundWindows, SoundOff, play });
+            SoundOnOpen = new CheckBox { AutoSize = true, Text = Lang.T("Play a cork pop when Elixar opens"), Margin = new Padding(S(4), S(2), 0, S(2)), Checked = Sounds.OnOpen };
+            var note = Note("Bubbles, a cork pop and wood notes when a clean finishes, a scan is done, Undo puts files back, and for Elixar's questions and warnings. Quiet and short. Scheduled cleans make no sound, and when Windows is set to \"No Sounds\", Elixar is silent too.");
+            note.Margin = new Padding(S(4), S(4), 0, 0);
+            box.Controls.AddRange(new Control[] { row, SoundOnOpen, note });
+            string c = Sounds.Choice;
+            (c == Sounds.Off ? SoundOff : c == Sounds.WindowsOwn ? SoundWindows : SoundPotion).Checked = true;
+            Func<string> chosen = () => SoundOff.Checked ? Sounds.Off : SoundWindows.Checked ? Sounds.WindowsOwn : Sounds.Potion;
+            EventHandler save = (o, e) =>
+            {
+                if (!((RadioButton)o).Checked || chosen() == Sounds.Choice) return;
+                Sounds.Choice = chosen(); SoundOnOpen.Enabled = Sounds.Choice == Sounds.Potion; play.Enabled = Sounds.Choice != Sounds.Off;
+                if (!testMode) Sounds.Play(Snd.Done);
+            };
+            foreach (var rb in new[] { SoundPotion, SoundWindows, SoundOff }) rb.CheckedChanged += save;
+            SoundOnOpen.CheckedChanged += (o, e) => { Sounds.OnOpen = SoundOnOpen.Checked; if (SoundOnOpen.Checked && !testMode) Sounds.Play(Snd.Open); };
+            SoundOnOpen.Enabled = c == Sounds.Potion; play.Enabled = c != Sounds.Off;
+            play.Click += (o, e) => Sounds.Play(Sounds.Choice == Sounds.WindowsOwn ? Snd.Info : Snd.Done);
+            return box;
         }
 
         // ---------- Security: an optional PIN for opening Elixar ----------

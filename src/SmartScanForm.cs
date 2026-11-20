@@ -213,6 +213,7 @@ namespace CDriveCleaner
                 try { Settings.Set("SmartScanAt", DateTime.Today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)); } catch { }
                 Summarize();
                 SetBusy(false);
+                Sounds.Play(Snd.Scan);
                 if (owner != null) owner.Log(Lang.T("Smart scan of " + title + " - " + result.Dups.Count + " sets of duplicates (" + Fs.Fmt(result.DupWaste) + " extra), " +
                                                    result.OlderThan(DateTime.Now.AddMonths(-6), SmartScan.OldMin).Count + " big files not used for 6 months."));
                 if (ScanDone != null) ScanDone();

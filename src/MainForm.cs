@@ -376,6 +376,7 @@ namespace CDriveCleaner
             Theme.Apply(this); Lang.Apply(this); Theme.Watch(this);
             Shown += (o, e) =>
             {
+                if (!testMode && Sounds.OnOpen) Sounds.Play(Snd.Open);
                 if (!testMode) { var pt = new System.Windows.Forms.Timer { Interval = 1500 }; pt.Tick += (o2, e2) => { pt.Stop(); pt.Dispose(); if (Form.ActiveForm == this) { PolicyPinCheck(); OfferPinOnce(); } }; pt.Start(); }
                 Log("Elixar " + (LinuxUi ? "(running as you; system items ask for your password when you clean them)" : Sys.IsAdmin() ? "(running as administrator)" : "(NOT running as administrator - some items will be skipped)"));
                 if (Win.IsWindows && Paths.Data != null && Paths.DataProblem != null) Log("Security: " + Paths.DataProblem);
@@ -428,7 +429,7 @@ namespace CDriveCleaner
                 string err = t.IsFaulted ? t.Exception.GetBaseException().Message : t.Result.Item2;
                 bool newer = r != null && r.Version != null && Updates.IsNewer(r.Version, Updates.Current);
                 lnkUpdate.Visible = newer;
-                if (newer) { lnkUpdate.Text = Lang.T("Update available") + ": " + r.Version.ToString(3); Log("Elixar " + r.Version.ToString(3) + " is available."); }
+                if (newer) { lnkUpdate.Text = Lang.T("Update available") + ": " + r.Version.ToString(3); Log("Elixar " + r.Version.ToString(3) + " is available."); if (interactive) { Sounds.Play(Snd.Update); NiceBox.NoSoundOnce = true; } }
                 if (!interactive) return;
                 if (r == null) { Lang.Box(this, err ?? "Could not check for updates.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
                 if (!newer) { Lang.Box(this, "Elixar is up to date (" + Updates.Current.ToString(3) + ").", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
@@ -1157,6 +1158,7 @@ namespace CDriveCleaner
                 StartMeasure(() =>
                 {
                     RefreshDashboard();
+                    if (!t.IsFaulted) { Sounds.Play(Snd.Done); NiceBox.NoSoundOnce = true; }
                     Lang.Box(this, Results.AfterClean(total, Math.Max(0, freeAfter - total), freeAfter, Sys.Main), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 });
             }));

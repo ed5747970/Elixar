@@ -35,6 +35,7 @@ namespace CDriveCleaner
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
             bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean") || args.Contains("--cure-alerts") || args.Contains("--keep-in-check") || Cli.IsCli(args) || args.Contains("--msi");
+            if (scheduled) Sounds.Quiet = true;   // scheduled runs and automatic cleans make no sound of their own
             if (Win.IsWindows)
             {
                 // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
@@ -91,6 +92,7 @@ namespace CDriveCleaner
             {
                 Application.EnableVisualStyles();
                 FolderGrowth.RunRules(DateTime.Now, m => Automation.Log(m));
+                foreach (var n in FolderGrowth.RunNotes.ToList()) Automation.Notify(n[0], n[1] + " Click to open Elixar.", ToolTipIcon.Info, true);
                 return 0;
             }
 #if BUSINESS

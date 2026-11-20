@@ -36,6 +36,7 @@ namespace CDriveCleaner
 
         public static int Run(bool showResult)
         {
+            Sounds.Quiet = true;   // the self-test records which sound would play; it never plays one
             var rep = new StringBuilder();
             int fails = 0;
             if (Lx.On) Catalog.WindowsOnLinux = true;   // sections 1-4 check Windows' lists and logic; 4L checks Linux
@@ -1840,6 +1841,7 @@ namespace CDriveCleaner
                         SelfTest1266.All(root, check);
                         SelfTest1266b.All(root, check);
                         SelfTest1267.All(root, check);
+                        SelfTest1268.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

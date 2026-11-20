@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.67</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.68</p></div>
 </div></header>
 <main class="wrap">
 
@@ -122,8 +122,19 @@
   <tr><td><strong>Your files</strong> (Videos, Downloads, Documents&hellip;)</td><td>Move off C:. Never deleted by Elixar</td></tr>
   <tr><td><strong>Windows</strong></td><td>The right tool (a log that keeps growing in Windows\Logs\CBS means a stuck update: Repair Windows)</td></tr>
   <tr><td><strong>Looks unusual</strong>: no app owns it and new unsigned programs appear, a hidden random-named folder, or many files turned into an unknown file type in a day (how ransomware looks)</td><td><em>Scan with Microsoft Defender</em>. Never deleted - that could hide what happened</td></tr>
-  <tr><td><strong>Look at it</strong></td><td>Open, Ignore</td></tr>
+  <tr><td><strong>Look at it</strong> (an app's folder Elixar can't fully explain)</td><td>Open, Ignore; in Elixar for Private, the choices below</td></tr>
 </table>
+<p><strong>What should Elixar do with this folder?</strong> (Elixar for Private.) For an app's folder in ProgramData or AppData that keeps growing, you choose:</p>
+<ul>
+  <li><strong>Just tell me</strong> - a notice once a week, nothing else (the start).</li>
+  <li><strong>Cap its size</strong> - when the folder passes the limit you set (for example 20 GB), its oldest files are deleted until it's under the second number (for example 2 GB). The newest file always stays and programs (.exe, .dll, scripts) are never deleted. These are deleted for good: copies in Undo would take the same space. Elixar asks once before saving, says how much it deletes right now, and does it once at once; after that it's checked daily.</li>
+  <li><strong>Delete files older than</strong> 7, 14, 30 or 90 days, daily - every kind of file except programs (for an app's logs and caches: only log, cache and temp files). The first two runs go to Undo.</li>
+  <li><strong>Ignore this folder</strong> - no more notices about it.</li>
+</ul>
+<p>Your own files, Windows' folders and folders that look unusual never get these choices. Every run checks the folder again (still an app's folder, no links, not Windows', not yours) and nothing is deleted if anything changed. Your choices are saved where only administrators can change them, and you get a notice after a run that deleted something, or when the app that owns the folder refuses (an antivirus guarding its own folder). In Elixar for Business the company sets these rules in Policy manager instead.</p>
+<p><strong>SecureAPlus</strong> (an antivirus by SecureAge Technology) keeps lists of your programs in ProgramData\SecureAge Technology\SecureAge\Whitelist\to be transferred to send to SecureAge. When its upload is stuck, a new 1-2 GB file is added every day (or every hour) and none are removed. Elixar names it and suggests a cap of 20 GB down to 2 GB. Updating or repairing SecureAPlus is the real fix; deleting the old lists doesn't turn off your protection.</p>
+<p><strong>C: is filling up fast:</strong> when C: loses 10 GB or more in a week (or in 2 days), you get a notice at once, naming the folder that took it when the check found one (at most every 3 days).</p>
+<p>The daily reading measures ProgramData and Windows' folders first, then your profile. If your profile takes too long, the places already measured are still kept (a place that ran out of time is left out, so its folders never look new the next day). If it runs out of time 2 days in a row you get a notice and PC health shows <em>The growing-folders check can't finish</em>.</p>
 <p>Only folder sizes are kept (never file names). <em>Ignore</em> keeps a folder quiet; <em>Check now</em> measures at once.</p>
 <h3>Choosing a drive</h3>
 <p>The switch at the top left lists <strong>C: Windows</strong>, every other drive in the PC (and USB drives), and <strong>All drives</strong>. Refresh (F5), Explore and Folder map work on the drive you picked.</p>
@@ -338,6 +349,7 @@
 <ul>
   <li><strong>Language:</strong> English, Hebrew or Arabic (laid out right to left), Russian or Spanish. Hebrew covers every screen; Arabic, Russian and Spanish cover the main screens (tabs, Dashboard, Cleaner, common buttons) and the rest stays in English. Email reports are in Hebrew or English. Some live status lines stay in English.</li>
   <li><strong>Theme:</strong> follow Windows, light or dark.</li>
+  <li><strong>Sounds:</strong> Elixar's own (<em>Potion</em>: bubbles, a cork pop and wood notes), Windows' own sounds, or no sounds. Saved at once, no restart; <em>Play</em> lets you hear it. They play when a clean you started finishes, a scan or PC health check is done (a different sound when the score went up or a security problem was found), Undo puts files back, an email report is sent, an update is ready, and for Elixar's questions and warnings. <em>Play a cork pop when Elixar opens</em> is off unless you turn it on. Quiet and short, built into Elixar.exe (no sound file is ever read from the disk). Scheduled and automatic cleans make no sound, and when Windows is set to "No Sounds", Elixar is silent too.</li>
   <li><strong>Install Elixar on this PC:</strong> adds it to the Start menu and to Windows&rsquo; installed apps list (with Uninstall), in C:\Program Files\Elixar.</li>
   <li><strong>Sponsor Elixar:</strong> shows once Elixar is published on GitHub, and opens its GitHub Sponsors page.</li>
   <li><strong>Check for updates:</strong> once Elixar is published on GitHub, it checks for a new version (also quietly once a week). An update is installed only if it is signed with Elisar&rsquo;s key and every file matches its fingerprint.</li>
@@ -570,6 +582,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-11-21</td><td>1.2.68</td><td>Growing fast: in Elixar for Private you choose what happens to an app&rsquo;s folder that keeps growing (just tell me, cap its size, delete files older than N days, or ignore). The daily check now finishes ProgramData and Windows first and tells you if it can&rsquo;t finish. A notice when C: loses 10 GB or more in a week. SecureAPlus&rsquo;s stuck uploads are recognised. Settings: Elixar&rsquo;s own sounds (Potion).</td></tr>
   <tr><td>2026-11-13</td><td>1.2.67</td><td>Startup: Also starts by itself (scheduled tasks and services apps added, flagged when they look like unwanted software; tasks can be turned off). PC health: battery health on laptops. Cleaner: Cookies to keep keeps you signed in to the sites you choose. The Recycle Bin item empties the bin even where Windows refuses. Security: another program can't borrow Elixar's administrator rights through Windows' prompt; Move off C: only into folders that are yours.</td></tr>
   <tr><td>2026-11-07</td><td>1.2.66</td><td>What Elixar did for you (space freed, Windows starting faster, PC health then and now) on the Dashboard and in the weekly email; the Cleaner&apos;s Comes back column (how fast each item fills up again, and the weekly clean leaves out what&apos;s back in a day or two); the clean when C: is low runs before the alert, which shows only if C: is still low; Fix all safe in PC health; Tools &gt; Leftover installers; security and PC health alerts; the Media Creation Tool and Update Assistant leftovers in the Cleaner; the search index in System space; Tools &gt; Old accounts</td></tr>
   <tr><td>2026-11-01</td><td>1.2.65</td><td>Fixes from a review of the last releases: Ignore in PC health now sticks for an app whose name has a symbol in it (like Notepad++); a window you move half onto another monitor stays where you put it (only a title bar you can&apos;t reach is brought back); the Cure Server counts wrong enrollment tokens per IPv6 network, not per address; the cloud check also records connections Windows blocked</td></tr>

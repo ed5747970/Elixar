@@ -272,7 +272,12 @@ namespace CDriveCleaner
             domStatus.Text = Lang.T(domPcs.Count == 1 ? "1 PC" : domPcs.Count + " PCs") + "  ·  " + Lang.T("updated") + " " + DateTime.Now.ToString("HH:mm");
             DomainKpis();
             DomainFillList();
+            // a sound when more PCs need attention than when you last looked (out of space, or a failing or worn disk)
+            int atRisk = domPcs.Count(p => p.Risk == CureRisk.Full || p.Risk == CureRisk.Disk || p.Risk == CureRisk.Worn);
+            if (atRisk > Math.Max(0, domAtRisk) && tabs.SelectedTab == pageDomain) Sounds.Play(Snd.Pc);
+            domAtRisk = atRisk;
         }
+        int domAtRisk = -1;
 
         void DomainKpis()
         {

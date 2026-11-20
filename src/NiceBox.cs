@@ -40,6 +40,7 @@ namespace CDriveCleaner
 
         // the same box with its own button names (for example "Connect email...", "Not now", "Don't ask again")
         [ThreadStatic] static string[] nextLabels;
+        [ThreadStatic] public static bool NoSoundOnce;
         public string[] Labels { get; private set; }
         public static DialogResult ShowWith(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, int defaultButton, string[] labels)
         {
@@ -51,6 +52,7 @@ namespace CDriveCleaner
 
         public static DialogResult Show(IWin32Window owner, string text, string caption, MessageBoxButtons buttons, MessageBoxIcon icon, int defaultButton)
         {
+            bool quiet = NoSoundOnce; NoSoundOnce = false;
             if (!Enabled) return MessageBox.Show(owner, text, caption, buttons, icon, defaultButton == 1 ? MessageBoxDefaultButton.Button2 : MessageBoxDefaultButton.Button1,
                                                  Lang.Rtl ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : 0);
             using (var f = new NiceBox(text ?? "", string.IsNullOrEmpty(caption) ? "Elixar" : caption, buttons, icon, defaultButton))
@@ -58,10 +60,11 @@ namespace CDriveCleaner
                 if (TestHook != null) return TestHook(f);
                 try
                 {
-                    if (icon == MessageBoxIcon.Warning) SystemSounds.Exclamation.Play();
-                    else if (icon == MessageBoxIcon.Error) SystemSounds.Hand.Play();
-                    else if (icon == MessageBoxIcon.Question) SystemSounds.Question.Play();
-                    else if (icon == MessageBoxIcon.Information) SystemSounds.Asterisk.Play();
+                    if (quiet) { }   // the moment already had its own sound ("Clean finished")
+                    else if (icon == MessageBoxIcon.Warning) Sounds.Play(Snd.Warning);
+                    else if (icon == MessageBoxIcon.Error) Sounds.Play(Snd.Error);
+                    else if (icon == MessageBoxIcon.Question) Sounds.Play(Snd.Question);
+                    else if (icon == MessageBoxIcon.Information) Sounds.Play(Snd.Info);
                 }
                 catch { }
                 return owner == null ? f.ShowDialog() : f.ShowDialog(owner);
