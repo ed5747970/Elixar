@@ -61,9 +61,10 @@ namespace CDriveCleaner
             var lastCheck = DateTime.Now;
             Action<bool, string> check = (ok, what) =>
             {
-                lastCheck = DateTime.Now;
+                int secs = (int)(DateTime.Now - lastCheck).TotalSeconds; lastCheck = DateTime.Now;
                 rep.AppendLine((ok ? "PASS  " : "FAIL  ") + what); if (!ok) { fails++; failed.Add(what); }
-                if (progress != null) try { File.AppendAllText(progress, (ok ? "PASS  " : "FAIL  ") + what + "\r\n"); } catch { }
+                // with the seconds it took, so a slow check on a test PC can be found
+                if (progress != null) try { File.AppendAllText(progress, (ok ? "PASS  " : "FAIL  ") + what + "  [" + secs + " s]\r\n"); } catch { }
             };
             // a check stuck for 4 minutes (a window waiting for a click, a wait that never ends): where the test thread is,
             // written to the progress file, so a test PC's report says which check and which line

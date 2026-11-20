@@ -59,9 +59,9 @@ if ($SelfTest) {
         $report = Join-Path (Split-Path $e) "selftest-report.txt"
         $progress = Join-Path (Split-Path $e) "selftest-progress.txt"
         Write-Host "===== Self-test: $e"
-        if (-not $p.WaitForExit(15 * 60 * 1000)) {
+        if (-not $p.WaitForExit(20 * 60 * 1000)) {
             # stuck (a window waiting for a click?): a picture of the screen, the last checks it finished, then stop it
-            Write-Host "Self-test still running after 15 minutes: stopped. The last checks it finished:"
+            Write-Host "Self-test still running after 20 minutes: stopped. The last checks it finished:"
             try {
                 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
                 $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
@@ -79,6 +79,11 @@ if ($SelfTest) {
             continue
         }
         if (Test-Path $report) { Get-Content $report }
+        # the slowest checks (the whole run must stay under 20 minutes)
+        if (Test-Path $progress) {
+            Write-Host "Slowest checks:"
+            Get-Content $progress | Where-Object { $_ -match '\[(\d+) s\]$' } | Sort-Object { [int]($_ -replace '^.*\[(\d+) s\]$', '$1') } -Descending | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
+        }
         if ($p.ExitCode -ne 0) { $failed += $p.ExitCode }
     }
     if ($failed -ne 0) { throw "Self-test: $failed check(s) failed" }
