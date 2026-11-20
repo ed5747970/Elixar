@@ -35,7 +35,7 @@ namespace CDriveCleaner
         {
             get
             {
-                string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string la = UserDirs.Local;   // inside your real profile, even if your registry points Local AppData elsewhere
                 if (string.IsNullOrEmpty(la)) la = Path.GetTempPath();
                 return Path.Combine(Path.Combine(la, "Elixar"), "platform-tools");
             }
@@ -79,7 +79,7 @@ namespace CDriveCleaner
         {
             if (Exe != null) return Exe;
             var dirs = new List<string> { SafeDir, ToolsDir, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "platform-tools") };
-            string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string la = UserDirs.Local;
             if (!string.IsNullOrEmpty(la)) dirs.Add(la + "\\Android\\Sdk\\platform-tools");
             foreach (var p in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
                 if (p.Trim().Length > 0) dirs.Add(p.Trim().Trim('"').TrimEnd('\\'));

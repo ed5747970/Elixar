@@ -190,6 +190,9 @@ namespace CDriveCleaner
                 string p = F(f); if (!string.IsNullOrEmpty(p)) yield return p;
             }
             if (Win.IsWindows) { yield return Paths.Data; yield return Install.Dir; }
+            // the real AppData too (your registry can point the names above somewhere else)
+            string home = UserDirs.Home;
+            if (Win.IsWindows && !string.IsNullOrEmpty(home)) yield return Path.Combine(home, "AppData");
         }
 
         static bool Under(string path, string folder)

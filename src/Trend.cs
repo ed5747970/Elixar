@@ -24,7 +24,7 @@ namespace CDriveCleaner
         {
             get
             {
-                string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string la = UserDirs.Local;   // inside your real profile, even if your registry points Local AppData elsewhere
                 return Path.Combine(Path.Combine(string.IsNullOrEmpty(la) ? Path.GetTempPath() : la, "Elixar"), "space-history.txt");
             }
         }
@@ -87,7 +87,7 @@ namespace CDriveCleaner
             get
             {
                 if (OverrideFile != null) return OverrideFile + ".drop-alerted";
-                string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string la = UserDirs.Local;   // inside your real profile, even if your registry points Local AppData elsewhere
                 return Path.Combine(Path.Combine(string.IsNullOrEmpty(la) ? Path.GetTempPath() : la, "Elixar"), "space-drop-alerted.txt");
             }
         }

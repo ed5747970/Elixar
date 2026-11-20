@@ -50,7 +50,7 @@ namespace CDriveCleaner
         static string F(string n)
         {
             if (OverrideDir != null) return System.IO.Path.Combine(OverrideDir, n);
-            string la = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string la = UserDirs.Local;   // inside your real profile, even if your registry points Local AppData elsewhere
             string d = System.IO.Path.Combine(System.IO.Path.Combine(string.IsNullOrEmpty(la) ? System.IO.Path.GetTempPath() : la, "Elixar"), "growing");
             try { Directory.CreateDirectory(d); } catch { }
             return System.IO.Path.Combine(d, n);
