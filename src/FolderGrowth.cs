@@ -556,9 +556,11 @@ namespace CDriveCleaner
             Func<Environment.SpecialFolder, string> sf = f => { try { return Environment.GetFolderPath(f); } catch { return ""; } };
             string full; try { full = System.IO.Path.GetFullPath(path).TrimEnd('\\', '/'); } catch { return "Not possible here."; }
             if (!string.Equals(full, path.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return "Not possible here.";   // only a plain, full path (no "..")
-            string la = sf(Environment.SpecialFolder.LocalApplicationData);
-            var places = new List<string> { sf(Environment.SpecialFolder.CommonApplicationData), la, sf(Environment.SpecialFolder.ApplicationData) };
-            if (!string.IsNullOrEmpty(la)) places.Add(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(la), "LocalLow"));
+            // AppData where Windows really keeps your profile (from the machine's list of profiles), never where your own registry
+            // says it is: another program running as you could point "Local AppData" at Documents
+            string home = UserDirs.Home;
+            var places = new List<string> { sf(Environment.SpecialFolder.CommonApplicationData) };
+            if (!string.IsNullOrEmpty(home)) foreach (var a in new[] { "Local", "Roaming", "LocalLow" }) places.Add(System.IO.Path.Combine(home, "AppData", a));
             if (Skip(full)) return "This is Elixar's own folder.";
             return PlaceProblem(full, places);
         }
