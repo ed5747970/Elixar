@@ -135,6 +135,8 @@ namespace CDriveCleaner
         }
 
         // ---------- game launchers ----------
+        // Business agent: measuring the second and later accounts, so the PC's shared part (GOG's, in ProgramData) is counted once
+        [ThreadStatic] public static bool AccountOnly;
         public static List<string> LauncherCaches()
         {
             string L = UserDirs.Local;
@@ -145,7 +147,7 @@ namespace CDriveCleaner
             l.Add(Path.Combine(L, "Roblox", "logs"));
             l.Add(Path.Combine(L, "Ubisoft Game Launcher", "logs"));
             l.Add(Path.Combine(L, "Riot Games", "Riot Client", "Logs"));
-            if (!string.IsNullOrEmpty(PD)) l.Add(Path.Combine(PD, "GOG.com", "Galaxy", "webcache"));
+            if (!string.IsNullOrEmpty(PD) && !AccountOnly) l.Add(Path.Combine(PD, "GOG.com", "Galaxy", "webcache"));   // the PC's, not an account's
             return l;
         }
 
@@ -220,22 +222,22 @@ namespace CDriveCleaner
         {
             return new List<CleanItem>
             {
-                new CleanItem { Name = "Other apps' web caches (Slack, Notion, Signal...)", Tier = Tier.Safe, Where = "App data of apps built on Chromium (found by their folders)",
+                new CleanItem { PerAccount = true, Name = "Other apps' web caches (Slack, Notion, Signal...)", Tier = Tier.Safe, Where = "App data of apps built on Chromium (found by their folders)",
                     Info = "The same web cache folders (Cache, Code Cache, GPUCache) in every other app built like Discord or Teams. Messages, notes and settings are kept. Close those apps first: what an open app is using is skipped.",
                     Measure = () => Sum(ElectronCaches()), Clean = log => ClearAll(ElectronCaches()) },
-                new CleanItem { Name = "Browser website storage (Service Worker caches)", Tier = Tier.Review, Where = "Chrome, Edge, Brave, Vivaldi profiles\\Service Worker\\CacheStorage",
+                new CleanItem { PerAccount = true, Name = "Browser website storage (Service Worker caches)", Tier = Tier.Review, Where = "Chrome, Edge, Brave, Vivaldi profiles\\Service Worker\\CacheStorage",
                     Procs = new[] { "chrome", "msedge", "brave", "vivaldi" },
                     Info = "Copies of websites' files that sites keep for themselves (often several GB). Sites download them again. Web apps you use offline lose their offline copy until you open them online. History, passwords and logins are kept. The browsers must be closed.",
                     Measure = () => MeasureAll(ServiceWorkerCaches()), Clean = log => ClearAll(ServiceWorkerCaches()) },
-                new CleanItem { Name = "More developer caches (Deno, Unity, Rust, old JetBrains)", Tier = Tier.Safe, Where = @"deno\deps, Unity\cache, .cargo\registry\src, JetBrains\<older versions> ...",
+                new CleanItem { PerAccount = true, Name = "More developer caches (Deno, Unity, Rust, old JetBrains)", Tier = Tier.Safe, Where = @"deno\deps, Unity\cache, .cargo\registry\src, JetBrains\<older versions> ...",
                     Procs = new[] { "idea64", "pycharm64", "rider64", "webstorm64", "clion64", "goland64", "Unity" },
                     Info = "Download caches tools fill again when needed (needs internet), and the caches of JetBrains IDE versions you updated from (the newest of each is kept; settings are kept). Projects are not touched.",
                     Measure = () => DevCaches().Sum(d => Fs.SizeOf(d)), Clean = log => { foreach (var d in DevCaches()) { if (d.IndexOf(@"\JetBrains\", StringComparison.OrdinalIgnoreCase) >= 0) Fs.Delete(d); else Fs.ClearIn(d); } } },
-                new CleanItem { Name = "Game launcher caches (Battle.net, Riot, Ubisoft, Roblox, GOG)", Tier = Tier.Safe, Where = "Launchers' web caches and logs",
+                new CleanItem { PerAccount = true, Name = "Game launcher caches (Battle.net, Riot, Ubisoft, Roblox, GOG)", Tier = Tier.Safe, Where = "Launchers' web caches and logs",
                     Procs = new[] { "Battle.net", "Agent", "RiotClientServices", "upc", "UbisoftConnect", "RobloxPlayerBeta", "GalaxyClient" },
                     Info = "Store pages, pictures and logs the launchers saved. Your games and saves are not touched. The launchers must be closed.",
                     Measure = () => MeasureAll(LauncherCaches()), Clean = log => ClearAll(LauncherCaches()) },
-                new CleanItem { Name = "Old installers in Downloads", Tier = Tier.Review, Where = "Downloads: setup files of apps that are installed, over 60 days old",
+                new CleanItem { PerAccount = true, Name = "Old installers in Downloads", Tier = Tier.Review, Where = "Downloads: setup files of apps that are installed, over 60 days old",
                     Info = "Setup files (.exe, .msi) you downloaded for apps that are now installed. They go to Undo for 7 days first. You can always download a newer one from the app's site.",
                     Measure = () => Sum(OldInstallers(DateTime.Now)), Clean = log => { var f = OldInstallers(DateTime.Now); if (f.Count > 0) Quarantine.MoveToUndo("Old installers in Downloads (" + f.Count + ")", f, log); } },
             };

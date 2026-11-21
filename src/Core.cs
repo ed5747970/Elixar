@@ -34,6 +34,7 @@ namespace CDriveCleaner
         public long Size;
         public bool SizeUnknown;
         public bool Privacy;               // traces of what you did, not disk space
+        public bool PerAccount;            // in each Windows account's own folders, though "Where" doesn't show the path (Business: measured in every account)
         public string RootScript;          // Linux: fixed commands run as root after one password prompt (null: runs as you)
         public string Drive;               // "D:" for items on another drive (null: C: and the system)
     }

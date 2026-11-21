@@ -202,10 +202,16 @@ namespace CDriveCleaner
             });
 
             if (Win.IsWindows)
-                Run(check, "Cure Agent counts every account: each person's own items (temp files) are measured in their profile and added up, the PC's items once", () =>
+                Run(check, "Cure Agent counts every account: each person's own items (temp files, other apps' caches) are measured in their profile and added up, the PC's items once", () =>
                 {
                     string a = Path.Combine(R, "profA"), b = Path.Combine(R, "profB");
                     foreach (var p in new[] { a, b }) { Directory.CreateDirectory(Path.Combine(p, "AppData", "Local", "Temp")); File.WriteAllBytes(Path.Combine(p, "AppData", "Local", "Temp", "x.tmp"), new byte[300000]); }
+                    // items whose "Where" shows no path (other apps' caches, 1.2.72) are counted in every account too
+                    foreach (var p in new[] { a, b })
+                    {
+                        string app = Path.Combine(p, "AppData", "Roaming", "SomeChatApp"); Directory.CreateDirectory(Path.Combine(app, "GPUCache"));
+                        File.WriteAllText(Path.Combine(app, "Preferences"), "{}"); File.WriteAllBytes(Path.Combine(app, "GPUCache", "data_1"), new byte[5000]);
+                    }
                     var keep = CureAgent.ProfilesOverride; CureAgent.ProfilesOverride = () => new List<string> { a, b };
                     try
                     {
@@ -213,6 +219,8 @@ namespace CDriveCleaner
                         var temp = items.FirstOrDefault(i => i.Name == "Your temp files");
                         if (temp == null || temp.Bytes < 600000 || temp.Bytes > 700000) return "temp files: " + (temp == null ? "missing" : temp.Bytes.ToString());
                         if (items.Count(i => i.Name == "Windows temp files") != 1) return "the PC's items twice";
+                        var other = items.FirstOrDefault(i => i.Name == "Other apps' web caches (Slack, Notion, Signal...)");
+                        if (other == null || other.Bytes < 10000) return "other apps' caches counted in one account only: " + (other == null ? "missing" : other.Bytes.ToString());
                         return null;
                     }
                     finally { CureAgent.ProfilesOverride = keep; }

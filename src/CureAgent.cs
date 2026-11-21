@@ -269,9 +269,14 @@ namespace CDriveCleaner
                     UserDirs.ProfileOverride = prof;
                     foreach (var it in Catalog.Build().Where(i => !i.Privacy))
                     {
-                        bool own = prof != null && (it.Where ?? "").IndexOf(prof, StringComparison.OrdinalIgnoreCase) >= 0;
+                        // an account's own item: its folder is in "Where", or the item says so (Teams, developer caches, other
+                        // apps' caches... show no path); before 1.2.72 those were counted for the first account only
+                        bool own = prof != null && (it.PerAccount || (it.Where ?? "").IndexOf(prof, StringComparison.OrdinalIgnoreCase) >= 0);
                         if (!own && !first) continue;   // the PC's items: measured once
-                        long b; try { b = it.Measure(); } catch { b = -1; }
+                        long b;
+                        MoreCaches.AccountOnly = !first;
+                        try { b = it.Measure(); } catch { b = -1; }
+                        finally { MoreCaches.AccountOnly = false; }
                         CureItem c;
                         if (!total.TryGetValue(it.Name, out c)) total[it.Name] = c = new CureItem { Name = it.Name, Tier = it.Tier.ToString().ToLowerInvariant(), Auto = it.DefaultOn, Bytes = 0 };
                         if (b > 0) c.Bytes += b;

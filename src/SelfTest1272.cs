@@ -154,6 +154,23 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "Business agent: the new items are each account's own; the PC's shared launcher cache (GOG, in ProgramData) is counted once", () =>
+            {
+                var items = MoreCaches.Items();
+                if (!items.All(i => i.PerAccount)) return "not marked as each account's: " + string.Join(", ", items.Where(i => !i.PerAccount).Select(i => i.Name));
+                var cats = Caches.Items().Where(i => i.Name.StartsWith("Microsoft Teams") || i.Name.StartsWith("Developer caches") || i.Name.StartsWith("WhatsApp")).ToList();
+                if (cats.Count != 3 || !cats.All(i => i.PerAccount)) return "older items without a path in Where";
+                if (Win.IsWindows || Catalog.WindowsOnLinux)
+                {
+                    bool withGog = MoreCaches.LauncherCaches().Any(d => d.IndexOf("GOG.com", StringComparison.OrdinalIgnoreCase) >= 0);
+                    MoreCaches.AccountOnly = true;
+                    bool later; try { later = MoreCaches.LauncherCaches().Any(d => d.IndexOf("GOG.com", StringComparison.OrdinalIgnoreCase) >= 0); } finally { MoreCaches.AccountOnly = false; }
+                    if (!withGog && !string.IsNullOrEmpty(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData))) return "GOG missing";
+                    if (later) return "GOG counted again for another account";
+                }
+                return null;
+            });
+
             Run(check, "Old JetBrains versions: the caches of older versions go, the newest of each IDE and Toolbox stay", () =>
             {
                 string jb = Path.Combine(R, "JetBrains");
