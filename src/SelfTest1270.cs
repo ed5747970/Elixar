@@ -57,7 +57,10 @@ namespace CDriveCleaner
             Run(check, "Shred: a file with a second name (a hard link, maybe to a Windows file) is never overwritten", () =>
             {
                 if (!Win.IsWindows) return null;   // hard links: Windows only
-                string other = Path.Combine(R, "important.dat"), name2 = Path.Combine(R, "looks-harmless.txt");
+                // in your user folder, outside AppData (the self-test's own folder is in AppData, where nothing is shredded anyway)
+                string dir = Path.Combine(UserDirs.Home, "ElixarShredTest-" + Guid.NewGuid().ToString("N").Substring(0, 6)); Directory.CreateDirectory(dir);
+                try {
+                string other = Path.Combine(dir, "important.dat"), name2 = Path.Combine(dir, "looks-harmless.txt");
                 File.WriteAllText(other, "data another program needs");
                 try { Sys.Run("cmd.exe", "/c mklink /H \"" + name2 + "\" \"" + other + "\"", 15000); } catch { }
                 if (!File.Exists(name2)) return null;   // can't make hard links here
@@ -67,6 +70,8 @@ namespace CDriveCleaner
                 File.Delete(name2);
                 if (SecureWipe.CanShred(other) != null) return "a plain file refused: " + SecureWipe.CanShred(other);
                 return null;
+                }
+                finally { try { Directory.Delete(dir, true); } catch { } }
             });
 
             Run(check, "Right-click menu: a Windows part dressed up as a broken app entry (from your own registry) stays Windows' own and is never blocked", () =>
