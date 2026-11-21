@@ -309,6 +309,23 @@ namespace CDriveCleaner
                     if (log != null) log("  Restored " + it[1]);
                 }
             }
+            else if (b.Kind == "hosts")
+            {
+                // the hosts file's old content goes back into Windows' own hosts file (and nowhere else)
+                foreach (var it in b.Items)
+                {
+                    string from = Path.Combine(b.Dir, it[0]);
+                    if (!File.Exists(from) || !string.Equals(it[1], NetCheck.HostsPath, StringComparison.OrdinalIgnoreCase)) { if (log != null) log("  Not restored: " + it[1]); continue; }
+                    try
+                    {
+                        if (NetCheck.HostsOverride == null && !SafeDelete.RealPathMatches(it[1])) { if (log != null) log("  Not restored (a link was in the way): " + it[1]); continue; }
+                        var fi = new FileInfo(from); if (fi.Length > (32L << 20)) continue;
+                        NetCheck.WriteInPlace(it[1], File.ReadAllBytes(from));
+                        ok++; if (log != null) log("  Restored " + it[1]);
+                    }
+                    catch (Exception e) { if (log != null) log("  Not restored: " + it[1] + ": " + e.Message); }
+                }
+            }
             else if (b.Kind == "drivers")
             {
                 foreach (var it in b.Items)

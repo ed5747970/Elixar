@@ -1877,6 +1877,7 @@ namespace CDriveCleaner
                         SelfTest1266b.All(root, check);
                         SelfTest1267.All(root, check);
                         SelfTest1268.All(root, check);
+                        SelfTest1269.All(root, check);
                     }
                     // ---- similar photos, empty folders, compression ----
                     {

@@ -15,7 +15,7 @@ using System.Text.RegularExpressions;
 namespace CDriveCleaner
 {
     public enum HLevel { Ok, Info, Warn, Bad }
-    public enum HAct { None, RepairWindows, UpdateApps, Restart, Drivers, Startup, Memory, PowerBalanced, RestorePoint, SystemProtection, Backup, BitLocker, Defender, Firewall, Uac, DiskHealth, CheckFix, Growing, SystemSpace, Battery }
+    public enum HAct { None, RepairWindows, UpdateApps, Restart, Drivers, Startup, Memory, PowerBalanced, RestorePoint, SystemProtection, Backup, BitLocker, Defender, Firewall, Uac, DiskHealth, CheckFix, Growing, SystemSpace, Battery, SecurityCheck, ElixarBackup }
 
     public class HFind
     {
@@ -51,6 +51,9 @@ namespace CDriveCleaner
         public BatteryInfo Battery;     // null: no battery (or unknown)
         public int AutostartsBad = -1;  // tasks and services apps added that look like unwanted software (-1 unknown)
         public bool GrowthCheckStuck;   // the daily growing-folders reading ran out of time 2 days in a row
+        public int HostsBad = -1;       // hosts file lines that send a known site elsewhere or block security updates (-1 unknown)
+        public DateTime? ElixarBackup;  // Elixar's own backup: when it last ran (null: not set up)
+        public bool ElixarBackupOn;
         public List<KeyValuePair<string, int>> BatteryHistory = new List<KeyValuePair<string, int>>();
         // safety net
         public bool RestoreKnown; public DateTime? LastRestore; public bool? FileHistory, OneDriveBackup;
@@ -436,6 +439,11 @@ namespace CDriveCleaner
                     add(new HFind { Area = "Space", Key = "fast", Level = HLevel.Info, Penalty = 5, Act = HAct.Growing, Button = "Show me",
                                     Title = H(Plural(f.FastFolders, "folder is growing fast", "folders are growing fast"), f.FastFolders == 1 ? "תיקייה אחת גדלה מהר" : f.FastFolders + " תיקיות גדלות מהר"),
                                     Detail = H("Elixar studied each one (Dashboard > Growing fast).", "Elixar בדק כל אחת (לוח בקרה > גדל מהר).") });
+                if (f.HostsBad > 0)
+                    add(new HFind { Area = "Security", Key = "hosts", Level = HLevel.Warn, Penalty = 15, Act = HAct.SecurityCheck, Button = "Show me",
+                                    Title = H("The hosts file sends sites somewhere else", "קובץ ה-hosts שולח אתרים למקום אחר"),
+                                    Detail = H("A line in it sends a well-known site to another address, or blocks a security program's updates. Unwanted software does this.",
+                                               "שורה בו שולחת אתר מוכר לכתובת אחרת, או חוסמת עדכונים של תוכנת אבטחה. תוכנות לא רצויות עושות את זה.") });
                 if (f.GrowthCheckStuck)
                     add(new HFind { Area = "Space", Key = "growcheck", Level = HLevel.Info, Penalty = 0, Act = HAct.Growing, Button = "Show me", CanIgnore = true,
                                     Title = H("The growing-folders check can't finish", "בדיקת התיקיות שגדלות לא מצליחה להסתיים"),
@@ -482,10 +490,15 @@ namespace CDriveCleaner
                                     Title = days < 0 ? H("No restore point", "אין נקודת שחזור") : H("Last restore point: " + (days == 0 ? "today" : Plural(days, "day", "days") + " ago"), "נקודת השחזור האחרונה: " + (days == 0 ? "היום" : "לפני " + days + " ימים")),
                                     Detail = H("If an update or a driver breaks Windows, a restore point takes it back.", "אם עדכון או דרייבר שוברים את Windows, נקודת שחזור מחזירה אותו לאחור.") });
                 }
-                bool backed = (f.FileHistory ?? false) || (f.OneDriveBackup ?? false);
-                if (f.FileHistory.HasValue || f.OneDriveBackup.HasValue)
+                int bakDays = f.ElixarBackup.HasValue ? Days(now, f.ElixarBackup.Value) : -1;
+                if (f.ElixarBackupOn && (bakDays < 0 || bakDays > 14))
+                    add(new HFind { Area = "Safety net", Key = "elixarbackup", Level = HLevel.Warn, Penalty = 20, CanIgnore = true, Act = HAct.ElixarBackup, Button = "Open Backup",
+                                    Title = bakDays < 0 ? H("Elixar's backup hasn't run yet", "הגיבוי של Elixar עוד לא רץ") : H("Your last backup is " + Plural(bakDays, "day", "days") + " old", "הגיבוי האחרון שלך בן " + bakDays + " ימים"),
+                                    Detail = H("Is the backup drive connected? Plug it in and click Back up now.", "כונן הגיבוי מחובר? חברו אותו ולחצו גבה עכשיו.") });
+                bool backed = (f.FileHistory ?? false) || (f.OneDriveBackup ?? false) || (bakDays >= 0 && bakDays <= 14);
+                if (f.FileHistory.HasValue || f.OneDriveBackup.HasValue || bakDays >= 0)
                     add(new HFind { Area = "Safety net", Key = "backup", Level = backed ? HLevel.Ok : HLevel.Warn, Penalty = backed ? 0 : 35, CanIgnore = !backed, Act = HAct.Backup, Button = backed ? "" : "Set up backup...",
-                                    Title = backed ? H("Your files are backed up (" + ((f.OneDriveBackup ?? false) ? "OneDrive" : "File History") + ")", "הקבצים שלך מגובים (" + ((f.OneDriveBackup ?? false) ? "OneDrive" : "היסטוריית קבצים") + ")")
+                                    Title = backed ? H("Your files are backed up (" + ((f.OneDriveBackup ?? false) ? "OneDrive" : (f.FileHistory ?? false) ? "File History" : "Elixar Backup") + ")", "הקבצים שלך מגובים (" + ((f.OneDriveBackup ?? false) ? "OneDrive" : (f.FileHistory ?? false) ? "היסטוריית קבצים" : "הגיבוי של Elixar") + ")")
                                                    : H("No backup of your files found", "לא נמצא גיבוי של הקבצים שלך"),
                                     Detail = backed ? H("Documents and Desktop are kept somewhere else too.", "המסמכים ושולחן העבודה נשמרים גם במקום אחר.")
                                                     : H("Neither File History nor OneDrive backup is on. A failing drive or ransomware would take your documents. Use another backup program? Click Ignore.", "לא היסטוריית קבצים ולא גיבוי OneDrive פועלים. כונן כושל או כופרה ייקחו את המסמכים שלך. משתמש בתוכנת גיבוי אחרת? לחץ התעלם.") });
@@ -603,6 +616,8 @@ namespace CDriveCleaner
             try { f.Disk = DiskHealth.Read().Worst; } catch { }
             try { var cur = FolderGrowth.Current(); f.FastFolders = cur.Count; f.UnusualFolders = cur.Count(x => x.Item2 == GrowKind.Unusual); } catch { }
             try { f.GrowthCheckStuck = FolderGrowth.Problem(DateTime.Now) != null; } catch { }
+            try { int n; string p; var h = NetCheck.ReadHosts(out n, out p); f.HostsBad = h.Count; } catch { }
+            try { f.ElixarBackupOn = Backup.Configured && Policy.Allowed("backup"); f.ElixarBackup = Backup.Last; } catch { }
             f.FileHistory = FileHistoryOn();
             f.OneDriveBackup = OneDriveBacksUp();
 

@@ -171,6 +171,10 @@ namespace CDriveCleaner
         // makes the folder (and the ones above it) and checks that no link was in the way
         public static void MakeDir(string dir)
         {
+            // the part that already exists is checked first, so nothing is made through a link (only then the rest is made)
+            string have = Path.GetFullPath(dir);
+            while (have != null && !Directory.Exists(have)) have = Path.GetDirectoryName(have);
+            if (have != null && !SafeDelete.NoLinks(have)) throw InTheWay(dir);
             Directory.CreateDirectory(dir);
             if (!SafeDelete.NoLinks(dir)) throw InTheWay(dir);
         }

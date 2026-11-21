@@ -34,7 +34,7 @@ namespace CDriveCleaner
         {
             SelfImage.Hold();          // first: nobody can rename or replace this Elixar.exe while it runs
             Install.HardenDllSearch();
-            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean") || args.Contains("--cure-alerts") || args.Contains("--keep-in-check") || Cli.IsCli(args) || args.Contains("--msi");
+            bool scheduled = args.Contains("--auto-clean") || args.Contains("--daily-tidy") || args.Contains("--mail-daily") || args.Contains("--check-space") || args.Contains("--fake-adb") || args.Contains("--policy-clean") || args.Contains("--cure-alerts") || args.Contains("--keep-in-check") || args.Contains("--backup") || Cli.IsCli(args) || args.Contains("--msi");
             if (scheduled) Sounds.Quiet = true;   // scheduled runs and automatic cleans make no sound of their own
             if (Win.IsWindows)
             {
@@ -94,6 +94,13 @@ namespace CDriveCleaner
                 FolderGrowth.RunRules(DateTime.Now, m => Automation.Log(m));
                 foreach (var n in FolderGrowth.RunNotes.Take(3).ToList()) Automation.Notify(n[0], n[1] + " Click to open Elixar.", ToolTipIcon.Info, true);
                 return 0;
+            }
+            if (args.Contains("--backup"))
+            {
+                // the scheduled backup: with your own rights (the task isn't an administrator's), quiet unless the drive is missing
+                Install.HideLauncherWindow();
+                Application.EnableVisualStyles();
+                return Backup.Scheduled(m => Automation.Log(m));
             }
 #if BUSINESS
             if (args.Contains("--cure-alerts"))

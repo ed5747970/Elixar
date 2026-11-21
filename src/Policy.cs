@@ -69,11 +69,13 @@ namespace CDriveCleaner
             R("apps.remove", "What Elixar may change", "Remove apps", "Apps tab: uninstallers and built-in or Store apps.", "allow", Allow),
             R("apps.update", "What Elixar may change", "Update apps", "Apps > Updates: newer versions through Windows' package manager (winget).", "allow", Allow),
             R("startup.change", "What Elixar may change", "Change startup programs", "Tools > Startup: turn programs on or off, remove leftovers.", "allow", Allow),
+            R("menu.change", "What Elixar may change", "Change the right-click menu", "Tools > Right-click menu: turn entries apps added on or off (Windows' own switches; nothing is deleted).", "allow", Allow),
             R("drivers.remove", "What Elixar may change", "Remove drivers", "Tools > Drivers: old and unused driver packages.", "allow", Allow),
             R("phone", "What Elixar may change", "Phone tools", "The Phone tab: clean, move files and remove apps on a phone.", "allow", Allow),
             R("sysprep", "What Elixar may change", "Sysprep and golden image tools", "Tools > Sysprep: fixes, answer files, image cleanup.", "allow", Allow),
             R("profiles", "What Elixar may change", "Old user accounts' files", "Tools > Old accounts: removes the folder of an account nobody used for 6 months (Windows' own profile removal; can't be undone). Off by default on company PCs.", "allow", Allow),
             R("installers", "What Elixar may change", "Leftover installer files", "Tools > Leftover installers: old installer copies no program uses, moved to Undo.", "allow", Allow),
+            R("backup", "What Elixar may change", "Backup", "Tools > Backup: copies your folders to another drive, a USB disk or a network folder. Off by default on company PCs (company files on a USB disk are IT's call).", "allow", Allow),
             R("wipe", "What Elixar may change", "Secure wipe", "Tools > Secure wipe: wipe free space and shred files (can't be undone).", "allow", Allow),
             R("email", "What Elixar may change", "Email", "Connect an email account, reports and Gmail cleaning.", "allow", Allow),
             R("updates.check", "What Elixar may change", "Check for Elixar updates", "Once a week and when you ask, from GitHub (api.github.com). Not allowed: Elixar never connects for updates; IT updates it.", "allow", Allow),
@@ -180,7 +182,7 @@ namespace CDriveCleaner
         }
 
         // ---- company PCs ----
-        public static readonly string[] CompanyBlocks = { "phone", "sysprep", "email", "wipe", "profiles" };   // wipe, profiles: what's removed can't be brought back, on a company PC that's IT's call
+        public static readonly string[] CompanyBlocks = { "phone", "sysprep", "email", "wipe", "profiles", "backup" };   // wipe, profiles: what's removed can't be brought back, on a company PC that's IT's call
         public static Func<string> CompanyOverride;   // self-test and previews: the company this PC is joined to (null = none)
         static string companyCache; static bool companyRead;
         // the domain or Entra ID organization this PC is joined to; null on a home PC

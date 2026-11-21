@@ -35,6 +35,19 @@ namespace CDriveCleaner
             return t;
         }
         Label Title(string t) { return new Label { AutoSize = true, Font = new Font("Segoe UI Semibold", 14f), Text = t, Margin = new Padding(0, S(2), 0, S(2)) }; }
+        // the last column takes the rest of the width (long advice stays readable)
+        void FillLast(ListView l)
+        {
+            EventHandler fit = (o, e) =>
+            {
+                if (l.Columns.Count < 2) return;
+                int used = 0; for (int i = 0; i < l.Columns.Count - 1; i++) used += l.Columns[i].Width;
+                int w = l.ClientSize.Width - used - S(4);
+                if (w > S(160)) l.Columns[l.Columns.Count - 1].Width = w;
+            };
+            l.Resize += fit; l.HandleCreated += fit;
+        }
+        Label StatusNote() { var l = Note(""); l.Margin = new Padding(S(12), S(9), 0, 0); l.MaximumSize = new Size(S(800), 0); return l; }
         Label Note(string t) { return new Label { AutoSize = true, ForeColor = Color.DimGray, MaximumSize = new Size(S(1000), 0), Text = t, Margin = new Padding(S(1), 0, 0, S(8)) }; }
 
         void BuildTools()
@@ -51,8 +64,9 @@ namespace CDriveCleaner
             pageLeft = new TabPage("Leftovers") { BackColor = pageTools.BackColor };
             pageSysprep = new TabPage("Sysprep") { BackColor = pageTools.BackColor };
             BuildSpaceMap(); BuildTweaks(); BuildRepair(); BuildWipe(); BuildInstallers(); BuildAccounts();
+            BuildSecurityCheck(); BuildBackup(); BuildMenu(); BuildGames();
             if (LinuxUi) toolsTabs.TabPages.AddRange(new[] { pageMap, pageDups });   // the others are Windows' own
-            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageTweaks, pageSys, pageMove, pageDups, pageLeft, pageInst, pageAcct, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
+            else toolsTabs.TabPages.AddRange(new[] { pageMap, pageDisk, pageDrivers, pageStartup, pageSec, pageMenu, pageTweaks, pageSys, pageMove, pageGames, pageDups, pageLeft, pageInst, pageAcct, pageBackup, pageRepair, pageWipe, pageSysprep, pageUndo }.Where(p => p != pageSysprep || !Edition.Business).ToArray());   // Elixar for Business has no Sysprep tools
             pageTools.Controls.Add(toolsTabs);
             BuildDiskHealth(); BuildDrivers(); BuildStartup(); BuildSystemSpace(); BuildMove(); BuildDuplicates(); BuildLeftovers(); BuildSysprep(); BuildUndo();
             toolsTabs.SelectedIndexChanged += (o, e) => { OnToolsTab(); RefitText(); };
@@ -68,6 +82,10 @@ namespace CDriveCleaner
             else if (toolsTabs.SelectedTab == pageTweaks) RefreshTweaks();
             else if (toolsTabs.SelectedTab == pageSysprep) OnSysprepTab();
             else if (toolsTabs.SelectedTab == pageWipe) OnWipeTab();
+            else if (toolsTabs.SelectedTab == pageSec) OnSecurityTab();
+            else if (toolsTabs.SelectedTab == pageMenu && !menuLoaded) RefreshMenu();
+            else if (toolsTabs.SelectedTab == pageGames && !gameLoaded) RefreshGames();
+            else if (toolsTabs.SelectedTab == pageBackup) ShowBackupLast();
         }
 
         public void ShowTools(int inner) { tabs.SelectedTab = pageTools; toolsTabs.SelectedIndex = inner; OnToolsTab(); }
@@ -77,6 +95,10 @@ namespace CDriveCleaner
         public void ShowMove() { ShowTools(pageMove); }
         public void ShowRepair() { ShowTools(pageRepair); }
         public void ShowWipe() { ShowTools(pageWipe); }
+        public void ShowSecurityCheck() { ShowTools(pageSec); }
+        public void ShowBackup() { ShowTools(pageBackup); }
+        public void ShowMenu() { ShowTools(pageMenu); }
+        public void ShowGames() { ShowTools(pageGames); }
 
         // ================= Drivers =================
         Label drvHardware; Button btnDrvSelectFit;

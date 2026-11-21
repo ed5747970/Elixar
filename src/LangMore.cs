@@ -223,6 +223,149 @@ namespace CDriveCleaner
             new[] { "Elixar couldn't write it down (it needs administrator rights).", "تعذّر على Elixar تسجيل ذلك (يحتاج إلى صلاحيات المسؤول).", "Elixar не смог это записать (нужны права администратора).", "Elixar no pudo guardarlo (necesita permisos de administrador)." },
             new[] { "Start Elixar as administrator to save a choice.", "شغّل Elixar كمسؤول لحفظ اختيار.", "Запустите Elixar от имени администратора, чтобы сохранить выбор.", "Abre Elixar como administrador para guardar una elección." },
             new[] { "Only choose this for a folder that just piles up (uploads, logs, caches): the app may lose data it keeps there.", "اختر هذا فقط لمجلد يتراكم فقط (ملفات رفع، سجلات، ذاكرة مؤقتة): قد يفقد التطبيق بيانات يحفظها هناك.", "Выбирайте это только для папки, где просто копятся файлы (загрузки, журналы, кэш): приложение может потерять данные, которые там хранит.", "Elige esto solo para una carpeta que simplemente se acumula (subidas, registros, cachés): la aplicación puede perder datos que guarda allí." },
+            new[] { "Security check", "فحص الأمان", "Проверка безопасности", "Revisión de seguridad" },
+            new[] { "Three tricks unwanted software plays: a browser extension that reads every page you open, a program that turns on your camera or microphone, and a changed hosts file, DNS server or proxy that sends you to fake sites. Elixar only looks; it tells you what to remove and where.", "ثلاث حيل تستخدمها البرامج غير المرغوب فيها: إضافة متصفح تقرأ كل صفحة تفتحها، وبرنامج يشغّل الكاميرا أو الميكروفون، وملف hosts أو خادم DNS أو وكيل تم تغييره ليرسلك إلى مواقع مزيفة. يكتفي Elixar بالنظر ويخبرك بما يجب إزالته وأين.", "Три уловки нежелательных программ: расширение браузера, читающее каждую открытую страницу, программа, включающая камеру или микрофон, и изменённый файл hosts, DNS-сервер или прокси, отправляющие вас на поддельные сайты. Elixar только смотрит и говорит, что удалить и где.", "Tres trucos del software no deseado: una extensión del navegador que lee cada página que abres, un programa que enciende la cámara o el micrófono, y un archivo hosts, servidor DNS o proxy cambiado que te lleva a sitios falsos. Elixar solo mira; te dice qué quitar y dónde." },
+            new[] { "Check now", "افحص الآن", "Проверить", "Revisar ahora" },
+            new[] { "Browser extensions", "إضافات المتصفح", "Расширения браузера", "Extensiones del navegador" },
+            new[] { "Camera, microphone and location", "الكاميرا والميكروفون والموقع", "Камера, микрофон и местоположение", "Cámara, micrófono y ubicación" },
+            new[] { "Hosts file, DNS and proxy", "ملف hosts وDNS والوكيل", "Файл hosts, DNS и прокси", "Archivo hosts, DNS y proxy" },
+            new[] { "Extension", "الإضافة", "Расширение", "Extensión" },
+            new[] { "Browser", "المتصفح", "Браузер", "Navegador" },
+            new[] { "Where it came from", "مصدرها", "Откуда", "De dónde vino" },
+            new[] { "It can", "يمكنها", "Может", "Puede" },
+            new[] { "Used", "استخدم", "Использовало", "Usó" },
+            new[] { "Last time", "آخر مرة", "Последний раз", "Última vez" },
+            new[] { "Setting", "الإعداد", "Значение", "Ajuste" },
+            new[] { "What it means", "ماذا يعني", "Что это значит", "Qué significa" },
+            new[] { "Open the browser's extensions page", "افتح صفحة إضافات المتصفح", "Открыть страницу расширений браузера", "Abrir la página de extensiones del navegador" },
+            new[] { "Open Windows' privacy settings", "افتح إعدادات خصوصية Windows", "Открыть параметры конфиденциальности Windows", "Abrir la configuración de privacidad de Windows" },
+            new[] { "Remove the flagged hosts lines...", "إزالة أسطر hosts المميزة...", "Удалить отмеченные строки hosts...", "Quitar las líneas marcadas de hosts..." },
+            new[] { "Show the hosts file", "إظهار ملف hosts", "Показать файл hosts", "Mostrar el archivo hosts" },
+            new[] { "Open proxy settings", "افتح إعدادات الوكيل", "Открыть параметры прокси", "Abrir la configuración del proxy" },
+            new[] { "Checking browser extensions, camera and microphone use, the hosts file, DNS and proxy...", "جارٍ فحص إضافات المتصفح واستخدام الكاميرا والميكروفون وملف hosts وDNS والوكيل...", "Проверка расширений, использования камеры и микрофона, файла hosts, DNS и прокси...", "Revisando extensiones, uso de cámara y micrófono, el archivo hosts, DNS y proxy..." },
+            new[] { "(off) ", "(متوقفة) ", "(выкл.) ", "(desactivada) " },
+            new[] { "No extensions found", "لم يتم العثور على إضافات", "Расширения не найдены", "No se encontraron extensiones" },
+            new[] { "In use now", "قيد الاستخدام الآن", "Используется сейчас", "En uso ahora" },
+            new[] { "Store app", "تطبيق من المتجر", "Приложение из Store", "Aplicación de la Tienda" },
+            new[] { "No app has used them", "لم يستخدمها أي تطبيق", "Ни одно приложение их не использовало", "Ninguna aplicación los usó" },
+            new[] { "Hosts file", "ملف hosts", "Файл hosts", "Archivo hosts" },
+            new[] { "line", "السطر", "строка", "línea" },
+            new[] { "Nothing sends a known site somewhere else or blocks security updates.", "لا شيء يرسل موقعًا معروفًا إلى مكان آخر أو يحظر تحديثات الأمان.", "Ничто не перенаправляет известные сайты и не блокирует обновления защиты.", "Nada envía un sitio conocido a otro lugar ni bloquea actualizaciones de seguridad." },
+            new[] { "DNS server", "خادم DNS", "DNS-сервер", "Servidor DNS" },
+            new[] { "Remove these lines from the hosts file?", "هل تريد إزالة هذه الأسطر من ملف hosts؟", "Удалить эти строки из файла hosts?", "¿Quitar estas líneas del archivo hosts?" },
+            new[] { "The rest of the file stays. The old file goes to Undo first.", "يبقى باقي الملف. يذهب الملف القديم إلى التراجع أولًا.", "Остальное остаётся. Старый файл сначала попадает в «Отмену».", "El resto del archivo se queda. El archivo antiguo va primero a Deshacer." },
+            new[] { "Removed. Tools > Undo puts the old hosts file back.", "تمت الإزالة. الأدوات > التراجع يعيد ملف hosts القديم.", "Удалено. Инструменты > Отмена вернёт старый файл hosts.", "Quitado. Herramientas > Deshacer devuelve el archivo hosts antiguo." },
+            new[] { "Read and change every website", "قراءة وتغيير كل موقع", "Читать и менять любые сайты", "Leer y cambiar todos los sitios web" },
+            new[] { "Talk to programs on this PC", "التحدث مع برامج على هذا الكمبيوتر", "Связываться с программами на этом ПК", "Hablar con programas de este PC" },
+            new[] { "Change your proxy", "تغيير الوكيل", "Менять ваш прокси", "Cambiar tu proxy" },
+            new[] { "Use the debugger on pages", "استخدام مصحح الأخطاء في الصفحات", "Использовать отладчик на страницах", "Usar el depurador en las páginas" },
+            new[] { "Manage other extensions", "إدارة الإضافات الأخرى", "Управлять другими расширениями", "Gestionar otras extensiones" },
+            new[] { "Read your cookies", "قراءة ملفات تعريف الارتباط", "Читать ваши файлы cookie", "Leer tus cookies" },
+            new[] { "Watch and block your web traffic", "مراقبة حركة الويب وحظرها", "Следить за трафиком и блокировать его", "Vigilar y bloquear tu tráfico web" },
+            new[] { "Read your history", "قراءة سجل التصفح", "Читать историю", "Leer tu historial" },
+            new[] { "Read what you copy", "قراءة ما تنسخه", "Читать то, что вы копируете", "Leer lo que copias" },
+            new[] { "Manage your downloads", "إدارة التنزيلات", "Управлять загрузками", "Gestionar tus descargas" },
+            new[] { "Developer mode", "وضع المطور", "Режим разработчика", "Modo de desarrollador" },
+            new[] { "Forced by a policy", "مفروضة بسياسة", "Установлено политикой", "Forzada por una directiva" },
+            new[] { "Added by another program", "أضافها برنامج آخر", "Добавлено другой программой", "Añadida por otro programa" },
+            new[] { "Store", "المتجر", "Магазин", "Tienda" },
+            new[] { "Not from the store", "ليست من المتجر", "Не из магазина", "No es de la tienda" },
+            new[] { "Not signed by Mozilla", "غير موقعة من Mozilla", "Не подписано Mozilla", "No firmada por Mozilla" },
+            new[] { "From the store, with wide powers. Fine if you know it (ad blockers and password managers need them).", "من المتجر، بصلاحيات واسعة. لا بأس إن كنت تعرفها (مانعات الإعلانات ومديرو كلمات المرور يحتاجونها).", "Из магазина, с широкими правами. Нормально, если вы его знаете (блокировщикам рекламы и менеджерам паролей они нужны).", "De la tienda, con permisos amplios. Bien si la conoces (los bloqueadores de anuncios y gestores de contraseñas los necesitan)." },
+            new[] { "From the store.", "من المتجر.", "Из магазина.", "De la tienda." },
+            new[] { "Camera", "الكاميرا", "Камера", "Cámara" },
+            new[] { "Microphone", "الميكروفون", "Микрофон", "Micrófono" },
+            new[] { "An unsigned program from your folders used it. Scan it with Microsoft Defender if you don't know it.", "استخدمها برنامج غير موقع من مجلداتك. افحصه باستخدام Microsoft Defender إن لم تكن تعرفه.", "Её использовала неподписанная программа из ваших папок. Проверьте её Microsoft Defender, если не знаете её.", "La usó un programa sin firmar de tus carpetas. Analízalo con Microsoft Defender si no lo conoces." },
+            new[] { "Not signed: check it's a program you know.", "غير موقع: تأكد أنه برنامج تعرفه.", "Не подписана: убедитесь, что это знакомая программа.", "Sin firmar: comprueba que es un programa que conoces." },
+            new[] { "The program isn't there any more.", "البرنامج لم يعد موجودًا.", "Программы больше нет.", "El programa ya no está." },
+            new[] { "A Store app.", "تطبيق من المتجر.", "Приложение из Store.", "Una aplicación de la Tienda." },
+            new[] { "Signed.", "موقّع.", "Подписана.", "Firmado." },
+            new[] { "Blocks a security program's or Windows' updates or checks.", "يحظر تحديثات أو فحوص برنامج أمان أو Windows.", "Блокирует обновления или проверки защитной программы или Windows.", "Bloquea actualizaciones o comprobaciones de un programa de seguridad o de Windows." },
+            new[] { "Nothing to remove.", "لا شيء لإزالته.", "Нечего удалять.", "Nada que quitar." },
+            new[] { "The hosts file isn't where it should be (a link?).", "ملف hosts ليس في مكانه (رابط؟).", "Файл hosts не там, где должен быть (ссылка?).", "El archivo hosts no está donde debe (¿un enlace?)." },
+            new[] { "Your router or network.", "الموجّه أو الشبكة.", "Ваш роутер или сеть.", "Tu router o red." },
+            new[] { "Given by your network (your internet provider).", "من شبكتك (مزود الإنترنت).", "Выдан вашей сетью (провайдером).", "Dado por tu red (tu proveedor de internet)." },
+            new[] { "Set by hand to a DNS server Elixar doesn't know. Unwanted software does this to send you to fake sites; if you didn't set it, change it back to automatic.", "تم ضبطه يدويًا على خادم DNS لا يعرفه Elixar. تفعل البرامج غير المرغوب فيها ذلك لإرسالك إلى مواقع مزيفة؛ إن لم تضبطه أنت، فأعده إلى تلقائي.", "Вручную указан DNS-сервер, неизвестный Elixar. Нежелательные программы так отправляют на поддельные сайты; если это не вы, верните «Автоматически».", "Configurado a mano con un servidor DNS que Elixar no conoce. El software no deseado hace esto para llevarte a sitios falsos; si no lo pusiste tú, vuelve a automático." },
+            new[] { "Proxy", "الوكيل", "Прокси", "Proxy" },
+            new[] { "Proxy script", "برنامج نصي للوكيل", "Сценарий прокси", "Script de proxy" },
+            new[] { "A program on this PC (a VPN, an antivirus or a developer tool) sees your web traffic first.", "برنامج على هذا الكمبيوتر (VPN أو مضاد فيروسات أو أداة مطورين) يرى حركة الويب أولًا.", "Программа на этом ПК (VPN, антивирус или инструмент разработчика) первой видит ваш трафик.", "Un programa de este PC (una VPN, un antivirus o una herramienta de desarrollo) ve primero tu tráfico web." },
+            new[] { "Backup", "النسخ الاحتياطي", "Резервная копия", "Copia de seguridad" },
+            new[] { "A plain copy of your folders on another drive, a USB disk or a network folder, kept up to date by itself. Only new and changed files are copied. A file that changed or was deleted here is kept in the backup for 30 days, so a mistake or ransomware doesn't take the backup with it. Your files open straight from the backup: no special program is needed to get them back.", "نسخة بسيطة من مجلداتك على محرك آخر أو قرص USB أو مجلد شبكة، تُحدَّث تلقائيًا. تُنسخ الملفات الجديدة والمعدلة فقط. يبقى الملف الذي تغير أو حُذف هنا في النسخة 30 يومًا، فلا يضيع النسخ بخطأ أو برنامج فدية. تُفتح ملفاتك مباشرة من النسخة: لا حاجة لبرنامج خاص لاستعادتها.", "Обычная копия ваших папок на другом диске, USB-диске или в сетевой папке, обновляемая сама. Копируются только новые и изменённые файлы. Изменённый или удалённый здесь файл хранится в копии 30 дней, так что ошибка или вымогатель не уничтожат и копию. Файлы открываются прямо из копии: никакая особая программа не нужна.", "Una copia simple de tus carpetas en otra unidad, un disco USB o una carpeta de red, que se actualiza sola. Solo se copian los archivos nuevos y cambiados. Un archivo que cambió o se borró aquí se guarda en la copia 30 días, así un error o un ransomware no se llevan también la copia. Tus archivos se abren directamente desde la copia: no hace falta ningún programa especial." },
+            new[] { "Back up to", "النسخ إلى", "Куда копировать", "Copiar en" },
+            new[] { "Choose a drive or folder...", "اختر محركًا أو مجلدًا...", "Выбрать диск или папку...", "Elegir una unidad o carpeta..." },
+            new[] { "Every day", "كل يوم", "Каждый день", "Cada día" },
+            new[] { "Every week (Sunday)", "كل أسبوع (الأحد)", "Каждую неделю (в воскресенье)", "Cada semana (domingo)" },
+            new[] { "Only when I click Back up now", "فقط عندما أنقر انسخ الآن", "Только по кнопке «Копировать сейчас»", "Solo cuando pulse Copiar ahora" },
+            new[] { "Back up now", "انسخ الآن", "Копировать сейчас", "Copiar ahora" },
+            new[] { "Open the backup", "افتح النسخة", "Открыть копию", "Abrir la copia" },
+            new[] { "No backup yet.", "لا توجد نسخة بعد.", "Копий пока нет.", "Todavía no hay copia." },
+            new[] { "Choose another drive, a USB disk or a network folder for the backup.", "اختر محركًا آخر أو قرص USB أو مجلد شبكة للنسخة.", "Выберите другой диск, USB-диск или сетевую папку для копии.", "Elige otra unidad, un disco USB o una carpeta de red para la copia." },
+            new[] { "Choose where the backup goes first.", "اختر مكان النسخة أولًا.", "Сначала выберите, куда копировать.", "Elige primero dónde va la copia." },
+            new[] { "No automatic backup.", "لا نسخ تلقائي.", "Без автоматического копирования.", "Sin copia automática." },
+            new[] { "Backs up every day at 13:17 (or when the PC is next on).", "ينسخ كل يوم الساعة 13:17 (أو عند تشغيل الكمبيوتر التالي).", "Копирует каждый день в 13:17 (или при следующем включении ПК).", "Copia cada día a las 13:17 (o cuando el PC vuelva a encenderse)." },
+            new[] { "Backs up every Sunday at 13:17 (or when the PC is next on).", "ينسخ كل أحد الساعة 13:17 (أو عند تشغيل الكمبيوتر التالي).", "Копирует каждое воскресенье в 13:17 (или при следующем включении ПК).", "Copia cada domingo a las 13:17 (o cuando el PC vuelva a encenderse)." },
+            new[] { "Starting the backup...", "جارٍ بدء النسخ...", "Начало копирования...", "Iniciando la copia..." },
+            new[] { "The backup stopped: ", "توقف النسخ: ", "Копирование остановлено: ", "La copia se detuvo: " },
+            new[] { "not on this PC", "ليس على هذا الكمبيوتر", "нет на этом ПК", "no está en este PC" },
+            new[] { "not in your user folder", "ليس في مجلد المستخدم", "не в вашей папке пользователя", "no está en tu carpeta de usuario" },
+            new[] { "Choose a drive or folder for the backup.", "اختر محركًا أو مجلدًا للنسخة.", "Выберите диск или папку для копии.", "Elige una unidad o carpeta para la copia." },
+            new[] { "Choose another drive: a backup on C: goes with C: if the drive fails.", "اختر محركًا آخر: النسخة على C: تضيع مع C: إذا تعطل المحرك.", "Выберите другой диск: копия на C: пропадёт вместе с C:, если диск откажет.", "Elige otra unidad: una copia en C: se pierde con C: si la unidad falla." },
+            new[] { "The backup can't be inside a folder it backs up.", "لا يمكن أن تكون النسخة داخل مجلد تنسخه.", "Копия не может быть внутри копируемой папки.", "La copia no puede estar dentro de una carpeta que copia." },
+            new[] { "Choose another folder: that one is Windows' or a main folder.", "اختر مجلدًا آخر: هذا مجلد Windows أو مجلد رئيسي.", "Выберите другую папку: эта принадлежит Windows или является главной.", "Elige otra carpeta: esa es de Windows o una carpeta principal." },
+            new[] { "Choose at least one folder to back up.", "اختر مجلدًا واحدًا على الأقل.", "Выберите хотя бы одну папку.", "Elige al menos una carpeta." },
+            new[] { "Stopped. What was copied so far is in the backup.", "توقف. ما نُسخ حتى الآن موجود في النسخة.", "Остановлено. Уже скопированное есть в копии.", "Detenido. Lo copiado hasta ahora está en la copia." },
+            new[] { "Backup didn't run", "لم يعمل النسخ", "Копирование не выполнено", "La copia no se hizo" },
+            new[] { "Open Backup", "افتح النسخ الاحتياطي", "Открыть копирование", "Abrir Copia de seguridad" },
+            new[] { "Elixar's backup hasn't run yet", "لم يعمل النسخ الاحتياطي من Elixar بعد", "Копирование Elixar ещё не запускалось", "La copia de Elixar aún no se ha hecho" },
+            new[] { "Is the backup drive connected? Plug it in and click Back up now.", "هل محرك النسخ متصل؟ صله وانقر انسخ الآن.", "Диск для копий подключён? Подключите и нажмите «Копировать сейчас».", "¿Está conectada la unidad de copia? Conéctala y pulsa Copiar ahora." },
+            new[] { "The hosts file sends sites somewhere else", "ملف hosts يرسل المواقع إلى مكان آخر", "Файл hosts перенаправляет сайты", "El archivo hosts envía sitios a otro lugar" },
+            new[] { "A line in it sends a well-known site to another address, or blocks a security program's updates. Unwanted software does this.", "سطر فيه يرسل موقعًا معروفًا إلى عنوان آخر أو يحظر تحديثات برنامج أمان. تفعل البرامج غير المرغوب فيها ذلك.", "Строка в нём перенаправляет известный сайт или блокирует обновления защиты. Так делают нежелательные программы.", "Una línea envía un sitio conocido a otra dirección o bloquea las actualizaciones de un programa de seguridad. Lo hace el software no deseado." },
+            new[] { "Right-click menu", "قائمة النقر بزر الماوس الأيمن", "Контекстное меню", "Menú contextual" },
+            new[] { "What apps added to the right-click menu of files, folders, drives and the desktop. An entry whose program is gone makes the menu slow or breaks it. Turning one off keeps it: Turn on puts it back. Windows' own entries are hidden and never changed. On Windows 11 most of these are under \"Show more options\".", "ما أضافته التطبيقات إلى قائمة النقر الأيمن للملفات والمجلدات والمحركات وسطح المكتب. العنصر الذي اختفى برنامجه يبطئ القائمة أو يعطلها. الإيقاف يحتفظ به: التشغيل يعيده. عناصر Windows مخفية ولا تتغير أبدًا. في Windows 11 معظمها تحت \"إظهار المزيد من الخيارات\".", "Что приложения добавили в контекстное меню файлов, папок, дисков и рабочего стола. Пункт без программы замедляет или ломает меню. Отключение сохраняет пункт: «Включить» вернёт его. Пункты Windows скрыты и не меняются. В Windows 11 большинство из них в «Показать дополнительные параметры».", "Lo que las aplicaciones añadieron al menú contextual de archivos, carpetas, unidades y el escritorio. Una entrada cuyo programa ya no está hace el menú lento o lo rompe. Desactivarla la conserva: Activar la devuelve. Las de Windows están ocultas y nunca se cambian. En Windows 11 la mayoría está en \"Mostrar más opciones\"." },
+            new[] { "Entry", "العنصر", "Пункт", "Entrada" },
+            new[] { "Shows for", "يظهر لـ", "Показывается для", "Aparece en" },
+            new[] { "Kind", "النوع", "Тип", "Tipo" },
+            new[] { "State", "الحالة", "Состояние", "Estado" },
+            new[] { "Files", "الملفات", "Файлы", "Archivos" },
+            new[] { "Files and folders", "الملفات والمجلدات", "Файлы и папки", "Archivos y carpetas" },
+            new[] { "Inside a folder", "داخل مجلد", "Внутри папки", "Dentro de una carpeta" },
+            new[] { "Add-in", "وظيفة إضافية", "Надстройка", "Complemento" },
+            new[] { "Command", "أمر", "Команда", "Comando" },
+            new[] { "Broken: its program is gone. Turn it off.", "معطل: برنامجه غير موجود. أوقفه.", "Сломан: его программы нет. Отключите.", "Roto: su programa ya no está. Desactívalo." },
+            new[] { "Turned off.", "متوقف.", "Отключено.", "Desactivado." },
+            new[] { "Windows' own.", "خاص بـ Windows.", "Принадлежит Windows.", "De Windows." },
+            new[] { "Added by an app.", "أضافه تطبيق.", "Добавлено приложением.", "Añadido por una aplicación." },
+            new[] { "Turned off. It goes from the menu after you sign out or restart File Explorer.", "تم الإيقاف. يختفي من القائمة بعد تسجيل الخروج أو إعادة تشغيل مستكشف الملفات.", "Отключено. Пункт исчезнет после выхода из системы или перезапуска Проводника.", "Desactivado. Desaparece del menú tras cerrar sesión o reiniciar el Explorador de archivos." },
+            new[] { "Turned on again.", "تم التشغيل مجددًا.", "Снова включено.", "Activado de nuevo." },
+            new[] { "That's Windows' own entry: Elixar doesn't change it.", "هذا عنصر خاص بـ Windows: لا يغيره Elixar.", "Это пункт Windows: Elixar его не меняет.", "Esa es una entrada de Windows: Elixar no la cambia." },
+            new[] { "Elixar needs administrator rights for that.", "يحتاج Elixar إلى صلاحيات المسؤول لذلك.", "Для этого Elixar нужны права администратора.", "Elixar necesita permisos de administrador para eso." },
+            new[] { "The entry is gone.", "العنصر غير موجود.", "Пункта больше нет.", "La entrada ya no está." },
+            new[] { "Games", "الألعاب", "Игры", "Juegos" },
+            new[] { "Games from Steam, Epic, GOG and the Xbox app, biggest first, with when each was last played (Steam keeps that). Elixar never deletes or moves a game itself: each store does that properly, so the buttons open the game in its store.", "ألعاب من Steam وEpic وGOG وتطبيق Xbox، الأكبر أولًا، مع آخر مرة لُعبت فيها كل لعبة (يحفظ Steam ذلك). لا يحذف Elixar أي لعبة أو ينقلها بنفسه: كل متجر يفعل ذلك بشكل صحيح، لذا تفتح الأزرار اللعبة في متجرها.", "Игры из Steam, Epic, GOG и приложения Xbox, сначала самые большие, с датой последнего запуска (её хранит Steam). Elixar никогда сам не удаляет и не переносит игры: каждый магазин делает это правильно, поэтому кнопки открывают игру в её магазине.", "Juegos de Steam, Epic, GOG y la aplicación Xbox, los más grandes primero, con cuándo se jugó cada uno por última vez (Steam lo guarda). Elixar nunca borra ni mueve un juego: cada tienda lo hace bien, así que los botones abren el juego en su tienda." },
+            new[] { "Game", "اللعبة", "Игра", "Juego" },
+            new[] { "Last played", "آخر لعب", "Последний запуск", "Última partida" },
+            new[] { "Drive", "المحرك", "Диск", "Unidad" },
+            new[] { "To move it to another drive", "لنقلها إلى محرك آخر", "Как перенести на другой диск", "Para moverlo a otra unidad" },
+            new[] { "Open in its store", "افتح في متجرها", "Открыть в магазине", "Abrir en su tienda" },
+            new[] { "Uninstall in Steam...", "إلغاء التثبيت في Steam...", "Удалить в Steam...", "Desinstalar en Steam..." },
+            new[] { "Looking for games and measuring them...", "جارٍ البحث عن الألعاب وقياسها...", "Поиск и измерение игр...", "Buscando juegos y midiéndolos..." },
+            new[] { "(over 6 months ago)", "(منذ أكثر من 6 أشهر)", "(более 6 месяцев назад)", "(hace más de 6 meses)" },
+            new[] { "No games found from Steam, Epic, GOG or the Xbox app.", "لم يتم العثور على ألعاب من Steam أو Epic أو GOG أو تطبيق Xbox.", "Игр из Steam, Epic, GOG или Xbox не найдено.", "No se encontraron juegos de Steam, Epic, GOG o la aplicación Xbox." },
+            new[] { "Steam: Settings > Storage, tick the game, Move.", "Steam: الإعدادات > التخزين، حدد اللعبة، نقل.", "Steam: Настройки > Хранилище, отметьте игру, Переместить.", "Steam: Ajustes > Almacenamiento, marca el juego, Mover." },
+            new[] { "Epic: Library, the game's ... menu, Manage, Move.", "Epic: المكتبة، قائمة ... للعبة، إدارة، نقل.", "Epic: Библиотека, меню ... игры, Управление, Переместить.", "Epic: Biblioteca, menú ... del juego, Administrar, Mover." },
+            new[] { "Xbox app: the game's ... menu, Manage, Files, Move.", "تطبيق Xbox: قائمة ... للعبة، إدارة، الملفات، نقل.", "Приложение Xbox: меню ... игры, Управление, Файлы, Переместить.", "Aplicación Xbox: menú ... del juego, Administrar, Archivos, Mover." },
+            new[] { "GOG Galaxy: the game's settings, Manage installation, Move.", "GOG Galaxy: إعدادات اللعبة، إدارة التثبيت، نقل.", "GOG Galaxy: настройки игры, Управление установкой, Переместить.", "GOG Galaxy: ajustes del juego, Administrar instalación, Mover." },
+            new[] { "Documents", "المستندات", "Документы", "Documentos" },
+            new[] { "Desktop", "سطح المكتب", "Рабочий стол", "Escritorio" },
+            new[] { "Pictures", "الصور", "Изображения", "Imágenes" },
+            new[] { "Videos", "مقاطع الفيديو", "Видео", "Vídeos" },
+            new[] { "Music", "الموسيقى", "Музыка", "Música" },
+            new[] { "Downloads", "التنزيلات", "Загрузки", "Descargas" },
+            new[] { "Your organization's policy doesn't allow this.", "سياسة مؤسستك لا تسمح بذلك.", "Политика вашей организации этого не разрешает.", "La directiva de tu organización no lo permite." },
+            new[] { "Change the right-click menu", "تغيير قائمة النقر الأيمن", "Изменять контекстное меню", "Cambiar el menú contextual" },
+            new[] { "Tools > Right-click menu: turn entries apps added on or off (Windows' own switches; nothing is deleted).", "الأدوات > قائمة النقر الأيمن: تشغيل أو إيقاف العناصر التي أضافتها التطبيقات (مفاتيح Windows نفسه؛ لا يُحذف شيء).", "Инструменты > Контекстное меню: включать и отключать пункты приложений (штатными средствами Windows; ничего не удаляется).", "Herramientas > Menú contextual: activar o desactivar entradas de aplicaciones (los interruptores de Windows; no se borra nada)." },
+            new[] { "Tools > Backup: copies your folders to another drive, a USB disk or a network folder. Off by default on company PCs (company files on a USB disk are IT's call).", "الأدوات > النسخ الاحتياطي: ينسخ مجلداتك إلى محرك آخر أو قرص USB أو مجلد شبكة. متوقف افتراضيًا على أجهزة الشركة (ملفات الشركة على قرص USB قرار قسم تقنية المعلومات).", "Инструменты > Резервная копия: копирует ваши папки на другой диск, USB-диск или в сетевую папку. На компьютерах компании по умолчанию выключено (файлы компании на USB-диске решает ИТ-отдел).", "Herramientas > Copia de seguridad: copia tus carpetas a otra unidad, un disco USB o una carpeta de red. Desactivado por defecto en PCs de empresa (los archivos de la empresa en un USB los decide TI)." },
+            new[] { "The check stopped: ", "توقف الفحص: ", "Проверка остановлена: ", "La revisión se detuvo: " },
             new[] { "Dashboard", "لوحة التحكم", "Панель", "Panel" },
             new[] { "Apps", "التطبيقات", "Приложения", "Aplicaciones" },
             new[] { "Cleaner", "التنظيف", "Очистка", "Limpieza" },
@@ -492,6 +635,8 @@ namespace CDriveCleaner
 
         static int Col(string code) { return code == "ar" ? 1 : code == "ru" ? 2 : 3; }
 
+        static string Lower1(string s) { return string.IsNullOrEmpty(s) ? s : char.ToLowerInvariant(s[0]) + s.Substring(1); }
+
         static Dictionary<string, string> BuildMore(string code)
         {
             var d = new Dictionary<string, string>();
@@ -512,6 +657,28 @@ namespace CDriveCleaner
                 m.Groups[1].Value + " кэша и временных файлов можно безопасно освободить: Windows и приложения создадут их заново.",
                 "Se pueden liberar con seguridad " + m.Groups[1].Value + " de cachés y archivos temporales: Windows y sus aplicaciones los vuelven a crear."));
             Pat(@"(\d+) items", m => m.Groups[1].Value + w(" عناصر", " эл.", " elementos"));
+            Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + w("، ويمكنها ", ", и может ", ", y puede ") + Lower1(T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1))) + w(". أزلها إلا إذا أضفتها بنفسك.", ". Удалите, если не добавляли сами.", ". Quítala salvo que la añadieras tú."));
+            Pat(@"([^,]+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + w(". أزلها إلا إذا أضفتها بنفسك.", ". Удалите, если не добавляли сами.", ". Quítala salvo que la añadieras tú."));
+            Pat(@"Sends (.+) to another address \((.+)\)\.", m => w("يرسل " + m.Groups[1].Value + " إلى عنوان آخر (", "Перенаправляет " + m.Groups[1].Value + " на другой адрес (", "Envía " + m.Groups[1].Value + " a otra dirección (") + m.Groups[2].Value + ").");
+            Pat(@"(.+) \(a well-known DNS service\)\.", m => m.Groups[1].Value + w(" (خدمة DNS معروفة).", " (известный DNS-сервис).", " (un servicio DNS conocido)."));
+            Pat(@"All your web pages go through (.+)\. Fine at work or with a VPN you chose; otherwise turn it off in Settings > Network > Proxy\.", m => w("كل صفحاتك تمر عبر " + m.Groups[1].Value + ". لا بأس في العمل أو مع VPN اخترته؛ وإلا فأوقفه من الإعدادات > الشبكة > الوكيل.", "Все страницы идут через " + m.Groups[1].Value + ". Нормально на работе или с выбранным VPN; иначе отключите в Параметры > Сеть > Прокси.", "Todas tus páginas pasan por " + m.Groups[1].Value + ". Bien en el trabajo o con una VPN que elegiste; si no, desactívalo en Configuración > Red > Proxy."));
+            Pat(@"(\d+) entries", m => m.Groups[1].Value + w(" إدخالات", " записей", " entradas"));
+            Pat(@"Nothing suspicious found\. (\d+) extensions, (\d+) apps that used the camera, microphone or location\.", m => w("لم يُعثر على شيء مريب. " + m.Groups[1].Value + " إضافات، " + m.Groups[2].Value + " تطبيقات استخدمت الكاميرا أو الميكروفون أو الموقع.", "Ничего подозрительного. Расширений: " + m.Groups[1].Value + ", приложений с доступом к камере, микрофону или местоположению: " + m.Groups[2].Value + ".", "Nada sospechoso. " + m.Groups[1].Value + " extensiones, " + m.Groups[2].Value + " aplicaciones que usaron la cámara, el micrófono o la ubicación."));
+            Pat(@"(\d+) things? to look at \(in red and orange\)\.", m => w(m.Groups[1].Value + " أمور للنظر فيها (بالأحمر والبرتقالي).", "Стоит проверить: " + m.Groups[1].Value + " (красным и оранжевым).", m.Groups[1].Value + " cosas que revisar (en rojo y naranja)."));
+            Pat(@"Not changed: (.+)", m => w("لم يتغير: ", "Не изменено: ", "Sin cambios: ") + T(m.Groups[1].Value));
+            Pat(@"Couldn't open it: (.+)", m => w("تعذر فتحه: ", "Не удалось открыть: ", "No se pudo abrir: ") + m.Groups[1].Value);
+            Pat(@"Last backup: (.+)", m => w("آخر نسخة: ", "Последняя копия: ", "Última copia: ") + m.Groups[1].Value);
+            Pat(@"(\d+) new and (\d+) changed files copied \((.+?)\), (\d+) unchanged(, (\d+) deleted here kept for 30 days)?(, (\d+) skipped)?(, (\d+) only in OneDrive \(not on this PC\))?\.", m => w("نُسخ " + m.Groups[1].Value + " ملفًا جديدًا و" + m.Groups[2].Value + " معدّلًا (", "Скопировано новых: " + m.Groups[1].Value + ", изменённых: " + m.Groups[2].Value + " (", "Copiados " + m.Groups[1].Value + " archivos nuevos y " + m.Groups[2].Value + " cambiados (") + m.Groups[3].Value + "), " + m.Groups[4].Value + w(" بلا تغيير", " без изменений", " sin cambios") + (m.Groups[5].Success ? ", " + m.Groups[6].Value + w(" محذوفة هنا محفوظة 30 يومًا", " удалённых здесь хранятся 30 дней", " borrados aquí se guardan 30 días") : "") + (m.Groups[7].Success ? ", " + m.Groups[8].Value + w(" تم تخطيها", " пропущено", " omitidos") : "") + (m.Groups[9].Success ? ", " + m.Groups[10].Value + w(" في OneDrive فقط (ليست على هذا الكمبيوتر)", " только в OneDrive (не на этом ПК)", " solo en OneDrive (no en este PC)") : "") + ".");
+            Pat(@"The backup goes to (.+)\.", m => w("تذهب النسخة إلى ", "Копия сохраняется в ", "La copia va a ") + m.Groups[1].Value + ".");
+            Pat(@"Couldn't copy (\d+) \(see Logs\)\.", m => w("تعذر نسخ " + m.Groups[1].Value + " (راجع السجلات).", "Не скопировано: " + m.Groups[1].Value + " (см. журнал).", "No se copiaron " + m.Groups[1].Value + " (ver registros)."));
+            Pat(@"Backing up (.+)\.\.\.", m => w("جارٍ نسخ ", "Копирование: ", "Copiando ") + T(m.Groups[1].Value) + "...");
+            Pat(@"Copied (\d+) files \((.+)\)\.\.\.", m => w("نُسخ " + m.Groups[1].Value + " ملفًا (", "Скопировано файлов: " + m.Groups[1].Value + " (", "Copiados " + m.Groups[1].Value + " archivos (") + m.Groups[2].Value + ")...");
+            Pat(@"The backup drive isn't connected \((.+)\)\.", m => w("محرك النسخ غير متصل (", "Диск для копий не подключён (", "La unidad de copia no está conectada (") + m.Groups[1].Value + ").");
+            Pat(@"Your last backup is (\d+) days? old", m => w("عمر آخر نسخة " + m.Groups[1].Value + " يوم", "Последней копии " + m.Groups[1].Value + " дн.", "Tu última copia tiene " + m.Groups[1].Value + " días"));
+            Pat(@"(\d+) entries added by apps, none broken\.", m => w(m.Groups[1].Value + " عناصر أضافتها التطبيقات، لا شيء معطل.", "Пунктов от приложений: " + m.Groups[1].Value + ", сломанных нет.", m.Groups[1].Value + " entradas añadidas por aplicaciones, ninguna rota."));
+            Pat(@"(\d+) entries added by apps, (\d+) broken \(in orange\): turn them off\.", m => w(m.Groups[1].Value + " عناصر أضافتها التطبيقات، " + m.Groups[2].Value + " معطلة (بالبرتقالي): أوقفها.", "Пунктов от приложений: " + m.Groups[1].Value + ", сломанных: " + m.Groups[2].Value + " (оранжевым): отключите их.", m.Groups[1].Value + " entradas añadidas por aplicaciones, " + m.Groups[2].Value + " rotas (en naranja): desactívalas."));
+            Pat(@"(\d+) games, ([^;]+)\.", m => m.Groups[1].Value + w(" ألعاب، ", " игр, ", " juegos, ") + m.Groups[2].Value + ".");
+            Pat(@"(\d+) games, (.+); (.+) in games not played for over 6 months \(in orange\)\.", m => m.Groups[1].Value + w(" ألعاب، ", " игр, ", " juegos, ") + m.Groups[2].Value + "; " + m.Groups[3].Value + w(" في ألعاب لم تُلعب منذ أكثر من 6 أشهر (بالبرتقالي).", " в играх, не запускавшихся более 6 месяцев (оранжевым).", " en juegos sin jugar en más de 6 meses (en naranja)."));
             Pat(@"(\d+) PCs", m => m.Groups[1].Value + w(" أجهزة", " ПК", " equipos"));
             return d;
         }

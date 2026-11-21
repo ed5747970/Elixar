@@ -396,6 +396,8 @@ namespace CDriveCleaner
                 case HAct.CheckFix: OpenCheckFix(); break;
                 case HAct.Growing: OpenGrowing(); break;
                 case HAct.SystemSpace: ShowTools(pageSys); break;
+                case HAct.SecurityCheck: ShowSecurityCheck(); break;
+                case HAct.ElixarBackup: ShowBackup(); break;
                 case HAct.Battery:
                     System.Threading.Tasks.Task.Factory.StartNew(() => Battery.OpenFullReport()).ContinueWith(t => UI(() =>
                     {
