@@ -226,6 +226,61 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "Names with right-to-left letters (\"invoice\u202Efdp.exe\" shows as invoiceexe.pdf) are shown plainly and flagged in startup programs and browser extensions", () =>
+            {
+                string trick = "invoice\u202Efdp.exe";
+                if (!NameText.HasBidi(trick) || NameText.HasBidi("Google Chrome") || NameText.Plain(trick) != "invoice[?]fdp.exe" || NameText.Plain("a\r\nb") != "a  b") return "plain: " + NameText.Plain(trick);
+                var e = new StartupEntry { Name = "Updater", File = @"C:\Users\me\AppData\Roaming\" + trick, Command = "\"" + trick + "\"", SigStatus = "Valid", Signer = "Contoso" };
+                StartupApps.Judge(e);
+                if (e.Flag != StartupFlag.Danger || !e.Why.Contains("right-to-left")) return "startup: " + e.Flag + " " + e.Why;
+                var x = new BrowserExt { Name = "Docs\u202Eedit", Source = "Store" };
+                BrowserExtensions.Judge(x);
+                if (x.Level != CheckLevel.Danger) return "extension: " + x.Level;
+                var ok = new StartupEntry { Name = "OneDrive", File = @"C:\Program Files\Microsoft OneDrive\OneDrive.exe", SigStatus = "Valid", Signer = "Microsoft" };
+                StartupApps.Judge(ok);
+                if (ok.Flag != StartupFlag.Ok) return "a normal entry was flagged";
+                string keep = Lang.Code;
+                try
+                {
+                    foreach (var lang in new[] { "he", "ar", "ru", "es" })
+                    {
+                        Lang.Init(lang);
+                        if (Lang.T(e.Why) == e.Why || Lang.T(x.Why) == x.Why) return "not in " + lang;
+                    }
+                }
+                finally { Lang.Init(keep); }
+                return null;
+            });
+
+            Run(check, "\"Open folder\" on a place another program wrote down opens only a real folder; a file there is shown, never started", () =>
+            {
+                string dir = Path.Combine(R, "AppDir"); Directory.CreateDirectory(dir);
+                string exe = Path.Combine(dir, "payload.exe"); File.WriteAllText(exe, "MZ");
+                var opened = new List<string>(); var selected = new List<string>();
+                Shell.OpenOverride = p => opened.Add(p); Shell.SelectOverride = p => selected.Add(p);
+                try
+                {
+                    Shell.OpenFolder(dir); Shell.OpenFolder("\"" + exe + "\"");
+                    try { Shell.OpenFolder(Path.Combine(R, "nothing-here")); return "a missing place was opened"; } catch (IOException) { }
+                    if (opened.Count != 1 || opened[0] != dir) return "opened: " + string.Join(", ", opened);
+                    if (selected.Count != 1 || selected[0] != exe) return "selected: " + string.Join(", ", selected);
+                    return null;
+                }
+                finally { Shell.OpenOverride = null; Shell.SelectOverride = null; }
+            });
+
+            Run(check, "Started with someone else's .NET code: an AppDomainManager loaded before Elixar's first line is noticed (even when its .config is gone)", () =>
+            {
+                if (EnvGuard.ForeignManager()) return "this test run itself has one";
+                EnvGuard.ManagerOverride = () => new object();
+                try { if (!EnvGuard.ForeignManager()) return "not noticed"; } finally { EnvGuard.ManagerOverride = null; }
+                string exe = Path.Combine(R, "dl", "Elixar.exe"); Directory.CreateDirectory(Path.GetDirectoryName(exe)); File.WriteAllText(exe, "x");
+                if (EnvGuard.PlantedFiles(exe).Count != 0) return "a clean folder";
+                File.WriteAllText(exe + ".config", "<configuration/>");
+                if (EnvGuard.PlantedFiles(exe).Count != 1) return "a planted .config not seen";
+                return null;
+            });
+
             Run(check, "Measuring several at once: Windows' folder lists and your profile are made once, safely, from many threads", () =>
             {
                 var errors = new List<string>();

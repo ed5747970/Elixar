@@ -93,6 +93,10 @@ namespace CDriveCleaner
             string cmd = (e.Command ?? "").ToLowerInvariant();
             string exe = f.Substring(f.LastIndexOf('\\') + 1);
             if (e.Missing) { e.Flag = StartupFlag.Leftover; e.Why = "the program is gone; this entry does nothing and can be removed"; return; }
+            if (NameText.HasBidi(e.File) || NameText.HasBidi(e.Command) || NameText.HasBidi(e.Name))
+            {
+                e.Flag = StartupFlag.Danger; e.Why = "its name hides its real type with right-to-left letters - a trick of unwanted software"; return;
+            }
             if (ScriptHosts.Contains(exe))
             {
                 bool hidden = cmd.Contains(" -enc") || cmd.Contains("encodedcommand") || cmd.Contains("http://") || cmd.Contains("https://") ||

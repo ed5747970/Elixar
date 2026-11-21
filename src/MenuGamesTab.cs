@@ -78,7 +78,7 @@ namespace CDriveCleaner
             menuList.BeginUpdate(); menuList.Items.Clear();
             foreach (var e in MenuEntries.Where(x => chkMenuWindows.Checked || !x.WindowsOwn))
             {
-                var it = new ListViewItem(e.Name) { Tag = e, ToolTipText = e.Hive + "\\...\\" + e.Key + (e.Clsid.Length > 0 ? "\n" + e.Clsid : "") };
+                var it = new ListViewItem(NameText.Plain(e.Name)) { Tag = e, ToolTipText = e.Hive + "\\...\\" + e.Key + (e.Clsid.Length > 0 ? "\n" + e.Clsid : "") };
                 it.SubItems.Add(string.Join(", ", e.Where.Split(new[] { ", " }, StringSplitOptions.None).Select(w => Lang.T(w))));
                 it.SubItems.Add(Lang.T(e.Kind == "Handler" ? "Add-in" : "Command"));
                 it.SubItems.Add(e.Program.Length > 0 ? e.Program : "-");
@@ -156,7 +156,7 @@ namespace CDriveCleaner
                 gamesList.BeginUpdate(); gamesList.Items.Clear();
                 foreach (var g in GameRows)
                 {
-                    var it = new ListViewItem(g.Name) { Tag = g, ToolTipText = g.Folder };
+                    var it = new ListViewItem(NameText.Plain(g.Name)) { Tag = g, ToolTipText = NameText.Plain(g.Folder) };
                     it.SubItems.Add(g.Store); it.SubItems.Add(g.Bytes > 0 ? Fs.Fmt(g.Bytes) : "-");
                     it.SubItems.Add(g.LastPlayed.HasValue ? g.LastPlayed.Value.ToString("d") + (g.Unplayed(DateTime.Now) ? "  " + Lang.T("(over 6 months ago)") : "") : "-");
                     it.SubItems.Add(g.Drive); it.SubItems.Add(Lang.T(Games.HowToMove(g.Store)));

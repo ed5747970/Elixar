@@ -21,6 +21,22 @@ namespace CDriveCleaner
 {
     public enum Tier { Safe, Review, Caution }
 
+    // Names that come from outside (a file, a program, an extension) shown as plain text. Right-to-left control letters
+    // reorder what you see: "invoice\u202Efdp.exe" shows as "invoiceexe.pdf". They are shown as [?], and the checks
+    // treat a name that has them as a trick.
+    public static class NameText
+    {
+        public static bool IsBidi(char c) { return (c >= '\u202A' && c <= '\u202E') || (c >= '\u2066' && c <= '\u2069') || c == '\u200E' || c == '\u200F' || c == '\u061C'; }
+        public static bool HasBidi(string s) { return !string.IsNullOrEmpty(s) && s.Any(IsBidi); }
+        public static string Plain(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s ?? "";
+            var sb = new System.Text.StringBuilder(s.Length);
+            foreach (char c in s) sb.Append(IsBidi(c) ? "[?]" : char.IsControl(c) ? " " : c.ToString());
+            return sb.ToString();
+        }
+    }
+
     public class CleanItem
     {
         public string Name;

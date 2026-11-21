@@ -2068,6 +2068,8 @@ HE.setdefault('Store pages, pictures and logs the launchers saved. Your games an
 HE.setdefault('Old installers in Downloads', 'מתקינים ישנים בהורדות')
 HE.setdefault('Downloads: setup files of apps that are installed, over 60 days old', 'הורדות: קובצי התקנה של אפליקציות שמותקנות, בני יותר מ-60 יום')
 HE.setdefault("Setup files (.exe, .msi) you downloaded for apps that are now installed. They go to Undo for 7 days first. You can always download a newer one from the app's site.", 'קובצי התקנה (.exe,\u200f .msi) שהורדתם לאפליקציות שכבר מותקנות. הם עוברים קודם לביטול ל-7 ימים. תמיד אפשר להוריד גרסה חדשה יותר מאתר האפליקציה.')
+HE.setdefault('its name hides its real type with right-to-left letters - a trick of unwanted software', 'השם שלו מסתיר את הסוג האמיתי שלו באותיות מימין לשמאל - תרגיל של תוכנות לא רצויות')
+HE.setdefault('Its name hides letters (right-to-left tricks). Remove it unless you added it yourself.', 'השם שלה מסתיר אותיות (תרגילי ימין-לשמאל). הסירו אותה אלא אם הוספתם אותה בעצמכם.')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']

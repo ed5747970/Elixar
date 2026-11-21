@@ -225,6 +225,8 @@ namespace CDriveCleaner
                   : e.Level == CheckLevel.Warn ? e.Source + ". Remove it unless you added it yourself."
                   : e.Level == CheckLevel.Info ? "From the store, with wide powers. Fine if you know it (ad blockers and password managers need them)."
                   : "From the store.";
+            // a name with right-to-left letters shows something other than what it is: never from a real extension
+            if (NameText.HasBidi(e.Name)) { e.Level = CheckLevel.Danger; e.Why = "Its name hides letters (right-to-left tricks). Remove it unless you added it yourself."; }
         }
         static string Lower(string s) { return s.Length == 0 ? s : char.ToLowerInvariant(s[0]) + s.Substring(1); }
 

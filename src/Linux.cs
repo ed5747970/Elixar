@@ -368,8 +368,23 @@ namespace CDriveCleaner
             catch (Exception e) { throw new InvalidOperationException("Elixar didn't open it, so it never runs with administrator rights: " + e.Message, e); }
         }
 
+        // "Open folder" for a place another program wrote down (an app's install location, a leftover): a real folder opens;
+        // a file is only shown selected, never started (a planted "location" could be a program or a shortcut)
+        public static void OpenFolder(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            string p = path.Trim().Trim('"');
+            bool dir = false, file = false;
+            try { dir = Directory.Exists(p) && (File.GetAttributes(p) & FileAttributes.ReparsePoint) == 0; file = !dir && File.Exists(p); } catch { }
+            if (dir) Open(p);
+            else if (file) Select(p);
+            else throw new IOException("Not found: " + p);
+        }
+
+        public static Action<string> SelectOverride;   // self-test: what would be shown selected
         public static void Select(string path)
         {
+            if (SelectOverride != null) { SelectOverride(path); return; }
             if (Win.IsWindows) { Explorer("/select,\"" + path.Replace("\"", "") + "\""); return; }
             // the file manager shows the file selected; if it can't, its folder opens
             string o;

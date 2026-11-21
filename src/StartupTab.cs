@@ -104,15 +104,15 @@ namespace CDriveCleaner
             foreach (var e in list.OrderBy(x => x.Flag == StartupFlag.Danger ? 0 : x.Flag == StartupFlag.Review ? 1 : 2).ThenBy(x => x.Name))
             {
                 var g = e.Flag == StartupFlag.Leftover ? gLeft : e.Flag == StartupFlag.Ok ? gOk : gLook;
-                var r = new ListViewItem(e.Name) { Tag = e, Group = g, UseItemStyleForSubItems = false, ToolTipText = e.Command };
+                var r = new ListViewItem(NameText.Plain(e.Name)) { Tag = e, Group = g, UseItemStyleForSubItems = false, ToolTipText = NameText.Plain(e.Command) };
                 r.SubItems.Add(e.Enabled ? "On" : "Off").ForeColor = e.Enabled ? Color.Black : Color.Gray;
                 var imp = startImpact == null ? null : startImpact.For(e.File);
                 var si = r.SubItems.Add(StartupImpact.Words(imp));
                 si.ForeColor = imp == null ? Color.Gray : imp.AvgMs >= 3000 ? DangerColor : imp.AvgMs >= 1000 ? CautionColor : Color.Black;
-                if (imp != null) r.ToolTipText = e.Command + "\n" + Lang.T("Windows saw it slow startup " + imp.Times + " times in 90 days, the last on " + imp.Last.ToString("d MMM")) + ".";
+                if (imp != null) r.ToolTipText = NameText.Plain(e.Command) + "\n" + Lang.T("Windows saw it slow startup " + imp.Times + " times in 90 days, the last on " + imp.Last.ToString("d MMM")) + ".";
                 var c = r.SubItems.Add(e.Why);
                 c.ForeColor = e.Flag == StartupFlag.Danger ? DangerColor : e.Flag == StartupFlag.Ok ? SafeColor : CautionColor;
-                r.SubItems.Add(e.File);
+                r.SubItems.Add(NameText.Plain(e.File));
                 r.SubItems.Add(e.Where).ForeColor = Color.DimGray;
                 if (!e.Enabled) r.ForeColor = Color.Gray;
                 startList.Items.Add(r);

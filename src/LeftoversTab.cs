@@ -42,7 +42,7 @@ namespace CDriveCleaner
             bAll.Click += (o, e) => { foreach (ListViewItem r in leftList.Items) r.Checked = true; };
             bNone.Click += (o, e) => { foreach (ListViewItem r in leftList.Items) r.Checked = false; };
             leftList.ItemChecked += (o, e) => LeftSel();
-            leftList.DoubleClick += (o, e) => { if (leftList.SelectedItems.Count > 0) try { Shell.Open(((Leftover)leftList.SelectedItems[0].Tag).Path); } catch { } };
+            leftList.DoubleClick += (o, e) => { if (leftList.SelectedItems.Count > 0) try { Shell.OpenFolder(((Leftover)leftList.SelectedItems[0].Tag).Path); } catch { } };
             btnLeftMove.Click += (o, e) => MoveLeftovers();
             LeftSel();
         }
@@ -62,7 +62,7 @@ namespace CDriveCleaner
                 leftList.BeginUpdate();
                 foreach (var l in t.Result)
                 {
-                    var lvi = new ListViewItem(l.Name) { Tag = l, ToolTipText = l.Path };
+                    var lvi = new ListViewItem(NameText.Plain(l.Name)) { Tag = l, ToolTipText = NameText.Plain(l.Path) };
                     lvi.SubItems.Add(l.Where); lvi.SubItems.Add(Fs.Fmt(l.Bytes)); lvi.SubItems.Add(l.LastChange.ToString("yyyy-MM-dd")); lvi.SubItems.Add(l.Path);
                     leftList.Items.Add(lvi);
                 }

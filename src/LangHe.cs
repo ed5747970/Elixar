@@ -2368,6 +2368,8 @@ namespace CDriveCleaner
             d["Old installers in Downloads"] = "מתקינים ישנים בהורדות";
             d["Downloads: setup files of apps that are installed, over 60 days old"] = "הורדות: קובצי התקנה של אפליקציות שמותקנות, בני יותר מ-60 יום";
             d["Setup files (.exe, .msi) you downloaded for apps that are now installed. They go to Undo for 7 days first. You can always download a newer one from the app's site."] = "קובצי התקנה (.exe,‏ .msi) שהורדתם לאפליקציות שכבר מותקנות. הם עוברים קודם לביטול ל-7 ימים. תמיד אפשר להוריד גרסה חדשה יותר מאתר האפליקציה.";
+            d["its name hides its real type with right-to-left letters - a trick of unwanted software"] = "השם שלו מסתיר את הסוג האמיתי שלו באותיות מימין לשמאל - תרגיל של תוכנות לא רצויות";
+            d["Its name hides letters (right-to-left tricks). Remove it unless you added it yourself."] = "השם שלה מסתיר אותיות (תרגילי ימין-לשמאל). הסירו אותה אלא אם הוספתם אותה בעצמכם.";
             // texts with numbers in them
             Pat(@"\.\.\.and (\d+) more", m => "...ועוד " + m.Groups[1].Value);
             Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");

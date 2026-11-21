@@ -79,13 +79,13 @@ namespace CDriveCleaner
             foreach (var e in list.OrderBy(x => x.Flag == StartupFlag.Danger ? 0 : x.Flag == StartupFlag.Review ? 1 : 2).ThenBy(x => x.Name))
             {
                 var g = e.Flag == StartupFlag.Leftover ? gLeft : e.Flag == StartupFlag.Ok ? gOk : gLook;
-                var r = new ListViewItem(e.Name) { Tag = e, Group = g, UseItemStyleForSubItems = false, ToolTipText = e.Command };
+                var r = new ListViewItem(NameText.Plain(e.Name)) { Tag = e, Group = g, UseItemStyleForSubItems = false, ToolTipText = NameText.Plain(e.Command) };
                 r.SubItems.Add(Lang.Hebrew ? (e.Kind == "Task" ? "משימה" : "שירות") : e.Kind);
-                r.SubItems.Add(e.Runs);
+                r.SubItems.Add(NameText.Plain(e.Runs));
                 r.SubItems.Add(e.Enabled ? Lang.T("On") : Lang.T("Off")).ForeColor = e.Enabled ? Color.Black : Color.Gray;
                 var c = r.SubItems.Add(Lang.T(e.Why));
                 c.ForeColor = e.Flag == StartupFlag.Danger ? DangerColor : e.Flag == StartupFlag.Ok ? SafeColor : CautionColor;
-                r.SubItems.Add(e.File);
+                r.SubItems.Add(NameText.Plain(e.File));
                 r.SubItems.Add(e.Where).ForeColor = Color.DimGray;
                 if (!e.Enabled) r.ForeColor = Color.Gray;
                 autoList.Items.Add(r);

@@ -115,7 +115,7 @@ namespace CDriveCleaner
             secExt.BeginUpdate(); secExt.Items.Clear();
             foreach (var e in SecExtensions)
             {
-                var it = new ListViewItem((e.Enabled ? "" : Lang.T("(off) ")) + e.Name) { Tag = e, ToolTipText = Lang.T(e.Why) + "\n" + e.Id + "  " + e.Version + "\n" + e.Folder };
+                var it = new ListViewItem((e.Enabled ? "" : Lang.T("(off) ")) + NameText.Plain(e.Name)) { Tag = e, ToolTipText = Lang.T(e.Why) + "\n" + e.Id + "  " + NameText.Plain(e.Version) + "\n" + e.Folder };
                 it.SubItems.Add(e.Browser + (e.Profile == "Default" || e.Profile.Length == 0 ? "" : " (" + e.Profile + ")"));
                 it.SubItems.Add(Lang.T(e.Source));
                 it.SubItems.Add(e.Can.Count == 0 ? "-" : string.Join(", ", e.Can.Select(c => Lang.T(c))));
@@ -128,10 +128,10 @@ namespace CDriveCleaner
             secDev.BeginUpdate(); secDev.Items.Clear();
             foreach (var r in SecDevices)
             {
-                var it = new ListViewItem(r.App) { Tag = r, ToolTipText = r.Packaged ? r.Package : r.Path };
+                var it = new ListViewItem(NameText.Plain(r.App)) { Tag = r, ToolTipText = NameText.Plain(r.Packaged ? r.Package : r.Path) };
                 it.SubItems.Add(Lang.T(r.What));
                 it.SubItems.Add(r.InUse ? Lang.T("In use now") : r.LastUsed.ToString("g"));
-                it.SubItems.Add(r.Packaged ? Lang.T("Store app") : r.Path);
+                it.SubItems.Add(r.Packaged ? Lang.T("Store app") : NameText.Plain(r.Path));
                 it.SubItems.Add(Lang.T(r.Why));
                 color(it, r.Level); secDev.Items.Add(it);
             }

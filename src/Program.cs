@@ -40,6 +40,8 @@ namespace CDriveCleaner
             {
                 // a .config, .local or .manifest put next to Elixar.exe could make it load someone else's code
                 var planted = EnvGuard.PlantedFiles(Application.ExecutablePath);
+                // a planted .config can load someone's code before Elixar's first line, and then remove itself: .NET still shows it
+                if (EnvGuard.ForeignManager()) planted.Add("(a .NET AppDomainManager, loaded into Elixar before it started)");
                 if (planted.Count > 0)
                 {
                     if (!scheduled)
@@ -172,6 +174,14 @@ namespace CDriveCleaner
                     catch { }
                     // keep --install / --uninstall when asking for admin rights
                     string pass = ElevationArgs(args);
+                    // looked at again right before asking: a file put there since Elixar started would load with administrator rights
+                    var late = EnvGuard.PlantedFiles(self);
+                    if (late.Count > 0)
+                    {
+                        Lang.Box(null, "Elixar did not ask for administrator rights, because something was just put next to Elixar.exe:\n\n" + string.Join("\n", late) +
+                            "\n\nElixar never uses these, and Windows would obey them. Delete them, or download Elixar again into a new folder.", "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return 1;
+                    }
                     Process.Start(new ProcessStartInfo(self, pass) { UseShellExecute = true, Verb = "runas" });
                 }
                 catch (Win32Exception)

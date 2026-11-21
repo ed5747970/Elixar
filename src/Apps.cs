@@ -355,7 +355,7 @@ namespace CDriveCleaner
         {
             var a = SelectedApp();
             if (a == null || a.Location.Length == 0) return;
-            try { Shell.Open(a.Location); }
+            try { Shell.OpenFolder(a.Location); }   // written by the app (or anything you ran, for your account's apps): only a folder opens
             catch (Exception ex) { Log("Could not open the folder: " + ex.Message); }
         }
 

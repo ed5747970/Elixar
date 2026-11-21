@@ -33,6 +33,14 @@ namespace CDriveCleaner
         public static readonly string[] PlantedSuffixes = { ".config", ".local", ".manifest" };
 
         // files or folders next to the program that Windows or .NET would obey
+        // .NET started Elixar with an AppDomainManager (from a .config or a variable): someone else's code ran first
+        public static Func<object> ManagerOverride;   // self-test
+        public static bool ForeignManager()
+        {
+            object m = ManagerOverride != null ? ManagerOverride() : AppDomain.CurrentDomain.DomainManager;
+            return m != null;
+        }
+
         public static List<string> PlantedFiles(string exePath)
         {
             var found = new List<string>();
