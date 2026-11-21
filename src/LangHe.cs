@@ -2352,6 +2352,22 @@ namespace CDriveCleaner
             d["The hosts file changed since the check. Click Check now again."] = "קובץ ה-hosts השתנה מאז הבדיקה. לחצו שוב על בדוק עכשיו.";
             d["Runs a file from your folders through a Windows tool. Turn it off if you don't know it."] = "מריץ קובץ מהתיקיות שלך דרך כלי של Windows. כבו אותו אם אתם לא מכירים אותו.";
             d["the file couldn't be checked (in use?)"] = "לא ניתן היה לבדוק את הקובץ (בשימוש?)";
+            d["AMD and Intel shader cache"] = "מטמון הצללות של AMD ו-Intel";
+            d["Compiled game shaders of AMD and Intel graphics. Games rebuild them, so the first launch after cleaning can stutter for a minute. Close all games first."] = "הצללות משחקים מהודרות של כרטיסי מסך AMD ו-Intel. המשחקים בונים אותן מחדש, כך שההפעלה הראשונה אחרי הניקוי עלולה לגמגם לדקה. סגרו קודם את כל המשחקים.";
+            d["Memory snapshots from past crashes, and the reports Windows makes when a driver hangs (LiveKernelReports, often several GB). Only useful if you are investigating a crash."] = "תמונות זיכרון מקריסות קודמות, והדוחות ש-Windows יוצר כשמנהל התקן נתקע (LiveKernelReports, לרוב כמה GB). שימושי רק אם אתם חוקרים קריסה.";
+            d["Other apps' web caches (Slack, Notion, Signal...)"] = "מטמוני רשת של אפליקציות אחרות (Slack,‏ Notion,‏ Signal...)";
+            d["App data of apps built on Chromium (found by their folders)"] = "נתוני אפליקציות שבנויות על Chromium (נמצאות לפי התיקיות שלהן)";
+            d["The same web cache folders (Cache, Code Cache, GPUCache) in every other app built like Discord or Teams. Messages, notes and settings are kept. Close those apps first: what an open app is using is skipped."] = "אותן תיקיות מטמון רשת (Cache,‏ Code Cache,‏ GPUCache) בכל אפליקציה אחרת שבנויה כמו Discord או Teams. הודעות, פתקים והגדרות נשמרים. סגרו קודם את האפליקציות: מה שאפליקציה פתוחה משתמשת בו מדולג.";
+            d["Browser website storage (Service Worker caches)"] = "אחסון אתרים בדפדפן (מטמוני Service Worker)";
+            d["Copies of websites' files that sites keep for themselves (often several GB). Sites download them again. Web apps you use offline lose their offline copy until you open them online. History, passwords and logins are kept. The browsers must be closed."] = "עותקים של קבצי אתרים שהאתרים שומרים לעצמם (לרוב כמה GB). האתרים מורידים אותם שוב. אפליקציות רשת שאתם משתמשים בהן במצב לא מקוון מאבדות את העותק הלא מקוון עד שתפתחו אותן באינטרנט. היסטוריה, סיסמאות והתחברויות נשמרות. הדפדפנים חייבים להיות סגורים.";
+            d["More developer caches (pnpm, Bun, Unity, Rust, old JetBrains)"] = "עוד מטמוני מפתחים (pnpm,‏ Bun,‏ Unity,‏ Rust,‏ JetBrains ישנים)";
+            d["Download caches tools fill again when needed (needs internet), and the caches of JetBrains IDE versions you updated from (the newest of each is kept; settings are kept). Projects are not touched."] = "מטמוני הורדות שהכלים ממלאים שוב לפי הצורך (דורש אינטרנט), ומטמונים של גרסאות JetBrains שעדכנתם מהן (החדשה של כל אחת נשמרת; ההגדרות נשמרות). פרויקטים לא נוגעים.";
+            d["Game launcher caches (Battle.net, Riot, Ubisoft, Roblox, GOG)"] = "מטמוני משגרי משחקים (Battle.net,‏ Riot,‏ Ubisoft,‏ Roblox,‏ GOG)";
+            d["Launchers' web caches and logs"] = "מטמוני רשת ויומנים של המשגרים";
+            d["Store pages, pictures and logs the launchers saved. Your games and saves are not touched. The launchers must be closed."] = "דפי חנות, תמונות ויומנים שהמשגרים שמרו. המשחקים והשמירות שלכם לא נוגעים. המשגרים חייבים להיות סגורים.";
+            d["Old installers in Downloads"] = "מתקינים ישנים בהורדות";
+            d["Downloads: setup files of apps that are installed, over 60 days old"] = "הורדות: קובצי התקנה של אפליקציות שמותקנות, בני יותר מ-60 יום";
+            d["Setup files (.exe, .msi) you downloaded for apps that are now installed. They go to Undo for 7 days first. You can always download a newer one from the app's site."] = "קובצי התקנה (.exe,‏ .msi) שהורדתם לאפליקציות שכבר מותקנות. הם עוברים קודם לביטול ל-7 ימים. תמיד אפשר להוריד גרסה חדשה יותר מאתר האפליקציה.";
             // texts with numbers in them
             Pat(@"\.\.\.and (\d+) more", m => "...ועוד " + m.Groups[1].Value);
             Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");

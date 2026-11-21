@@ -34,6 +34,11 @@ namespace CDriveCleaner
 
             string nvDx = Path.Combine(L, "NVIDIA", "DXCache");
             string nvGl = Path.Combine(L, "NVIDIA", "GLCache");
+            string intelSc = Path.Combine(Path.Combine(Path.GetDirectoryName(L.TrimEnd('\\')) ?? L, "LocalLow"), @"Intel\ShaderCache");
+            Func<List<string>> amdIntel = () => new[] { "DxCache", "DxcCache", "VkCache", "GLCache", "OglCache" }.Select(n => Path.Combine(L, "AMD", n))
+                                                    .Concat(new[] { intelSc }).Where(Directory.Exists).ToList();
+            string winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows); if (string.IsNullOrEmpty(winDir)) winDir = @"C:\Windows";
+            string liveKernel = Path.Combine(winDir, "LiveKernelReports");
             string stremio = Path.Combine(R, "stremio", "stremio-server", "stremio-cache");
             string winTemp = @"C:\Windows\Temp";
             string wuDl = @"C:\Windows\SoftwareDistribution\Download";
@@ -60,6 +65,12 @@ namespace CDriveCleaner
                     Info = "Compiled game shaders. Games rebuild them, so the first launch after cleaning can stutter for a minute. Close all games first. Tip: cap it in NVIDIA Control Panel > Manage 3D settings > Shader Cache Size.",
                     Measure = () => Fs.MeasureIn(nvDx) + Fs.MeasureIn(nvGl),
                     Clean = log => { Fs.ClearIn(nvDx); Fs.ClearIn(nvGl); } },
+
+                new CleanItem {
+                    Name = "AMD and Intel shader cache", Tier = Tier.Safe, DefaultOn = true, Where = amdIntel().Count == 0 ? Path.Combine(L, "AMD") + @"\DxCache, " + intelSc : string.Join(", ", amdIntel()),
+                    Info = "Compiled game shaders of AMD and Intel graphics. Games rebuild them, so the first launch after cleaning can stutter for a minute. Close all games first.",
+                    Measure = () => amdIntel().Sum(d => Fs.MeasureIn(d)),
+                    Clean = log => { foreach (var d in amdIntel()) Fs.ClearIn(d); } },
 
                 new CleanItem {
                     Name = "Stremio cache", Tier = Tier.Safe, DefaultOn = true, Where = stremio, Procs = new[] { "stremio*" },
@@ -117,10 +128,10 @@ namespace CDriveCleaner
                     Clean = log => { Fs.ClearIn(werArchive); Fs.ClearIn(werQueue); } },
 
                 new CleanItem {
-                    Name = "Crash dumps", Tier = Tier.Safe, DefaultOn = true, Where = minidump + ", " + memDump + ", " + appDumps,
-                    Info = "Memory snapshots from past crashes. Only useful if you are investigating a crash.",
-                    Measure = () => Fs.MeasureIn(minidump) + Fs.SizeOf(memDump) + Fs.MeasureIn(appDumps),
-                    Clean = log => { Fs.ClearIn(minidump); Fs.Delete(memDump); Fs.ClearIn(appDumps); } },
+                    Name = "Crash dumps", Tier = Tier.Safe, DefaultOn = true, Where = minidump + ", " + memDump + ", " + appDumps + ", " + liveKernel,
+                    Info = "Memory snapshots from past crashes, and the reports Windows makes when a driver hangs (LiveKernelReports, often several GB). Only useful if you are investigating a crash.",
+                    Measure = () => Fs.MeasureIn(minidump) + Fs.SizeOf(memDump) + Fs.MeasureIn(appDumps) + Fs.MeasureIn(liveKernel),
+                    Clean = log => { Fs.ClearIn(minidump); Fs.Delete(memDump); Fs.ClearIn(appDumps); Fs.ClearIn(liveKernel); } },
 
                 new CleanItem {
                     Name = "Old Windows servicing logs", Tier = Tier.Safe, DefaultOn = true, Where = cbs + @"\CbsPersist_*",

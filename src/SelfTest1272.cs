@@ -56,6 +56,109 @@ namespace CDriveCleaner
                 return null;
             });
 
+            Run(check, "Other apps' web caches: any Electron app is found by its folders; only Chromium's cache folders go, never its settings or local data", () =>
+            {
+                string roaming = Path.Combine(R, "Roaming"), local = Path.Combine(R, "Local");
+                string slack = Path.Combine(roaming, "Slack"), notion = Path.Combine(roaming, "Notion"), vendorApp = Path.Combine(local, "Vendor", "App");
+                foreach (var app in new[] { slack, notion, vendorApp })
+                {
+                    Directory.CreateDirectory(Path.Combine(app, "Cache", "Cache_Data")); File.WriteAllBytes(Path.Combine(app, "Cache", "Cache_Data", "f_000001"), new byte[3000]);
+                    Directory.CreateDirectory(Path.Combine(app, "Code Cache", "js")); File.WriteAllBytes(Path.Combine(app, "Code Cache", "js", "a"), new byte[1000]);
+                    Directory.CreateDirectory(Path.Combine(app, "Local Storage", "leveldb")); File.WriteAllText(Path.Combine(app, "Local Storage", "leveldb", "000003.log"), "your notes");
+                    File.WriteAllText(Path.Combine(app, "Preferences"), "{}");
+                }
+                // not Electron: a folder named Cache without Chromium's files next to it; and Discord (its own item)
+                string other = Path.Combine(roaming, "SomeTool"); Directory.CreateDirectory(Path.Combine(other, "Cache")); File.WriteAllText(Path.Combine(other, "Cache", "data.db"), "needed");
+                string discord = Path.Combine(roaming, "discord"); Directory.CreateDirectory(Path.Combine(discord, "Cache")); File.WriteAllText(Path.Combine(discord, "Preferences"), "{}");
+                MoreCaches.ElectronRootsOverride = () => new List<string> { roaming, local };
+                try
+                {
+                    var apps = MoreCaches.ElectronApps().Select(a => a[1]).ToList();
+                    if (apps.Count != 3 || !apps.Contains(slack) || !apps.Contains(notion) || !apps.Contains(vendorApp)) return "apps: " + string.Join(", ", apps.Select(Path.GetFileName));
+                    var item = MoreCaches.Items().First(i => i.Name.StartsWith("Other apps' web caches"));
+                    if (item.Measure() != 3 * 4000) return "measured " + item.Measure();
+                    item.Clean(x => { });
+                    foreach (var app in new[] { slack, notion, vendorApp })
+                    {
+                        if (Directory.GetFiles(Path.Combine(app, "Cache"), "*", SearchOption.AllDirectories).Length > 0) return "a cache was left";
+                        if (!File.Exists(Path.Combine(app, "Local Storage", "leveldb", "000003.log")) || !File.Exists(Path.Combine(app, "Preferences"))) return "your data was touched";
+                    }
+                    if (!File.Exists(Path.Combine(other, "Cache", "data.db"))) return "a non-Electron app's Cache folder was cleared";
+                    return null;
+                }
+                finally { MoreCaches.ElectronRootsOverride = null; }
+            });
+
+            Run(check, "Browser website storage: only Service Worker caches of browser profiles (a review item, never ticked by itself)", () =>
+            {
+                string ud = Path.Combine(R, "Chrome User Data"), prof = Path.Combine(ud, "Default");
+                Directory.CreateDirectory(Path.Combine(prof, "Service Worker", "CacheStorage", "abc")); File.WriteAllBytes(Path.Combine(prof, "Service Worker", "CacheStorage", "abc", "x"), new byte[500]);
+                Directory.CreateDirectory(Path.Combine(prof, "Service Worker", "Database")); File.WriteAllText(Path.Combine(prof, "Service Worker", "Database", "MANIFEST"), "keep");
+                File.WriteAllText(Path.Combine(prof, "Login Data"), "passwords");
+                MoreCaches.BrowserRootsOverride = () => new List<string> { ud };
+                try
+                {
+                    var item = MoreCaches.Items().First(i => i.Name.StartsWith("Browser website storage"));
+                    if (item.Tier != Tier.Review || item.DefaultOn) return "it would be ticked by itself";
+                    if (item.Measure() != 500) return "measured " + item.Measure();
+                    item.Clean(x => { });
+                    if (Directory.GetFiles(Path.Combine(prof, "Service Worker", "CacheStorage"), "*", SearchOption.AllDirectories).Length > 0) return "left";
+                    if (!File.Exists(Path.Combine(prof, "Service Worker", "Database", "MANIFEST")) || !File.Exists(Path.Combine(prof, "Login Data"))) return "other data was touched";
+                    return null;
+                }
+                finally { MoreCaches.BrowserRootsOverride = null; }
+            });
+
+            Run(check, "Old JetBrains versions: the caches of older versions go, the newest of each IDE and Toolbox stay", () =>
+            {
+                string jb = Path.Combine(R, "JetBrains");
+                foreach (var d in new[] { "IntelliJIdea2024.1", "IntelliJIdea2025.2", "PyCharm2023.3", "Rider2025.1", "Rider2024.3", "Toolbox" }) Directory.CreateDirectory(Path.Combine(jb, d));
+                var old = MoreCaches.OldJetBrains(jb).Select(Path.GetFileName).OrderBy(x => x).ToList();
+                if (string.Join(",", old) != "IntelliJIdea2024.1,Rider2024.3") return "old: " + string.Join(",", old);
+                return null;
+            });
+
+            Run(check, "Old installers in Downloads: setup files of installed apps over 60 days old go to Undo; new ones, other apps' and other files stay", () =>
+            {
+                string dl = Path.Combine(R, "Downloads"); Directory.CreateDirectory(dl);
+                Func<string, int, string> make = (n, days) => { string f = Path.Combine(dl, n); File.WriteAllBytes(f, new byte[100]); File.SetLastWriteTime(f, DateTime.Now.AddDays(-days)); return f; };
+                string chrome = make("ChromeSetup.exe", 90), vlc = make("vlc-3.0.20-win64.exe", 200), fresh = make("Firefox Installer.exe", 5), notInstalled = make("Blender-4.2-windows-x64.msi", 300),
+                       doc = make("report.pdf", 300), bare = make("setup.exe", 300), app = make("App Installer.exe", 300);
+                MoreCaches.DownloadsOverride = () => dl;
+                MoreCaches.InstalledOverride = () => new List<string> { "Google Chrome", "VLC media player", "Mozilla Firefox", "App Installer" };
+                try
+                {
+                    if (MoreCaches.ProductOf("ChromeSetup.exe") != "chrome" || MoreCaches.ProductOf("vlc-3.0.20-win64.exe") != "vlc" || MoreCaches.ProductOf("Firefox Installer (1).exe") != "firefox") return "names: " + MoreCaches.ProductOf("ChromeSetup.exe") + "/" + MoreCaches.ProductOf("vlc-3.0.20-win64.exe");
+                    var l = MoreCaches.OldInstallers(DateTime.Now).Select(Path.GetFileName).OrderBy(x => x).ToList();
+                    if (string.Join(",", l) != "ChromeSetup.exe,vlc-3.0.20-win64.exe") return "found: " + string.Join(",", l);
+                    var item = MoreCaches.Items().First(i => i.Name == "Old installers in Downloads");
+                    if (item.DefaultOn || item.Tier != Tier.Review) return "it would be ticked by itself";
+                    return null;
+                }
+                finally { MoreCaches.DownloadsOverride = null; MoreCaches.InstalledOverride = null; }
+            });
+
+            Run(check, "New cleaning items are in the list (AMD/Intel shaders, LiveKernelReports in crash dumps, other apps, website storage, developer, launchers, old installers) and translated", () =>
+            {
+                var names = Catalog.Build().Select(i => i.Name).ToList();
+                var want = new[] { "AMD and Intel shader cache", "Other apps' web caches (Slack, Notion, Signal...)", "Browser website storage (Service Worker caches)",
+                    "More developer caches (pnpm, Bun, Unity, Rust, old JetBrains)", "Game launcher caches (Battle.net, Riot, Ubisoft, Roblox, GOG)", "Old installers in Downloads" };
+                if (!Lx.On || Catalog.WindowsOnLinux) foreach (var w in want) if (!names.Contains(w)) return "missing: " + w;
+                var crash = Catalog.Build().FirstOrDefault(i => i.Name == "Crash dumps");
+                if (crash != null && !crash.Where.Contains("LiveKernelReports")) return "LiveKernelReports not in crash dumps";
+                string keep = Lang.Code;
+                try
+                {
+                    foreach (var lang in new[] { "he", "ar", "ru", "es" })
+                    {
+                        Lang.Init(lang);
+                        foreach (var w in want) if (Lang.T(w) == w) return "not in " + lang + ": " + w;
+                    }
+                }
+                finally { Lang.Init(keep); }
+                return null;
+            });
+
             Run(check, "Measuring several at once: Windows' folder lists and your profile are made once, safely, from many threads", () =>
             {
                 var errors = new List<string>();

@@ -201,7 +201,7 @@ namespace CDriveCleaner
                 new CleanItem { Name = "NVIDIA app update downloads", Tier = Tier.Caution, Where = nvOta,
                     Info = "Driver and app installers the NVIDIA app downloaded for updates. Moved to Undo for 7 days first. The NVIDIA app downloads again if it needs them.",
                     Measure = () => Fs.MeasureIn(nvOta), Clean = log => Quarantine.MoveToUndo("NVIDIA app update downloads", Dirs(nvOta, "*"), log) },
-            };
+            }.Concat(MoreCaches.Items()).ToList();
         }
     }
 }

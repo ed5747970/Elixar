@@ -364,7 +364,6 @@ namespace CDriveCleaner
             }
         }
 
-        // a PowerShell string literal: PowerShell also ends a '...' string at the curly quotes, so those are doubled too
         // on another computer: \\server\share, //server/share, \\?\UNC\..., or a device path that can lead anywhere (\\.\, \\?\GLOBALROOT)
         public static bool IsNetworkPath(string p)
         {
@@ -375,6 +374,7 @@ namespace CDriveCleaner
             return true;
         }
 
+        // a PowerShell string literal: PowerShell also ends a '...' string at the curly quotes, so those are doubled too
         public static string PsQuote(string v)
         {
             var sb = new StringBuilder("'");
