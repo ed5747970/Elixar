@@ -167,7 +167,10 @@ namespace CDriveCleaner
                     if (cs != null) foreach (var c in cs) sites.AddRange(Strs(Get(c, "matches")));
                     bool store = Str(Get(st, "from_webstore")).Equals("True", StringComparison.OrdinalIgnoreCase);
                     string upd = Str(Get(mf, "update_url"));
-                    if (!store && st == null) store = upd.Contains("clients2.google.com") || upd.Contains("edge.microsoft.com");
+                    if (!store && st == null) store = StoreUpdates(upd);
+                    // the settings file is plain text any program you run can edit: "from the store" counts only if the extension
+                    // also updates from a store (the stores give every extension that address, and an extension can't pick its own)
+                    if (store && upd.Length > 0 && !StoreUpdates(upd)) store = false;
                     var e = new BrowserExt { Browser = browser, Profile = Path.GetFileName(prof), Id = id, Folder = verDir, Version = Str(Get(mf, "version")) };
                     e.Name = Localized(verDir, Str(Get(mf, "name")), Str(Get(mf, "default_locale")));
                     e.Source = loc == 4 || loc == 8 ? "Developer mode" : loc == 7 || loc == 9 ? "Forced by a policy" : loc == 2 || loc == 3 || loc == 6 ? "Added by another program" : store ? "Store" : "Not from the store";
@@ -178,6 +181,15 @@ namespace CDriveCleaner
                     all.Add(e);
                 }
             }
+        }
+
+        public static bool StoreUpdates(string url)
+        {
+            Uri u;
+            if (!Uri.TryCreate(url ?? "", UriKind.Absolute, out u) || u.Scheme != "https") return false;
+            string h = u.Host.ToLowerInvariant(), p = u.AbsolutePath.ToLowerInvariant();
+            return (h == "clients2.google.com" && p.StartsWith("/service/update2/crx")) || (h == "edge.microsoft.com" && p.StartsWith("/extensionwebstorebase/")) ||
+                   (h == "extension-updates.opera.com" && p.StartsWith("/api/omaha/update"));
         }
 
         static void ReadFirefox(string prof, List<BrowserExt> all)
@@ -415,6 +427,15 @@ namespace CDriveCleaner
             byte[] raw = File.ReadAllBytes(path);
             string text = latin1.GetString(raw);
             var all = text.Replace("\r\n", "\n").Split('\n').ToList();
+            // removed by line number, so each line must still say what you were shown (an antivirus or a VPN may have
+            // rewritten the file since the check): otherwise nothing is removed
+            foreach (var f in flagged.Where(f => f.Line > 0))
+            {
+                if (f.Line > all.Count) return "The hosts file changed since the check. Click Check now again.";
+                string ln = all[f.Line - 1]; int hash = ln.IndexOf('#');
+                var p = (hash >= 0 ? ln.Substring(0, hash) : ln).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (p.Length < 2 || p[0] != f.Address || !p.Skip(1).Contains(f.Name, StringComparer.OrdinalIgnoreCase)) return "The hosts file changed since the check. Click Check now again.";
+            }
             var kept = all.Where((s, i) => !lines.Contains(i + 1)).ToList();
             var b = Quarantine.Begin("Hosts file: " + lines.Count + " line(s) removed", "hosts", raw.Length + 1);
             try

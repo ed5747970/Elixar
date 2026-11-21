@@ -181,7 +181,10 @@ namespace CDriveCleaner
         {
             var flagged = SecHosts.Where(h => h.Line > 0).ToList();
             if (flagged.Count == 0) return;
-            string q = Lang.T("Remove these lines from the hosts file?") + "\n\n" + string.Join("\n", flagged.Select(h => h.Address + "  " + h.Name).Distinct().Take(15)) +
+            // the whole lines that go (a line can name more than one site), every one of them
+            var lines = flagged.GroupBy(h => h.Line).Select(g => g.First().Text).ToList();
+            string q = Lang.T("Remove these lines from the hosts file?") + "\n\n" + string.Join("\n", lines.Take(15).Select(t => t.Length > 90 ? t.Substring(0, 90) + "..." : t)) +
+                       (lines.Count > 15 ? "\n" + Lang.T("...and " + (lines.Count - 15) + " more") : "") +
                        "\n\n" + Lang.T("The rest of the file stays. The old file goes to Undo first.");
             bool yes = SecConfirmForTest != null ? SecConfirmForTest(q) : Lang.Box(this, q, "Elixar", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
             if (!yes) return;

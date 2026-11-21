@@ -34,7 +34,7 @@ namespace CDriveCleaner
             try { l.AddRange(Epic()); } catch { }
             try { l.AddRange(Gog(measure)); } catch { }
             try { l.AddRange(Xbox(measure)); } catch { }
-            return l.GroupBy(g => g.Folder.TrimEnd('\\'), StringComparer.OrdinalIgnoreCase).Select(x => x.First()).OrderByDescending(g => g.Bytes).ToList();
+            return l.Where(g => g.Folder.Length > 0 && g.Name.Length > 0).GroupBy(g => g.Folder.TrimEnd('\\'), StringComparer.OrdinalIgnoreCase).Select(x => x.First()).OrderByDescending(g => g.Bytes).ToList();
         }
 
         // ---------- Steam: libraryfolders.vdf, then each appmanifest_*.acf ----------

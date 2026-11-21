@@ -2349,7 +2349,10 @@ namespace CDriveCleaner
             d["a system file"] = "קובץ מערכת";
             d["a link is in the way"] = "קישור חוסם את הדרך";
             d["A backup is already running."] = "גיבוי כבר רץ.";
+            d["The hosts file changed since the check. Click Check now again."] = "קובץ ה-hosts השתנה מאז הבדיקה. לחצו שוב על בדוק עכשיו.";
+            d["Runs a file from your folders through a Windows tool. Turn it off if you don't know it."] = "מריץ קובץ מהתיקיות שלך דרך כלי של Windows. כבו אותו אם אתם לא מכירים אותו.";
             // texts with numbers in them
+            Pat(@"\.\.\.and (\d+) more", m => "...ועוד " + m.Groups[1].Value);
             Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
             Pat(@"([^,]+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
             Pat(@"Sends (.+) to another address \((.+)\)\.", m => "שולח את " + m.Groups[1].Value + " לכתובת אחרת (" + m.Groups[2].Value + ").");

@@ -14,7 +14,7 @@ namespace CDriveCleaner
 {
     public class MenuEntry
     {
-        public string Name = "", Where = "", Kind = "", Hive = "", Key = "", Clsid = "", Program = "", Why = "";
+        public string Name = "", Where = "", Kind = "", Hive = "", Key = "", Clsid = "", Program = "", Why = "", Command = "";
         public bool Missing, Off, WindowsOwn;
         public bool MachineClsid; public string MachineProgram = "";
         public List<string> Keys = new List<string>();   // a command shown once but registered in several places (Directory and Folder): all of them   // a handler: how the machine-wide registry (only administrators can change it) lists it
@@ -114,7 +114,7 @@ namespace CDriveCleaner
                                         if (text.StartsWith("@")) text = verb;
                                         var e = new MenuEntry { Name = text.Replace("&", ""), Where = place[1], Kind = "Command", Hive = c.Item1, Key = place[0] + @"\shell\" + verb };
                                         string line = cmd == null ? "" : cmd.GetValue("") as string ?? "";
-                                        e.Program = line.Length > 0 ? ProgramOf(line) : "";
+                                        e.Program = line.Length > 0 ? ProgramOf(line) : ""; e.Command = line;
                                         e.Off = v.GetValueNames().Contains("LegacyDisable", StringComparer.OrdinalIgnoreCase);
                                         if (e.Program.Length == 0 && v.GetValue("ExplorerCommandHandler") == null && v.OpenSubKey("DropTarget") == null && cmd == null) continue;   // a menu folder
                                         l.Add(e);
@@ -160,14 +160,27 @@ namespace CDriveCleaner
             return "";
         }
 
+        static readonly string[] Hosts = { "rundll32.exe", "regsvr32.exe", "mshta.exe", "powershell.exe", "pwsh.exe", "cmd.exe", "wscript.exe", "cscript.exe", "conhost.exe" };
+
+        // a Windows tool started on a file in your folders (rundll32 C:\Users\...\AppData\x.dll): that file is the app, not Windows
+        public static bool RunsUserFile(MenuEntry e)
+        {
+            if (e.Kind != "Command" || e.Command.Length == 0) return false;
+            string prog = Path.GetFileName(e.Program.Replace('/', '\\').Split('\\').Last());
+            if (!Hosts.Contains(prog, StringComparer.OrdinalIgnoreCase)) return false;
+            string rest = Environment.ExpandEnvironmentVariables(e.Command).ToLowerInvariant();
+            return rest.Contains(@"\appdata\") || rest.Contains(@"\temp\") || rest.Contains(@"\downloads\") || rest.Contains(@"\users\public\") || rest.Contains(@"\programdata\") || rest.Contains("http://") || rest.Contains("https://");
+        }
+
         public static void Judge(MenuEntry e)
         {
-            e.WindowsOwn = Windows(e.Program);
+            e.WindowsOwn = Windows(e.Program) && !RunsUserFile(e);
             // a handler the machine lists as Windows' own (or without a program file) stays Windows' own, whatever your own registry
             // says: a program could otherwise dress up a Windows part as a broken app entry, and turning it off blocks it for everyone
             if (e.Kind == "Handler" && e.MachineClsid && Windows(e.MachineProgram)) e.WindowsOwn = true;
             e.Missing = !e.WindowsOwn && e.Program.Length > 0 && Rooted(e.Program) && !Exists(e.Program);
             if (e.Missing && !e.Off) { e.Level = CheckLevel.Warn; e.Why = "Broken: its program is gone. Turn it off."; }
+            else if (RunsUserFile(e) && !e.Off) { e.Level = CheckLevel.Warn; e.Why = "Runs a file from your folders through a Windows tool. Turn it off if you don't know it."; }
             else if (e.Off) { e.Level = CheckLevel.Ok; e.Why = "Turned off."; }
             else if (e.WindowsOwn) { e.Level = CheckLevel.Ok; e.Why = "Windows' own."; }
             else { e.Level = CheckLevel.Info; e.Why = "Added by an app."; }

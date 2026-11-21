@@ -37,6 +37,20 @@ namespace CDriveCleaner
             "bitdefender", "malwarebytes", "trendmicro", "sophos", "comodo", "panda", "webex", "cisco", "citrix", "anydesk", "teamviewer", "parsec"
         }.Select(N));
 
+        // owned by TrustedInstaller: a part of Windows (Common Files, Windows Defender, Windows NT...), whatever its name
+        public static Func<string, bool> WindowsOwnedOverride;   // self-test
+        public static bool WindowsOwned(string dir)
+        {
+            if (WindowsOwnedOverride != null) return WindowsOwnedOverride(dir);
+            if (!Win.IsWindows) return false;
+            try
+            {
+                var o = Directory.GetAccessControl(dir, System.Security.AccessControl.AccessControlSections.Owner).GetOwner(typeof(System.Security.Principal.SecurityIdentifier));
+                return o != null && o.Value == "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
+            }
+            catch { return true; }   // can't tell: left alone
+        }
+
         public static string N(string s) { return Regex.Replace((s ?? "").ToLowerInvariant(), "[^a-z0-9]", ""); }
 
         public static Func<List<string>> NamesOverride;   // self-test
@@ -168,7 +182,10 @@ namespace CDriveCleaner
                 {
                     if (found.Any(f => string.Equals(f.Path, d, StringComparison.OrdinalIgnoreCase) || DashData.Inside(d, f.Path))) return;
                     var di = new DirectoryInfo(d);
-                    if (!di.Exists || (di.Attributes & (FileAttributes.ReparsePoint | FileAttributes.System)) != 0 || Protect.IsProtected(d)) return;
+                    if (!di.Exists || (di.Attributes & (FileAttributes.ReparsePoint | FileAttributes.System)) != 0 || Protect.IsProtected(d) || WindowsOwned(d)) return;
+                    // an app listed under your own account (any program you run can write that list) can only have left things in
+                    // your own folders: a "per-user app" claiming a folder in Program Files is never believed
+                    if (a.PerUser && Win.IsWindows && !DashData.Inside(di.FullName, UserDirs.Home)) return;
                     if (others.Contains(N(di.Name))) return;   // another app, service or running program still has this name
                     found.Add(new Leftover { Path = di.FullName, Where = where, Bytes = Fs.SizeOf(di.FullName), LastChange = Directory.GetLastWriteTime(di.FullName) });
                 }
@@ -225,7 +242,7 @@ namespace CDriveCleaner
                     try
                     {
                         var di = new DirectoryInfo(d);
-                        if ((di.Attributes & (FileAttributes.ReparsePoint | FileAttributes.System)) != 0 || Protect.IsProtected(d)) continue;
+                        if ((di.Attributes & (FileAttributes.ReparsePoint | FileAttributes.System)) != 0 || Protect.IsProtected(d) || WindowsOwned(d)) continue;
                         if (Belongs(di.Name, exact, long_)) continue;
                         // a publisher folder: if any folder inside belongs to an installed app, leave the whole folder
                         if (Directory.GetDirectories(d).Any(s => N(Path.GetFileName(s)).Length >= 5 && !Never.Contains(N(Path.GetFileName(s))) && Belongs(Path.GetFileName(s), exact, long_))) continue;

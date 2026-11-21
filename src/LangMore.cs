@@ -379,6 +379,8 @@ namespace CDriveCleaner
             new[] { "a link is in the way", "يوجد رابط في الطريق", "мешает ссылка", "hay un vínculo en medio" },
             new[] { "ready", "جاهز", "готово", "listo" },
             new[] { "A backup is already running.", "النسخ الاحتياطي قيد التشغيل بالفعل.", "Копирование уже выполняется.", "Ya hay una copia en curso." },
+            new[] { "The hosts file changed since the check. Click Check now again.", "تغير ملف hosts منذ الفحص. انقر افحص الآن مجددًا.", "Файл hosts изменился после проверки. Нажмите «Проверить» ещё раз.", "El archivo hosts cambió desde la revisión. Pulsa Revisar ahora otra vez." },
+            new[] { "Runs a file from your folders through a Windows tool. Turn it off if you don't know it.", "يشغّل ملفًا من مجلداتك عبر أداة من Windows. أوقفه إن لم تكن تعرفه.", "Запускает файл из ваших папок через инструмент Windows. Отключите, если не знаете его.", "Ejecuta un archivo de tus carpetas mediante una herramienta de Windows. Desactívalo si no lo conoces." },
             new[] { "Dashboard", "لوحة التحكم", "Панель", "Panel" },
             new[] { "Apps", "التطبيقات", "Приложения", "Aplicaciones" },
             new[] { "Cleaner", "التنظيف", "Очистка", "Limpieza" },
@@ -693,6 +695,7 @@ namespace CDriveCleaner
             Pat(@"(\d+) games, ([^;]+)\.", m => m.Groups[1].Value + w(" ألعاب، ", " игр, ", " juegos, ") + m.Groups[2].Value + ".");
             Pat(@"(\d+) games, (.+); (.+) in games not played for over 6 months \(in orange\)\.", m => m.Groups[1].Value + w(" ألعاب، ", " игр, ", " juegos, ") + m.Groups[2].Value + "; " + m.Groups[3].Value + w(" في ألعاب لم تُلعب منذ أكثر من 6 أشهر (بالبرتقالي).", " в играх, не запускавшихся более 6 месяцев (оранжевым).", " en juegos sin jugar en más de 6 meses (en naranja)."));
             Pat(@"refused: (.+)", m => w("مرفوض: ", "Отклонено: ", "Rechazado: ") + T(m.Groups[1].Value));
+            Pat(@"\.\.\.and (\d+) more", m => w("...و" + m.Groups[1].Value + " أخرى", "...и ещё " + m.Groups[1].Value, "...y " + m.Groups[1].Value + " más"));
             Pat(@"(\d+) PCs", m => m.Groups[1].Value + w(" أجهزة", " ПК", " equipos"));
             return d;
         }

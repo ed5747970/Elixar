@@ -2049,11 +2049,14 @@ HE.setdefault('a link', 'קישור')
 HE.setdefault('a system file', 'קובץ מערכת')
 HE.setdefault('a link is in the way', 'קישור חוסם את הדרך')
 HE.setdefault('A backup is already running.', 'גיבוי כבר רץ.')
+HE.setdefault('The hosts file changed since the check. Click Check now again.', 'קובץ ה-hosts השתנה מאז הבדיקה. לחצו שוב על בדוק עכשיו.')
+HE.setdefault("Runs a file from your folders through a Windows tool. Turn it off if you don't know it.", 'מריץ קובץ מהתיקיות שלך דרך כלי של Windows. כבו אותו אם אתם לא מכירים אותו.')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']
 for k,v in HE.items(): out.append('            d[%s] = %s;' % (cs(k), cs(v)))
 out += ['            // texts with numbers in them',
+             '            Pat(@"\\.\\.\\.and (\\d+) more", m => "...ועוד " + m.Groups[1].Value);',
              '            Pat(@"(.+), and it can (.+)\\. Remove it unless you added it yourself\\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");',
              '            Pat(@"([^,]+)\\. Remove it unless you added it yourself\\.", m => T(m.Groups[1].Value) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");',
              '            Pat(@"Sends (.+) to another address \\((.+)\\)\\.", m => "שולח את " + m.Groups[1].Value + " לכתובת אחרת (" + m.Groups[2].Value + ").");',

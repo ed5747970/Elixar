@@ -157,6 +157,106 @@ namespace CDriveCleaner
                 finally { ContextMenus.ClassesOverride = null; ContextMenus.BlockedOverride = null; ContextMenus.ExistsOverride = null; Registry.CurrentUser.DeleteSubKeyTree(TestKey, false); }
             });
 
+            Run(check, "Security check: an extension whose settings were edited to say \"from the store\" but that updates from somewhere else counts as not from the store", () =>
+            {
+                string ud = Path.Combine(R, "Chrome UD"), prof = Path.Combine(ud, "Default"), id = new string('k', 32), id2 = new string('m', 32);
+                Directory.CreateDirectory(Path.Combine(prof, "Extensions", id, "1.0_0")); Directory.CreateDirectory(Path.Combine(prof, "Extensions", id2, "2.0_0"));
+                File.WriteAllText(Path.Combine(prof, "Extensions", id, "1.0_0", "manifest.json"), "{\"name\":\"Coupons\",\"version\":\"1.0\",\"update_url\":\"https://evil.example/update.xml\",\"host_permissions\":[\"<all_urls>\"]}");
+                File.WriteAllText(Path.Combine(prof, "Extensions", id2, "2.0_0", "manifest.json"), "{\"name\":\"Real one\",\"version\":\"2.0\",\"update_url\":\"https://clients2.google.com/service/update2/crx\",\"host_permissions\":[\"<all_urls>\"]}");
+                File.WriteAllText(Path.Combine(prof, "Secure Preferences"), "{\"extensions\":{\"settings\":{\"" + id + "\":{\"location\":1,\"from_webstore\":true},\"" + id2 + "\":{\"location\":1,\"from_webstore\":true}}}}");
+                BrowserExtensions.ChromiumOverride = () => new List<string[]> { new[] { "Chrome", ud } }; BrowserExtensions.FirefoxOverride = () => new List<string>();
+                try
+                {
+                    var l = BrowserExtensions.Read();
+                    var fake = l.FirstOrDefault(e => e.Id == id); var real = l.FirstOrDefault(e => e.Id == id2);
+                    if (fake == null || fake.Source == "Store" || fake.Level != CheckLevel.Danger) return "the edited one: " + (fake == null ? "missing" : fake.Source + " " + fake.Level);
+                    if (real == null || real.Source != "Store" || real.Level != CheckLevel.Info) return "the real store one: " + (real == null ? "missing" : real.Source + " " + real.Level);
+                    if (BrowserExtensions.StoreUpdates("http://clients2.google.com/service/update2/crx") || BrowserExtensions.StoreUpdates("https://clients2.google.com.evil.example/service/update2/crx")) return "a fake store address passed";
+                    return null;
+                }
+                finally { BrowserExtensions.ChromiumOverride = null; BrowserExtensions.FirefoxOverride = null; }
+            });
+
+            Run(check, "Hosts file: lines are removed only if they still say what you were shown (the file can change after the check)", () =>
+            {
+                string hosts = Path.Combine(R, "hosts-race");
+                File.WriteAllText(hosts, "# hosts\r\n127.0.0.1 localhost\r\n6.6.6.6 www.paypal.com\r\n");
+                NetCheck.HostsOverride = hosts;
+                try
+                {
+                    int n; string p; var flagged = NetCheck.ReadHosts(out n, out p);
+                    if (flagged.Count != 1 || flagged[0].Line != 3) return "flagged: " + flagged.Count;
+                    // a VPN rewrites the file: line 3 is now something else
+                    string changed = "# hosts\r\n127.0.0.1 localhost\r\n10.8.0.1 vpn-gateway.corp\r\n6.6.6.6 www.paypal.com\r\n";
+                    File.WriteAllText(hosts, changed);
+                    string err = NetCheck.FixHosts(flagged);
+                    if (err == null || !err.Contains("changed since") || File.ReadAllText(hosts) != changed) return "the wrong line was removed: " + err;
+                    // checked again: the right line goes
+                    flagged = NetCheck.ReadHosts(out n, out p);
+                    if (NetCheck.FixHosts(flagged) != null || File.ReadAllText(hosts).Contains("paypal") || !File.ReadAllText(hosts).Contains("vpn-gateway")) return "after checking again";
+                    return null;
+                }
+                finally { NetCheck.HostsOverride = null; }
+            });
+
+            Run(check, "Right-click menu: a Windows tool started on a file in your folders (rundll32 ...\\AppData\\x.dll) is shown and flagged, not hidden as Windows' own", () =>
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(TestKey, false);
+                try
+                {
+                    using (var k = Registry.CurrentUser.CreateSubKey(TestKey + @"\HKCU\*\shell\Helper\command")) k.SetValue("", @"rundll32.exe C:\Users\me\AppData\Roaming\helper\h.dll,Run %1");
+                    using (var k = Registry.CurrentUser.CreateSubKey(TestKey + @"\HKCU\*\shell\Notes\command")) k.SetValue("", @"notepad.exe ""%1""");
+                    ContextMenus.ClassesOverride = () => new List<Tuple<string, RegistryKey>> { Tuple.Create("HKCU", Registry.CurrentUser.OpenSubKey(TestKey + @"\HKCU", true)) };
+                    ContextMenus.BlockedOverride = () => Registry.CurrentUser.CreateSubKey(TestKey + @"\Blocked");
+                    ContextMenus.ExistsOverride = p => true;
+                    var l = ContextMenus.Read();
+                    var h = l.FirstOrDefault(e => e.Key.EndsWith("Helper", StringComparison.OrdinalIgnoreCase)); var n = l.FirstOrDefault(e => e.Key.EndsWith("Notes", StringComparison.OrdinalIgnoreCase));
+                    if (h == null || h.WindowsOwn || h.Level != CheckLevel.Warn) return "the rundll32 one: " + (h == null ? "missing" : h.Level + " own=" + h.WindowsOwn);
+                    if (n == null || !n.WindowsOwn) return "notepad on the file you clicked should stay Windows' own";
+                    if (ContextMenus.SetOff(h, true) != null) return "couldn't turn it off";
+                    return null;
+                }
+                finally { ContextMenus.ClassesOverride = null; ContextMenus.BlockedOverride = null; ContextMenus.ExistsOverride = null; Registry.CurrentUser.DeleteSubKeyTree(TestKey, false); }
+            });
+
+            Run(check, "Games: a store's list with an empty folder or name doesn't merge games into one row", () =>
+            {
+                string epic = Path.Combine(R, "epic"); Directory.CreateDirectory(epic);
+                File.WriteAllText(Path.Combine(epic, "a.item"), "{\"DisplayName\":\"Game A\",\"InstallLocation\":\"\",\"InstallSize\":100}");
+                File.WriteAllText(Path.Combine(epic, "b.item"), "{\"DisplayName\":\"Game B\",\"InstallLocation\":\"\",\"InstallSize\":200}");
+                File.WriteAllText(Path.Combine(epic, "c.item"), "{\"DisplayName\":\"Game C\",\"InstallLocation\":\"" + Path.Combine(R, "GameC").Replace("\\", "\\\\") + "\",\"InstallSize\":300}");
+                Games.EpicManifestsOverride = () => epic; Games.SteamOverride = () => null; Games.XboxRootsOverride = () => new List<string>(); Games.GogOverride = () => new List<string[]>();
+                try
+                {
+                    var l = Games.Read(false);
+                    if (l.Count != 1 || l[0].Name != "Game C") return "games: " + string.Join(", ", l.Select(g => g.Name));
+                    return null;
+                }
+                finally { Games.EpicManifestsOverride = null; Games.SteamOverride = null; Games.XboxRootsOverride = null; Games.GogOverride = null; }
+            });
+
+            Run(check, "Leftovers: a fake app listed under your own account never gets a Program Files folder (like Common Files) offered, and Windows' own folders are never offered", () =>
+            {
+                // outside your user folder, like Program Files (the self-test's own folder is inside it)
+                string pf = Win.IsWindows ? Path.Combine(Path.GetPathRoot(Path.GetFullPath(R)), "ElixarTestPF-" + Guid.NewGuid().ToString("N").Substring(0, 6)) : Path.Combine(R, "PF");
+                string common = Path.Combine(pf, "Common Files");
+                Directory.CreateDirectory(common); File.WriteAllText(Path.Combine(common, "x.dll"), "x");
+                string appDir = Path.Combine(pf, "Real Tool"); Directory.CreateDirectory(appDir); File.WriteAllText(Path.Combine(appDir, "t.exe"), "x");
+                Leftovers.ProgramRootsOverride = () => new List<string[]> { new[] { pf, "Program Files" } };
+                Leftovers.RootsOverride = () => new List<string[]>();
+                try
+                {
+                    var fake = new AppEntry { Name = "Common Files", Publisher = "Nobody", Location = common, PerUser = true };
+                    if (Win.IsWindows && Leftovers.ForApp(fake, new List<string>()).Any()) return "a per-user app got a Program Files folder offered";
+                    var machine = new AppEntry { Name = "Real Tool", Publisher = "Tools Inc", Location = appDir, PerUser = false };
+                    if (!Leftovers.ForApp(machine, new List<string>()).Any(l => l.Path.EndsWith("Real Tool"))) return "a real app's leftover wasn't offered";
+                    Leftovers.WindowsOwnedOverride = d => d.EndsWith("Real Tool");
+                    if (Leftovers.ForApp(machine, new List<string>()).Any()) return "a folder owned by Windows (TrustedInstaller) was offered";
+                    return null;
+                }
+                finally { Leftovers.ProgramRootsOverride = null; Leftovers.RootsOverride = null; Leftovers.WindowsOwnedOverride = null; if (Win.IsWindows) try { Directory.Delete(pf, true); } catch { } }
+            });
+
             Run(check, "PC health: Windows' pages opened by a link (ms-settings:, windowsdefender:) open with your normal rights, never as administrator (your own registry says what opens a link)", () =>
             {
                 if (!Win.IsWindows) return null;
@@ -232,14 +332,15 @@ namespace CDriveCleaner
             {
                 var words = new[] { "Choose a drive letter or a network folder (\\\\server\\share).", "Choose a real drive: that network path leads back to this PC.",
                     "Choose another drive: that one is really on C:.", "refused: a file with a second name (a hard link): shredding it would destroy the other one too",
-                    "refused: a link is in the way", "refused: one of Windows' or your main folders" };
+                    "refused: a link is in the way", "refused: one of Windows' or your main folders",
+                    "The hosts file changed since the check. Click Check now again.", "Runs a file from your folders through a Windows tool. Turn it off if you don't know it.", "...and 4 more", "A backup is already running." };
                 string keep = Lang.Code;
                 try
                 {
                     foreach (var lang in new[] { "he", "ar", "ru", "es" })
                     {
                         Lang.Init(lang);
-                        foreach (var w in words) { string t = Lang.T(w); if (t == w || t.Contains("refused") || t.Contains("hard link") || t.Contains("in the way")) return "not in " + lang + ": " + w + " -> " + t; }
+                        foreach (var w in words) { string t = Lang.T(w); if (t == w || t.Contains("refused") || t.Contains("hard link") || t.Contains("in the way") || t.Contains("more") || t.Contains("Check now")) return "not in " + lang + ": " + w + " -> " + t; }
                     }
                 }
                 finally { Lang.Init(keep); }
