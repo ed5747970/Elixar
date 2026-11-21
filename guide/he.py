@@ -2037,6 +2037,17 @@ HE.setdefault("Your organization's policy doesn't allow this.", 'מדיניות 
 HE.setdefault('Change the right-click menu', 'שינוי תפריט הקליק הימני')
 HE.setdefault("Tools > Right-click menu: turn entries apps added on or off (Windows' own switches; nothing is deleted).", 'כלים > תפריט קליק ימני: הפעלה או כיבוי של פריטים שאפליקציות הוסיפו (המתגים של Windows עצמו; שום דבר לא נמחק).')
 HE.setdefault("Tools > Backup: copies your folders to another drive, a USB disk or a network folder. Off by default on company PCs (company files on a USB disk are IT's call).", 'כלים > גיבוי: מעתיק את התיקיות שלך לכונן אחר, לדיסק USB או לתיקיית רשת. כבוי כברירת מחדל במחשבי חברה (קבצי חברה על דיסק USB הם החלטה של IT).')
+HE.setdefault('Choose a drive letter or a network folder (\\\\server\\share).', 'בחרו אות כונן או תיקיית רשת (\\\\server\\share).')
+HE.setdefault('Choose a real drive: that network path leads back to this PC.', 'בחרו כונן אמיתי: נתיב הרשת הזה מוביל חזרה למחשב הזה.')
+HE.setdefault('Choose another drive: that one is really on C:.', 'בחרו כונן אחר: הוא בעצם נמצא על C:.')
+HE.setdefault('a file with a second name (a hard link): shredding it would destroy the other one too', 'קובץ עם שם נוסף (קישור קשיח): גריסה שלו תהרוס גם את השני')
+HE.setdefault("one of Windows' or your main folders", 'אחת מהתיקיות של Windows או מהתיקיות הראשיות שלך')
+HE.setdefault("Windows', an app's or Elixar's own file", 'קובץ של Windows, של אפליקציה או של Elixar')
+HE.setdefault('a folder (pick the files inside)', 'תיקייה (בחרו את הקבצים שבתוכה)')
+HE.setdefault('not found', 'לא נמצא')
+HE.setdefault('a link', 'קישור')
+HE.setdefault('a system file', 'קובץ מערכת')
+HE.setdefault('a link is in the way', 'קישור חוסם את הדרך')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']
@@ -2440,7 +2451,7 @@ out += ['            // texts with numbers in them',
  '            Pat(@"Run TRIM on (\\w:)", m => "הרצת TRIM על " + m.Groups[1].Value);',
  '            Pat(@"Shred (\\d+) files?\\.\\.\\.", m => "גריסת " + m.Groups[1].Value + " קבצים...");',
  '            Pat(@"Pass (\\d+) of (\\d+): (.+) of (.+)", m => "סבב " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ": " + m.Groups[3].Value + " מתוך " + m.Groups[4].Value);',
- '            Pat(@"refused: (.+)", m => "נדחה: " + m.Groups[1].Value);',
+ '            Pat(@"refused: (.+)", m => "נדחה: " + T(m.Groups[1].Value));',
   '            Pat(@"Not sent: (.+)", m => "לא נשלח: " + m.Groups[1].Value);',
   '            Pat(@"(\\d+) folders?", m => m.Groups[1].Value + " תיקיות");',
  '            Pat(@"\\+(.+) in (\\d+) days?", m => "+" + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים");',

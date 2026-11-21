@@ -78,7 +78,7 @@ namespace CDriveCleaner
             bakDay.CheckedChanged += every; bakWeek.CheckedChanged += every; bakOff.CheckedChanged += every;
             btnBakNow.Click += (o, e) => RunBackupNow();
             btnBakStop.Click += (o, e) => { if (bakCts != null) bakCts.Cancel(); };
-            btnBakOpen.Click += (o, e) => { string d = Backup.Dest; if (!testMode && d.Length > 0) try { string r = Backup.Root(d); Shell.Open(Directory.Exists(r) ? r : d); } catch { } };
+            btnBakOpen.Click += (o, e) => { string d = Backup.Dest; if (!testMode && d.Length > 0) try { string r = Backup.Root(d), f = Directory.Exists(r) ? r : d; if (Directory.Exists(f)) Shell.Open(f.TrimEnd('\\') + "\\"); } catch { } };   // only a folder (the setting could name a program)
             ShowBackupLast();
         }
 

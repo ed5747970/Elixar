@@ -352,8 +352,10 @@ namespace CDriveCleaner
         // On Windows, Elixar runs as administrator. A web link, an .html file or "ms-settings:" opens with the program
         // registered for it under your account (HKCU), which any program you run can change: started from Elixar, that
         // program would get administrator rights. So everything is opened with your normal rights, through the desktop.
+        public static Action<string> OpenOverride;   // self-test: what would be opened
         public static void Open(string target)
         {
+            if (OpenOverride != null) { OpenOverride(target); return; }
             if (Win.IsWindows) Explorer("\"" + target.Replace("\"", "") + "\"");
             else Lx.Open(target);
         }

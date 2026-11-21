@@ -13,6 +13,10 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace CDriveCleaner
 {
@@ -96,16 +100,69 @@ namespace CDriveCleaner
             {
                 if (string.IsNullOrEmpty(dest)) return "Choose a drive or folder for the backup.";
                 if (!Path.IsPathRooted(dest)) return "Choose a whole path, like E:\\Backup.";
+                // only a drive letter or \\server\share: "\\?\", "\\.\" and device names can point anywhere, even into Windows
+                if (dest.StartsWith(@"\\?") || dest.StartsWith(@"\\.") || dest.StartsWith("//") || dest.StartsWith(@"\??") || dest.IndexOf(':', 2) >= 0)
+                    return "Choose a drive letter or a network folder (\\\\server\\share).";
                 string full = Path.GetFullPath(dest);
                 if (!Directory.Exists(full)) return "The backup drive isn't connected (" + full + ").";
                 bool network = full.StartsWith(@"\\");
+                if (network && LocalHost(full)) return "Choose a real drive: that network path leads back to this PC.";
                 if (!network && Win.IsWindows && string.Equals(Path.GetPathRoot(full), SystemRoot, StringComparison.OrdinalIgnoreCase))
                     return "Choose another drive: a backup on C: goes with C: if the drive fails.";
+                // a drive letter can really be a folder on C: (subst, a mounted folder, a link): where it really is decides
+                if (!network && OnSystemVolume(full)) return "Choose another drive: that one is really on C:.";
                 if (sources.Any(s => !string.IsNullOrEmpty(s) && (Inside(full, s) || Inside(s, full)))) return "The backup can't be inside a folder it backs up.";
                 if (Protect.IsProtected(full) && !network) return "Choose another folder: that one is Windows' or a main folder.";
                 return null;
             }
             catch (Exception e) { return e.Message; }
+        }
+
+        // the folder really is on the Windows drive (through subst, a mount point or a link)
+        public static Func<string, bool> OnSystemVolumeOverride;   // self-test
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr tmpl);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern uint GetFinalPathNameByHandleW(SafeFileHandle h, StringBuilder buf, uint size, uint flags);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool GetVolumeNameForVolumeMountPointW(string mount, StringBuilder name, uint size);
+        public static bool OnSystemVolume(string dir)
+        {
+            if (OnSystemVolumeOverride != null) return OnSystemVolumeOverride(dir);
+            if (!Win.IsWindows || SystemRootOverride != null) return false;   // the self-test names its own "system drive"
+            try
+            {
+                var sys = new StringBuilder(64);
+                if (!GetVolumeNameForVolumeMountPointW(SystemRoot.TrimEnd('\\') + "\\", sys, 64)) return true;   // can't tell: not allowed
+                using (var h = CreateFileW(@"\\?\" + Path.GetFullPath(dir), 0x80 /* read attributes */, 7, IntPtr.Zero, 3, 0x02000000 /* a folder */, IntPtr.Zero))
+                {
+                    if (h.IsInvalid) return true;
+                    var b = new StringBuilder(1024);
+                    uint n = GetFinalPathNameByHandleW(h, b, 1024, 1 /* VOLUME_NAME_GUID */);
+                    if (n == 0 || n >= 1024) return true;
+                    return b.ToString().StartsWith(sys.ToString().TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch { return true; }
+        }
+
+        // \\localhost\C$, \\127.0.0.1\..., \\<this PC's name>\...: a network path that leads back to this PC
+        public static bool LocalHost(string unc)
+        {
+            try
+            {
+                string host = unc.TrimStart('\\', '/').Split('\\', '/')[0].Trim('[', ']').ToLowerInvariant();
+                if (host.Length == 0 || host == "." || host == "?" || host == "localhost" || host.StartsWith("127.") || host == "::1" || host == "0.0.0.0" || host.EndsWith(".ipv6-literal.net")) return true;
+                string me = Environment.MachineName.ToLowerInvariant();
+                if (host == me || host.StartsWith(me + ".")) return true;
+                IPAddress ip;
+                if (!IPAddress.TryParse(host, out ip)) return false;
+                if (IPAddress.IsLoopback(ip)) return true;
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                    try { foreach (var a in ni.GetIPProperties().UnicastAddresses) if (a.Address.Equals(ip)) return true; } catch { }
+                return false;
+            }
+            catch { return true; }
         }
 
         public static string Root(string dest) { return Path.Combine(Path.Combine(dest, "Elixar Backup"), Safe(Environment.MachineName)); }

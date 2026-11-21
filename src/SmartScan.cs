@@ -244,6 +244,15 @@ namespace CDriveCleaner
             }
         }
 
+        // the same, for a file Elixar already has open (no name to swap in between)
+        public static uint LinksOf(Microsoft.Win32.SafeHandles.SafeFileHandle h)
+        {
+            if (!Win.IsWindows) return 1;
+            FILE_STANDARD_INFO i;
+            if (h == null || h.IsInvalid || !GetFileInformationByHandleEx(h, 1, out i, (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(FILE_STANDARD_INFO))) || i.Directory != 0) return 0;
+            return i.NumberOfLinks;
+        }
+
         // Windows' own compact.exe, a few files at a time; returns the space saved. A file with a second name (a hard link)
         // is skipped: that second name could be a Windows file, and Elixar runs as administrator.
         public static long Compress(List<string> paths, Action<string> log)

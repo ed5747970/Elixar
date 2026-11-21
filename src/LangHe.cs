@@ -2337,6 +2337,17 @@ namespace CDriveCleaner
             d["Change the right-click menu"] = "שינוי תפריט הקליק הימני";
             d["Tools > Right-click menu: turn entries apps added on or off (Windows' own switches; nothing is deleted)."] = "כלים > תפריט קליק ימני: הפעלה או כיבוי של פריטים שאפליקציות הוסיפו (המתגים של Windows עצמו; שום דבר לא נמחק).";
             d["Tools > Backup: copies your folders to another drive, a USB disk or a network folder. Off by default on company PCs (company files on a USB disk are IT's call)."] = "כלים > גיבוי: מעתיק את התיקיות שלך לכונן אחר, לדיסק USB או לתיקיית רשת. כבוי כברירת מחדל במחשבי חברה (קבצי חברה על דיסק USB הם החלטה של IT).";
+            d["Choose a drive letter or a network folder (\\\\server\\share)."] = "בחרו אות כונן או תיקיית רשת (\\\\server\\share).";
+            d["Choose a real drive: that network path leads back to this PC."] = "בחרו כונן אמיתי: נתיב הרשת הזה מוביל חזרה למחשב הזה.";
+            d["Choose another drive: that one is really on C:."] = "בחרו כונן אחר: הוא בעצם נמצא על C:.";
+            d["a file with a second name (a hard link): shredding it would destroy the other one too"] = "קובץ עם שם נוסף (קישור קשיח): גריסה שלו תהרוס גם את השני";
+            d["one of Windows' or your main folders"] = "אחת מהתיקיות של Windows או מהתיקיות הראשיות שלך";
+            d["Windows', an app's or Elixar's own file"] = "קובץ של Windows, של אפליקציה או של Elixar";
+            d["a folder (pick the files inside)"] = "תיקייה (בחרו את הקבצים שבתוכה)";
+            d["not found"] = "לא נמצא";
+            d["a link"] = "קישור";
+            d["a system file"] = "קובץ מערכת";
+            d["a link is in the way"] = "קישור חוסם את הדרך";
             // texts with numbers in them
             Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
             Pat(@"([^,]+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
@@ -2736,7 +2747,7 @@ namespace CDriveCleaner
             Pat(@"Run TRIM on (\w:)", m => "הרצת TRIM על " + m.Groups[1].Value);
             Pat(@"Shred (\d+) files?\.\.\.", m => "גריסת " + m.Groups[1].Value + " קבצים...");
             Pat(@"Pass (\d+) of (\d+): (.+) of (.+)", m => "סבב " + m.Groups[1].Value + " מתוך " + m.Groups[2].Value + ": " + m.Groups[3].Value + " מתוך " + m.Groups[4].Value);
-            Pat(@"refused: (.+)", m => "נדחה: " + m.Groups[1].Value);
+            Pat(@"refused: (.+)", m => "נדחה: " + T(m.Groups[1].Value));
             Pat(@"Not sent: (.+)", m => "לא נשלח: " + m.Groups[1].Value);
             Pat(@"(\d+) folders?", m => m.Groups[1].Value + " תיקיות");
             Pat(@"\+(.+) in (\d+) days?", m => "+" + m.Groups[1].Value + " תוך " + m.Groups[2].Value + " ימים");

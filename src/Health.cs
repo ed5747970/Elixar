@@ -713,7 +713,9 @@ namespace CDriveCleaner
             try
             {
                 if (p[0].EndsWith(".exe")) Process.Start(new ProcessStartInfo(Win.SystemExe(p[0]), p[1]) { UseShellExecute = false });
-                else Process.Start(new ProcessStartInfo(p[0]) { UseShellExecute = true });
+                // a link like ms-settings: is opened by File Explorer with your normal rights: Windows looks up what opens it in
+                // your own registry, which any program you run can change, and Elixar runs as administrator
+                else Shell.Open(p[0]);
                 return null;
             }
             catch (Exception ex) { return ex.Message; }

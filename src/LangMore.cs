@@ -366,6 +366,18 @@ namespace CDriveCleaner
             new[] { "Tools > Right-click menu: turn entries apps added on or off (Windows' own switches; nothing is deleted).", "الأدوات > قائمة النقر الأيمن: تشغيل أو إيقاف العناصر التي أضافتها التطبيقات (مفاتيح Windows نفسه؛ لا يُحذف شيء).", "Инструменты > Контекстное меню: включать и отключать пункты приложений (штатными средствами Windows; ничего не удаляется).", "Herramientas > Menú contextual: activar o desactivar entradas de aplicaciones (los interruptores de Windows; no se borra nada)." },
             new[] { "Tools > Backup: copies your folders to another drive, a USB disk or a network folder. Off by default on company PCs (company files on a USB disk are IT's call).", "الأدوات > النسخ الاحتياطي: ينسخ مجلداتك إلى محرك آخر أو قرص USB أو مجلد شبكة. متوقف افتراضيًا على أجهزة الشركة (ملفات الشركة على قرص USB قرار قسم تقنية المعلومات).", "Инструменты > Резервная копия: копирует ваши папки на другой диск, USB-диск или в сетевую папку. На компьютерах компании по умолчанию выключено (файлы компании на USB-диске решает ИТ-отдел).", "Herramientas > Copia de seguridad: copia tus carpetas a otra unidad, un disco USB o una carpeta de red. Desactivado por defecto en PCs de empresa (los archivos de la empresa en un USB los decide TI)." },
             new[] { "The check stopped: ", "توقف الفحص: ", "Проверка остановлена: ", "La revisión se detuvo: " },
+            new[] { "Choose a drive letter or a network folder (\\\\server\\share).", "اختر حرف محرك أو مجلد شبكة (\\\\server\\share).", "Выберите букву диска или сетевую папку (\\\\server\\share).", "Elige una letra de unidad o una carpeta de red (\\\\server\\share)." },
+            new[] { "Choose a real drive: that network path leads back to this PC.", "اختر محركًا حقيقيًا: مسار الشبكة هذا يعود إلى هذا الكمبيوتر.", "Выберите настоящий диск: этот сетевой путь ведёт обратно на этот ПК.", "Elige una unidad real: esa ruta de red lleva de vuelta a este PC." },
+            new[] { "Choose another drive: that one is really on C:.", "اختر محركًا آخر: هذا موجود فعليًا على C:.", "Выберите другой диск: на самом деле он находится на C:.", "Elige otra unidad: esa está en realidad en C:." },
+            new[] { "a file with a second name (a hard link): shredding it would destroy the other one too", "ملف باسم ثانٍ (رابط ثابت): تمزيقه سيُتلف الآخر أيضًا", "файл со вторым именем (жёсткая ссылка): уничтожение повредит и второй", "un archivo con un segundo nombre (vínculo físico): triturarlo destruiría también el otro" },
+            new[] { "one of Windows' or your main folders", "أحد مجلدات Windows أو مجلداتك الرئيسية", "одна из папок Windows или ваших главных папок", "una de las carpetas de Windows o tus carpetas principales" },
+            new[] { "Windows', an app's or Elixar's own file", "ملف خاص بـ Windows أو بتطبيق أو بـ Elixar", "файл Windows, приложения или самого Elixar", "un archivo de Windows, de una aplicación o de Elixar" },
+            new[] { "a folder (pick the files inside)", "مجلد (اختر الملفات بداخله)", "папка (выберите файлы внутри)", "una carpeta (elige los archivos de dentro)" },
+            new[] { "not found", "غير موجود", "не найден", "no encontrado" },
+            new[] { "a link", "رابط", "ссылка", "un vínculo" },
+            new[] { "a system file", "ملف نظام", "системный файл", "un archivo del sistema" },
+            new[] { "a link is in the way", "يوجد رابط في الطريق", "мешает ссылка", "hay un vínculo en medio" },
+            new[] { "ready", "جاهز", "готово", "listo" },
             new[] { "Dashboard", "لوحة التحكم", "Панель", "Panel" },
             new[] { "Apps", "التطبيقات", "Приложения", "Aplicaciones" },
             new[] { "Cleaner", "التنظيف", "Очистка", "Limpieza" },
@@ -679,6 +691,7 @@ namespace CDriveCleaner
             Pat(@"(\d+) entries added by apps, (\d+) broken \(in orange\): turn them off\.", m => w(m.Groups[1].Value + " عناصر أضافتها التطبيقات، " + m.Groups[2].Value + " معطلة (بالبرتقالي): أوقفها.", "Пунктов от приложений: " + m.Groups[1].Value + ", сломанных: " + m.Groups[2].Value + " (оранжевым): отключите их.", m.Groups[1].Value + " entradas añadidas por aplicaciones, " + m.Groups[2].Value + " rotas (en naranja): desactívalas."));
             Pat(@"(\d+) games, ([^;]+)\.", m => m.Groups[1].Value + w(" ألعاب، ", " игр, ", " juegos, ") + m.Groups[2].Value + ".");
             Pat(@"(\d+) games, (.+); (.+) in games not played for over 6 months \(in orange\)\.", m => m.Groups[1].Value + w(" ألعاب، ", " игр, ", " juegos, ") + m.Groups[2].Value + "; " + m.Groups[3].Value + w(" في ألعاب لم تُلعب منذ أكثر من 6 أشهر (بالبرتقالي).", " в играх, не запускавшихся более 6 месяцев (оранжевым).", " en juegos sin jugar en más de 6 meses (en naranja)."));
+            Pat(@"refused: (.+)", m => w("مرفوض: ", "Отклонено: ", "Rechazado: ") + T(m.Groups[1].Value));
             Pat(@"(\d+) PCs", m => m.Groups[1].Value + w(" أجهزة", " ПК", " equipos"));
             return d;
         }

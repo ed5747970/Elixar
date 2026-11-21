@@ -16,6 +16,7 @@ namespace CDriveCleaner
     {
         public string Name = "", Where = "", Kind = "", Hive = "", Key = "", Clsid = "", Program = "", Why = "";
         public bool Missing, Off, WindowsOwn;
+        public bool MachineClsid; public string MachineProgram = "";   // a handler: how the machine-wide registry (only administrators can change it) lists it
         public CheckLevel Level;
     }
 
@@ -47,7 +48,8 @@ namespace CDriveCleaner
             return write ? Registry.LocalMachine.CreateSubKey(BlockedPath) : Registry.LocalMachine.OpenSubKey(BlockedPath);
         }
 
-        static bool Exists(string p) { return ExistsOverride != null ? ExistsOverride(p) : File.Exists(p); }
+        // a network path is never opened (that would send your sign-in to that server): it counts as there
+        static bool Exists(string p) { return ExistsOverride != null ? ExistsOverride(p) : (p.StartsWith(@"\\") || p.StartsWith("//") || File.Exists(p)); }
 
         static readonly Regex Guid = new Regex(@"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$");
 
@@ -94,6 +96,7 @@ namespace CDriveCleaner
                                         if (!Guid.IsMatch(clsid)) continue;
                                         var e = new MenuEntry { Name = name.TrimStart('-'), Where = place[1], Kind = "Handler", Hive = c.Item1, Key = place[0] + @"\shellex\ContextMenuHandlers\" + name, Clsid = clsid };
                                         e.Program = Server(classes, clsid);
+                                        bool known; e.MachineProgram = MachineServer(classes, clsid, out known); e.MachineClsid = known;
                                         string friendly = ClsidName(classes, clsid); if (Guid.IsMatch(e.Name) && friendly.Length > 0) e.Name = friendly;
                                         e.Off = blocked.Contains(clsid);
                                         l.Add(e);
@@ -131,6 +134,24 @@ namespace CDriveCleaner
                 try { using (var k = c.Item2.OpenSubKey(@"CLSID\" + clsid + @"\InprocServer32")) { string p = k == null ? null : k.GetValue("") as string; if (!string.IsNullOrEmpty(p)) return Expand(p); } } catch { }
             return "";
         }
+        // the machine-wide registration of a handler (your own registry can override it, the machine's can't be changed by a program you run)
+        static string MachineServer(List<Tuple<string, RegistryKey>> classes, string clsid, out bool known)
+        {
+            known = false;
+            foreach (var c in classes.Where(x => x.Item1 == "HKLM"))
+                try
+                {
+                    using (var k = c.Item2.OpenSubKey(@"CLSID\" + clsid))
+                    {
+                        if (k == null) continue;
+                        known = true;
+                        using (var s = k.OpenSubKey("InprocServer32")) { string p = s == null ? null : s.GetValue("") as string; return string.IsNullOrEmpty(p) ? "" : Expand(p); }
+                    }
+                }
+                catch { known = true; }   // can't read it: treated as Windows' own
+            return "";
+        }
+
         static string ClsidName(List<Tuple<string, RegistryKey>> classes, string clsid)
         {
             foreach (var c in classes)
@@ -141,6 +162,9 @@ namespace CDriveCleaner
         public static void Judge(MenuEntry e)
         {
             e.WindowsOwn = Windows(e.Program);
+            // a handler the machine lists as Windows' own (or without a program file) stays Windows' own, whatever your own registry
+            // says: a program could otherwise dress up a Windows part as a broken app entry, and turning it off blocks it for everyone
+            if (e.Kind == "Handler" && e.MachineClsid && Windows(e.MachineProgram)) e.WindowsOwn = true;
             e.Missing = !e.WindowsOwn && e.Program.Length > 0 && Rooted(e.Program) && !Exists(e.Program);
             if (e.Missing && !e.Off) { e.Level = CheckLevel.Warn; e.Why = "Broken: its program is gone. Turn it off."; }
             else if (e.Off) { e.Level = CheckLevel.Ok; e.Why = "Turned off."; }
@@ -158,6 +182,10 @@ namespace CDriveCleaner
                 if (e.Kind == "Handler")
                 {
                     if (!Guid.IsMatch(e.Clsid)) return "not a handler";
+                    // checked again now, from the machine-wide registry
+                    var cl = Classes();
+                    try { bool known; string mp = MachineServer(cl, e.Clsid, out known); if (known && Windows(mp)) return "That's Windows' own entry: Elixar doesn't change it."; }
+                    finally { if (ClassesOverride == null) foreach (var c in cl) c.Item2.Dispose(); }
                     using (var b = Blocked(true))
                     {
                         if (off) b.SetValue(e.Clsid, e.Name, RegistryValueKind.String);

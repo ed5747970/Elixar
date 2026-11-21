@@ -218,6 +218,8 @@ namespace CDriveCleaner
                 if ((a & FileAttributes.ReparsePoint) != 0) return "a link";
                 if ((a & FileAttributes.System) != 0) return "a system file";
                 if (!SafeDelete.RealPathMatches(full)) return "a link is in the way";
+                // a second name (hard link) is the same data: overwriting this name would destroy the other one too (maybe a Windows file)
+                if (SmartScan.Links(full) != 1 && Win.IsWindows) return "a file with a second name (a hard link): shredding it would destroy the other one too";
                 return null;
             }
             catch (Exception e) { return e.Message; }
@@ -237,6 +239,7 @@ namespace CDriveCleaner
                 {
                     // held open with no sharing: check it is still the same file in the same place
                     if (Win.IsWindows && !SafeDelete.Same(SafeDelete.Final(fs.SafeFileHandle), expected)) { error = "a link is in the way"; return false; }
+                    if (Win.IsWindows && SmartScan.LinksOf(fs.SafeFileHandle) != 1) { error = "a file with a second name (a hard link): shredding it would destroy the other one too"; return false; }
                     size = fs.Length;
                     var buf = new byte[1 << 20];
                     for (int pass = 1; pass <= passes; pass++)

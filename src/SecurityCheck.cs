@@ -283,11 +283,13 @@ namespace CDriveCleaner
             // the same app in both lists: the newest use
             rows = rows.GroupBy(r => r.What + "|" + (r.Packaged ? r.Package : r.Path), StringComparer.OrdinalIgnoreCase).Select(g => g.OrderByDescending(r => r.LastUsed).First()).ToList();
             Dictionary<string, string[]> sig = null;
-            if (checkSignatures) try { sig = Trust.CheckMany(rows.Where(r => !r.Packaged && File.Exists(r.Path)).Select(r => r.Path)); } catch { }
+            // a network path is never opened: reaching for it would send your sign-in to that server (and could hang the check)
+            Func<string, bool> local = p => !Win.IsWindows || System.Text.RegularExpressions.Regex.IsMatch(p ?? "", @"^[A-Za-z]:\\[^:]*$");
+            if (checkSignatures) try { sig = Trust.CheckMany(rows.Where(r => !r.Packaged && local(r.Path) && File.Exists(r.Path)).Select(r => r.Path)); } catch { }
             foreach (var r in rows)
             {
                 string[] s; if (sig != null && sig.TryGetValue(r.Path, out s)) r.Signed = s[0];
-                r.Missing = !r.Packaged && !File.Exists(r.Path);
+                r.Missing = !r.Packaged && local(r.Path) && !File.Exists(r.Path);
                 Judge(r);
             }
             return rows.OrderByDescending(r => r.Level).ThenByDescending(r => r.LastUsed).ToList();

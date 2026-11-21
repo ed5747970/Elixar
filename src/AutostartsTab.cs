@@ -35,8 +35,8 @@ namespace CDriveCleaner
             btnAutoOff.Click += (o, e) => SwitchAutostarts(false);
             btnAutoOn.Click += (o, e) => SwitchAutostarts(true);
             btnAutoScan.Click += (o, e) => ScanAutostarts();
-            btnAutoTasks.Click += (o, e) => { try { System.Diagnostics.Process.Start(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe("taskschd.msc"))); } catch { } };
-            btnAutoServices.Click += (o, e) => { try { System.Diagnostics.Process.Start(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe("services.msc"))); } catch { } };
+            btnAutoTasks.Click += (o, e) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe("taskschd.msc"))) { UseShellExecute = false }); /* started directly, never through a file-type handler your own registry can change */ } catch { } };
+            btnAutoServices.Click += (o, e) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe("services.msc"))) { UseShellExecute = false }); /* started directly, never through a file-type handler your own registry can change */ } catch { } };
             chkAutoWindows.CheckedChanged += (o, e) => ShowAutostarts();
             UpdateAutoButtons();
         }
