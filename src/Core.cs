@@ -52,6 +52,7 @@ namespace CDriveCleaner
                 if ((new DirectoryInfo(path).Attributes & FileAttributes.ReparsePoint) != 0) return 0;
             }
             catch { return 0; }
+            if (Win.IsWindows) { long fast = FastSize(path); if (fast >= 0) return fast; }
 
             long total = 0;
             var stack = new Stack<string>();
@@ -75,6 +76,56 @@ namespace CDriveCleaner
                 catch { }
             }
             return total;
+        }
+
+        // ---- the same count, the fast way (Windows): one call per batch of names, with sizes and attributes, no short names ----
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct FindData
+        {
+            public uint Attributes; public long Created, Accessed, Written; public uint SizeHigh, SizeLow, Reserved0, Reserved1;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string Name;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)] public string ShortName;
+        }
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr FindFirstFileExW(string name, int infoLevel, out FindData data, int searchOp, IntPtr filter, int flags);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool FindNextFileW(IntPtr h, out FindData data);
+        [DllImport("kernel32.dll")] static extern bool FindClose(IntPtr h);
+        public static bool FastSizeOff;   // self-test: compare with the plain way
+        // -1: couldn't (the plain way is used then)
+        public static long FastSize(string path)
+        {
+            if (FastSizeOff) return -1;
+            try
+            {
+                long total = 0;
+                var stack = new Stack<string>(); stack.Push(Path.GetFullPath(path).TrimEnd('\\'));
+                bool first = true;
+                while (stack.Count > 0)
+                {
+                    string dir = stack.Pop();
+                    string q = (dir.Length > 240 && !dir.StartsWith(@"\\?\") ? (dir.StartsWith(@"\\") ? @"\\?\UNC\" + dir.Substring(2) : @"\\?\" + dir) : dir) + "\\*";
+                    FindData d;
+                    IntPtr h = FindFirstFileExW(q, 1 /* basic: no short names */, out d, 0, IntPtr.Zero, 2 /* large fetch */);
+                    if (h == new IntPtr(-1)) { if (first) return -1; continue; }   // the top one can't be read: the plain way decides
+                    first = false;
+                    try
+                    {
+                        do
+                        {
+                            if (d.Name == "." || d.Name == "..") continue;
+                            if ((d.Attributes & 0x10) != 0)   // a folder: never through a junction or link (nothing counted twice)
+                            {
+                                if ((d.Attributes & 0x400) == 0) stack.Push(dir + "\\" + d.Name);
+                            }
+                            else total += ((long)d.SizeHigh << 32) | d.SizeLow;
+                        }
+                        while (FindNextFileW(h, out d));
+                    }
+                    finally { FindClose(h); }
+                }
+                return total;
+            }
+            catch { return -1; }
         }
 
         public static string[] Children(string dir, string pattern)

@@ -342,7 +342,14 @@ namespace CDriveCleaner
             {
                 if (ProfileOverride != null) return ProfileOverride;
                 if (read) return profile;
-                read = true;
+                lock (profileLock) { if (read) return profile; string p = ReadProfile(); profile = p; read = true; return p; }
+            }
+        }
+        static readonly object profileLock = new object();
+        static string ReadProfile()
+        {
+            string profile;
+            {
                 if (!Win.IsWindows) return profile = null;
                 try
                 {
@@ -394,9 +401,14 @@ namespace CDriveCleaner
 
         static List<string> exact, subtree;
 
+        static readonly object initLock = new object();
         static void Init()
         {
-            if (exact != null) return;
+            if (subtree != null) return;
+            lock (initLock) { if (subtree == null) Build(); }
+        }
+        static void Build()
+        {
             var ex = new List<string>(); var sub = new List<string>();
             Func<Environment.SpecialFolder, string> F = f => { try { return Environment.GetFolderPath(f); } catch { return ""; } };
             string win = F(Environment.SpecialFolder.Windows);
@@ -422,7 +434,7 @@ namespace CDriveCleaner
                 if (!string.IsNullOrEmpty(users)) ex.Add(N(users));
             }
             if (Win.IsWindows) sub.Add(N(Install.Dir));
-            exact = ex.Distinct().ToList(); subtree = sub.Distinct().ToList();
+            exact = ex.Distinct().ToList(); subtree = sub.Distinct().ToList();   // subtree last: Init's "ready" sign
         }
 
         // true for Windows' own folders, drive roots and the main personal folders themselves
@@ -723,9 +735,17 @@ namespace CDriveCleaner
         static bool ready;
         static string chosen;
         public static string DataProblem;   // shown in the log when Elixar's data folder had to move
+        static readonly object dataLock = new object();
         public static string Data
         {
             get
+            {
+                if (chosen != null) return chosen;
+                lock (dataLock) return DataLocked();
+            }
+        }
+        static string DataLocked()
+        {
             {
                 if (!Win.IsWindows)
                 {

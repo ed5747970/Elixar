@@ -563,6 +563,8 @@ namespace CDriveCleaner
             return rows.Values.All(r => r.SubItems[3].Text.Length > 0);
         }
 
+        public static int MeasureThreads = Math.Max(2, Math.Min(4, Environment.ProcessorCount));
+
         void StartMeasure(Action after)
         {
             ready = false;
@@ -573,17 +575,23 @@ namespace CDriveCleaner
             lblScan.Text = "Scanning...";
             Task.Factory.StartNew(() =>
             {
-                foreach (var it in items)
+                // several at once: most of the time goes to waiting for the disk, and a slow one (Windows.old, developer caches)
+                // no longer holds up the rest
+                var opts = new ParallelOptions { MaxDegreeOfParallelism = MeasureThreads };
+                Parallel.ForEach(items.ToList(), opts, it =>
                 {
                     long v = 0;
+                    var one = Stopwatch.StartNew();
                     try { v = it.Measure(); }
                     catch (Exception ex) { Log("Could not measure " + it.Name + ": " + ex.Message); }
+                    if (one.Elapsed.TotalSeconds >= 5) Log("Measuring " + it.Name + " took " + one.Elapsed.TotalSeconds.ToString("0") + " s");
                     it.SizeUnknown = v < 0;
                     it.Size = Math.Max(0, v);
-                    var row = rows[it];
+                    ListViewItem row;
+                    if (!rows.TryGetValue(it, out row)) return;
                     string text = it.SizeUnknown ? "varies" : Fs.Fmt(it.Size);
                     UI(() => row.SubItems[2].Text = text);
-                }
+                });
             }, TaskCreationOptions.LongRunning).ContinueWith(t => UI(() =>
             {
                 ready = true;
