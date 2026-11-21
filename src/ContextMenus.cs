@@ -16,8 +16,8 @@ namespace CDriveCleaner
     {
         public string Name = "", Where = "", Kind = "", Hive = "", Key = "", Clsid = "", Program = "", Why = "", Command = "";
         public bool Missing, Off, WindowsOwn;
-        public bool MachineClsid; public string MachineProgram = "";
-        public List<string> Keys = new List<string>();   // a command shown once but registered in several places (Directory and Folder): all of them   // a handler: how the machine-wide registry (only administrators can change it) lists it
+        public bool MachineClsid; public string MachineProgram = "";   // a handler: how the machine-wide registry (only administrators can change it) lists it
+        public List<string> Keys = new List<string>();   // a command shown once but registered in several places (Directory and Folder): all of them
         public CheckLevel Level;
     }
 

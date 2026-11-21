@@ -2051,6 +2051,7 @@ HE.setdefault('a link is in the way', 'קישור חוסם את הדרך')
 HE.setdefault('A backup is already running.', 'גיבוי כבר רץ.')
 HE.setdefault('The hosts file changed since the check. Click Check now again.', 'קובץ ה-hosts השתנה מאז הבדיקה. לחצו שוב על בדוק עכשיו.')
 HE.setdefault("Runs a file from your folders through a Windows tool. Turn it off if you don't know it.", 'מריץ קובץ מהתיקיות שלך דרך כלי של Windows. כבו אותו אם אתם לא מכירים אותו.')
+HE.setdefault("the file couldn't be checked (in use?)", 'לא ניתן היה לבדוק את הקובץ (בשימוש?)')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']

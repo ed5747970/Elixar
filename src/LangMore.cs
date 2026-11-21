@@ -381,6 +381,7 @@ namespace CDriveCleaner
             new[] { "A backup is already running.", "النسخ الاحتياطي قيد التشغيل بالفعل.", "Копирование уже выполняется.", "Ya hay una copia en curso." },
             new[] { "The hosts file changed since the check. Click Check now again.", "تغير ملف hosts منذ الفحص. انقر افحص الآن مجددًا.", "Файл hosts изменился после проверки. Нажмите «Проверить» ещё раз.", "El archivo hosts cambió desde la revisión. Pulsa Revisar ahora otra vez." },
             new[] { "Runs a file from your folders through a Windows tool. Turn it off if you don't know it.", "يشغّل ملفًا من مجلداتك عبر أداة من Windows. أوقفه إن لم تكن تعرفه.", "Запускает файл из ваших папок через инструмент Windows. Отключите, если не знаете его.", "Ejecuta un archivo de tus carpetas mediante una herramienta de Windows. Desactívalo si no lo conoces." },
+            new[] { "the file couldn't be checked (in use?)", "تعذر فحص الملف (قيد الاستخدام؟)", "файл не удалось проверить (используется?)", "no se pudo comprobar el archivo (¿en uso?)" },
             new[] { "Dashboard", "لوحة التحكم", "Панель", "Panel" },
             new[] { "Apps", "التطبيقات", "Приложения", "Aplicaciones" },
             new[] { "Cleaner", "التنظيف", "Очистка", "Limpieza" },

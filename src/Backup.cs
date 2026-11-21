@@ -170,8 +170,7 @@ namespace CDriveCleaner
                     if (look.Wait(3000)) addrs.AddRange(look.Result);
                 }
                 var mine = new List<IPAddress>();
-                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-                    try { foreach (var a in ni.GetIPProperties().UnicastAddresses) mine.Add(a.Address); } catch { }
+                try { foreach (var ni in NetworkInterface.GetAllNetworkInterfaces()) try { foreach (var a in ni.GetIPProperties().UnicastAddresses) mine.Add(a.Address); } catch { } } catch { }
                 foreach (var a0 in addrs)
                 {
                     var a = a0.IsIPv4MappedToIPv6 ? a0.MapToIPv4() : a0;

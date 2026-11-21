@@ -2351,6 +2351,7 @@ namespace CDriveCleaner
             d["A backup is already running."] = "גיבוי כבר רץ.";
             d["The hosts file changed since the check. Click Check now again."] = "קובץ ה-hosts השתנה מאז הבדיקה. לחצו שוב על בדוק עכשיו.";
             d["Runs a file from your folders through a Windows tool. Turn it off if you don't know it."] = "מריץ קובץ מהתיקיות שלך דרך כלי של Windows. כבו אותו אם אתם לא מכירים אותו.";
+            d["the file couldn't be checked (in use?)"] = "לא ניתן היה לבדוק את הקובץ (בשימוש?)";
             // texts with numbers in them
             Pat(@"\.\.\.and (\d+) more", m => "...ועוד " + m.Groups[1].Value);
             Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
