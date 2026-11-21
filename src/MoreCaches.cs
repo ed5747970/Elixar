@@ -71,7 +71,21 @@ namespace CDriveCleaner
         }
         // only Chromium's own cache folders inside them (never Local Storage, IndexedDB or settings: those are your data)
         // and only right inside the app's folder: a "cache" deeper down belongs to the app itself, not to Chromium
-        static List<string> ElectronCaches() { return ElectronApps().SelectMany(a => Caches.ChromiumCaches(a[1], 0)).ToList(); }
+        static List<string> ElectronCaches() { return ElectronApps().SelectMany(a => Caches.ChromiumCaches(a[1], 0)).Where(RealChromiumCache).ToList(); }
+
+        // a folder called "Cache" (any case) is Chromium's web cache only when it is laid out like one: Cache_Data inside
+        // (Chromium 92 and later), or its index and data_0 files (older). An app's own "cache" folder, with its own data, isn't.
+        // The other names (Code Cache, GPUCache, DawnCache...) only Chromium makes.
+        public static bool RealChromiumCache(string dir)
+        {
+            if (!string.Equals(Path.GetFileName(dir), "Cache", StringComparison.OrdinalIgnoreCase)) return true;
+            try
+            {
+                return Directory.Exists(Path.Combine(dir, "Cache_Data")) ||
+                       (File.Exists(Path.Combine(dir, "index")) && File.Exists(Path.Combine(dir, "data_0")));
+            }
+            catch { return false; }
+        }
 
         // ---------- browser website storage (Service Worker) ----------
         public static Func<List<string>> BrowserRootsOverride;   // self-test: browsers' "User Data" folders
@@ -127,7 +141,7 @@ namespace CDriveCleaner
             string PD = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
             var l = new List<string>();
             foreach (var r in new[] { Path.Combine(L, "Battle.net"), Path.Combine(L, "Blizzard Entertainment"), Path.Combine(L, "Riot Games"), Path.Combine(L, "Ubisoft Game Launcher") })
-                l.AddRange(Caches.ChromiumCaches(r, 4));
+                l.AddRange(Caches.ChromiumCaches(r, 4).Where(RealChromiumCache));   // a launcher's own "cache" (game ownership, settings) stays
             l.Add(Path.Combine(L, "Roblox", "logs"));
             l.Add(Path.Combine(L, "Ubisoft Game Launcher", "logs"));
             l.Add(Path.Combine(L, "Riot Games", "Riot Client", "Logs"));
@@ -167,6 +181,18 @@ namespace CDriveCleaner
             return false;
         }
 
+        // an .exe counts as a setup file only when its name says so (setup / install, a version number, a build like x64);
+        // "putty.exe" or "procexp.exe" is a program you run from Downloads, not an installer
+        public static bool LooksInstaller(string file)
+        {
+            string ext = Path.GetExtension(file).ToLowerInvariant();
+            if (ext == ".msi" || ext == ".msix" || ext == ".msixbundle") return true;
+            if (ext != ".exe") return false;
+            string n = Path.GetFileNameWithoutExtension(file).ToLowerInvariant();
+            return Regex.IsMatch(n, @"setup|install") || Regex.IsMatch(n, @"\d+\.\d+") ||
+                   Regex.IsMatch(n, @"(^|[^a-z])(win32|win64|x64|x86|amd64|arm64|64-?bit|32-?bit)([^a-z]|$)");
+        }
+
         public static List<string> OldInstallers(DateTime now)
         {
             string dl = DownloadsOverride != null ? DownloadsOverride() : Path.Combine(UserDirs.Home ?? "", "Downloads");
@@ -181,8 +207,7 @@ namespace CDriveCleaner
             try { files = new DirectoryInfo(dl).GetFiles(); } catch { return l; }
             foreach (var f in files)
             {
-                string ext = f.Extension.ToLowerInvariant();
-                if (ext != ".exe" && ext != ".msi" && ext != ".msix" && ext != ".msixbundle") continue;
+                if (!LooksInstaller(f.Name)) continue;
                 if ((f.Attributes & FileAttributes.ReparsePoint) != 0 || (now - f.LastWriteTime).TotalDays < 60) continue;
                 string p = ProductOf(f.Name);
                 if (p.Length < 3) continue;

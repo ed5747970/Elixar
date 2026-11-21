@@ -107,7 +107,9 @@ namespace CDriveCleaner
                 while (stack.Count > 0)
                 {
                     string dir = stack.Pop();
-                    string q = (dir.Length > 240 && !dir.StartsWith(@"\\?\") ? (dir.StartsWith(@"\\") ? @"\\?\UNC\" + dir.Substring(2) : @"\\?\" + dir) : dir) + "\\*";
+                    // always the \\?\ form: no 260-character limit, and a name is taken as it is (without it Windows drops a
+                    // trailing dot or space, so "abc." would be read as a different folder "abc")
+                    string q = (!dir.StartsWith(@"\\?\") ? (dir.StartsWith(@"\\") ? @"\\?\UNC\" + dir.Substring(2) : @"\\?\" + dir) : dir) + "\\*";
                     FindData d;
                     IntPtr h = FindFirstFileExW(q, 1 /* basic: no short names */, out d, 0, IntPtr.Zero, 2 /* large fetch */);
                     if (h == new IntPtr(-1)) { if (first) return -1; continue; }   // the top one can't be read: the plain way decides

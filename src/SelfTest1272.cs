@@ -45,6 +45,13 @@ namespace CDriveCleaner
                 {
                     string deep = top; while (deep.Length < 300) deep = Path.Combine(deep, "a-rather-long-folder-name");
                     try { Directory.CreateDirectory(@"\\?\" + deep); File.WriteAllBytes(@"\\?\" + Path.Combine(deep, "deep.bin"), new byte[1234]); expect += 1234; } catch { }
+                    // a folder whose name ends in a dot, next to one without: each counted once, as itself
+                    try
+                    {
+                        Directory.CreateDirectory(@"\\?\" + Path.Combine(top, "dot.")); File.WriteAllBytes(@"\\?\" + Path.Combine(top, "dot.", "a.bin"), new byte[777]); expect += 777;
+                        Directory.CreateDirectory(Path.Combine(top, "dot")); File.WriteAllBytes(Path.Combine(top, "dot", "b.bin"), new byte[55]); expect += 55;
+                    }
+                    catch { }
                     // a junction to a big folder: not counted
                     string big = Path.Combine(R, "big"); Directory.CreateDirectory(big); File.WriteAllBytes(Path.Combine(big, "big.bin"), new byte[100000]);
                     try { Sys.Run("cmd.exe", "/c mklink /J \"" + Path.Combine(top, "link") + "\" \"" + big + "\"", 15000); } catch { }
@@ -74,6 +81,12 @@ namespace CDriveCleaner
                 // (even with a "Preferences" file and a "Cache" folder: only folders that only Chromium makes count)
                 string other = Path.Combine(roaming, "SomeTool"); Directory.CreateDirectory(Path.Combine(other, "Cache")); File.WriteAllText(Path.Combine(other, "Cache", "data.db"), "needed");
                 File.WriteAllText(Path.Combine(other, "Preferences"), "{}");
+                // an Electron app's own "cache" right inside it, not laid out like Chromium's, is the app's too
+                string figma = Path.Combine(roaming, "Figma"); File.WriteAllText(Path.Combine(Directory.CreateDirectory(figma).FullName, "Preferences"), "{}");
+                Directory.CreateDirectory(Path.Combine(figma, "GPUCache")); File.WriteAllBytes(Path.Combine(figma, "GPUCache", "data_1"), new byte[200]);
+                string own = Path.Combine(figma, "cache"); Directory.CreateDirectory(own); File.WriteAllText(Path.Combine(own, "offline.db"), "the app's");
+                if (MoreCaches.RealChromiumCache(own) || !MoreCaches.RealChromiumCache(Path.Combine(slack, "Cache")) || !MoreCaches.RealChromiumCache(Path.Combine(slack, "GPUCache")))
+                    return "Chromium's cache layout isn't told apart";
                 // an Electron app's own "cache" deeper down is the app's, not Chromium's
                 string plug = Path.Combine(slack, "plugins", "cache"); Directory.CreateDirectory(plug); File.WriteAllText(Path.Combine(plug, "x"), "the app's");
                 string discord = Path.Combine(roaming, "discord"); Directory.CreateDirectory(Path.Combine(discord, "Cache")); File.WriteAllText(Path.Combine(discord, "Preferences"), "{}");
@@ -81,9 +94,9 @@ namespace CDriveCleaner
                 try
                 {
                     var apps = MoreCaches.ElectronApps().Select(a => a[1]).ToList();
-                    if (apps.Count != 3 || !apps.Contains(slack) || !apps.Contains(notion) || !apps.Contains(vendorApp)) return "apps: " + string.Join(", ", apps.Select(Path.GetFileName));
+                    if (apps.Count != 4 || !apps.Contains(slack) || !apps.Contains(notion) || !apps.Contains(vendorApp) || !apps.Contains(figma)) return "apps: " + string.Join(", ", apps.Select(Path.GetFileName));
                     var item = MoreCaches.Items().First(i => i.Name.StartsWith("Other apps' web caches"));
-                    if (item.Measure() != 3 * 4000) return "measured " + item.Measure();
+                    if (item.Measure() != 3 * 4000 + 200) return "measured " + item.Measure();
                     item.Clean(x => { });
                     foreach (var app in new[] { slack, notion, vendorApp })
                     {
@@ -92,6 +105,8 @@ namespace CDriveCleaner
                     }
                     if (!File.Exists(Path.Combine(other, "Cache", "data.db"))) return "a non-Electron app's Cache folder was cleared";
                     if (!File.Exists(Path.Combine(plug, "x"))) return "a cache folder deeper inside an app was cleared";
+                    if (!File.Exists(Path.Combine(own, "offline.db"))) return "an app's own cache folder was cleared";
+                    if (File.Exists(Path.Combine(figma, "GPUCache", "data_1"))) return "the app's GPU cache was left";
                     return null;
                 }
                 finally { MoreCaches.ElectronRootsOverride = null; }
@@ -155,13 +170,15 @@ namespace CDriveCleaner
                 string chrome = make("ChromeSetup.exe", 90), vlc = make("vlc-3.0.20-win64.exe", 200), fresh = make("Firefox Installer.exe", 5), notInstalled = make("Blender-4.2-windows-x64.msi", 300),
                        doc = make("report.pdf", 300), bare = make("setup.exe", 300), app = make("App Installer.exe", 300),
                        part = make("art-studio-setup.exe", 300), git = make("Git-2.43.0-64-bit.exe", 300), earth = make("google-earth-pro-setup.exe", 300),
-                       gh = make("GitKraken-amd64.exe", 300), obs = make("OBS-Studio-30.0-Full-Installer-x64.exe", 300);
+                       gh = make("GitKraken-amd64.exe", 300), obs = make("OBS-Studio-30.0-Full-Installer-x64.exe", 300),
+                       putty = make("putty.exe", 300);
                 MoreCaches.DownloadsOverride = () => dl;
-                MoreCaches.InstalledOverride = () => new List<string> { "Google Chrome", "VLC media player", "Mozilla Firefox", "App Installer", "Samsung Smart Switch", "Git", "OBS Studio" };
+                MoreCaches.InstalledOverride = () => new List<string> { "Google Chrome", "VLC media player", "Mozilla Firefox", "App Installer", "Samsung Smart Switch", "Git", "OBS Studio", "PuTTY release 0.81 (64-bit)" };
                 try
                 {
                     if (MoreCaches.ProductOf("ChromeSetup.exe") != "chrome" || MoreCaches.ProductOf("vlc-3.0.20-win64.exe") != "vlc" || MoreCaches.ProductOf("Firefox Installer (1).exe") != "firefox") return "names: " + MoreCaches.ProductOf("ChromeSetup.exe") + "/" + MoreCaches.ProductOf("vlc-3.0.20-win64.exe");
                     if (MoreCaches.NameHas(new List<string> { "github", "desktop" }, "git") || !MoreCaches.NameHas(new List<string> { "google", "earth", "pro" }, "googleearth")) return "whole words";
+                    if (MoreCaches.LooksInstaller("putty.exe") || !MoreCaches.LooksInstaller("putty-64bit-0.81-installer.msi") || !MoreCaches.LooksInstaller("vlc-3.0.20-win64.exe")) return "setup files told apart";
                     var l = MoreCaches.OldInstallers(DateTime.Now).Select(Path.GetFileName).OrderBy(x => x).ToList();
                     if (string.Join(",", l) != "ChromeSetup.exe,Git-2.43.0-64-bit.exe,OBS-Studio-30.0-Full-Installer-x64.exe,vlc-3.0.20-win64.exe") return "found: " + string.Join(",", l);
                     var item = MoreCaches.Items().First(i => i.Name == "Old installers in Downloads");
