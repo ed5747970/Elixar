@@ -226,7 +226,7 @@ namespace CDriveCleaner
                 return null;
             });
 
-            Run(check, "Names with right-to-left letters (\"invoice\u202Efdp.exe\" shows as invoiceexe.pdf) are shown plainly and flagged in startup programs and browser extensions", () =>
+            Run(check, "Names with right-to-left letters (\"invoice[RLO]fdp.exe\" shows as invoiceexe.pdf) are shown plainly and flagged in startup programs and browser extensions", () =>
             {
                 string trick = "invoice\u202Efdp.exe";
                 if (!NameText.HasBidi(trick) || NameText.HasBidi("Google Chrome") || NameText.Plain(trick) != "invoice[?]fdp.exe" || NameText.Plain("a\r\nb") != "a  b") return "plain: " + NameText.Plain(trick);
