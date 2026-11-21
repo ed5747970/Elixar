@@ -137,8 +137,7 @@ namespace CDriveCleaner
 
         static string CachesSteam()
         {
-            try { using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam")) { var p = k == null ? null : k.GetValue("SteamPath") as string; if (!string.IsNullOrEmpty(p)) return p.Replace('/', '\\'); } } catch { }
-            return @"C:\Program Files (x86)\Steam";
+            return Caches.SteamPath();   // only a real Steam folder (the setting is in your own registry)
         }
 
         void ShowMove(List<UserFolder> folders, List<SteamGame> games, List<DriveInfo> drives)

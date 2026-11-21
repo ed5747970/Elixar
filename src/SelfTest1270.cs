@@ -257,6 +257,23 @@ namespace CDriveCleaner
                 finally { Leftovers.ProgramRootsOverride = null; Leftovers.RootsOverride = null; Leftovers.WindowsOwnedOverride = null; if (Win.IsWindows) try { Directory.Delete(pf, true); } catch { } }
             });
 
+            Run(check, "Steam caches: the Steam folder your own registry names is used only if it really is Steam's (Elixar empties caches in it as administrator)", () =>
+            {
+                string notSteam = Path.Combine(R, "NotSteam"), steam = Path.Combine(R, "RealSteam");
+                Directory.CreateDirectory(Path.Combine(notSteam, "appcache", "httpcache")); Directory.CreateDirectory(steam); File.WriteAllText(Path.Combine(steam, "steam.exe"), "x");
+                try
+                {
+                    Caches.SteamSettingOverride = () => notSteam;
+                    if (string.Equals(Caches.SteamPath(), notSteam, StringComparison.OrdinalIgnoreCase)) return "a folder without Steam in it was used";
+                    Caches.SteamSettingOverride = () => Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                    if (Win.IsWindows && string.Equals(Caches.SteamPath(), Environment.GetFolderPath(Environment.SpecialFolder.Windows), StringComparison.OrdinalIgnoreCase)) return "Windows' folder was used";
+                    Caches.SteamSettingOverride = () => steam.Replace('\\', '/');
+                    if (!string.Equals(Caches.SteamPath().TrimEnd('\\', '/'), steam.Replace('/', '\\').TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) && Win.IsWindows) return "the real Steam folder wasn't used: " + Caches.SteamPath();
+                    return null;
+                }
+                finally { Caches.SteamSettingOverride = null; }
+            });
+
             Run(check, "PC health: Windows' pages opened by a link (ms-settings:, windowsdefender:) open with your normal rights, never as administrator (your own registry says what opens a link)", () =>
             {
                 if (!Win.IsWindows) return null;

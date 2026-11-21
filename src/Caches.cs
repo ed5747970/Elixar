@@ -74,14 +74,21 @@ namespace CDriveCleaner
             return vers.OrderByDescending(x => x.Item1).Skip(1).Select(x => x.Item2).ToList();
         }
 
+        public static Func<string> SteamSettingOverride;   // self-test: what your registry says
         public static string SteamPath()
         {
             try
             {
-                using (var k = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
+                using (var k = SteamSettingOverride != null ? null : Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam"))
                 {
-                    var p = k == null ? null : k.GetValue("SteamPath") as string;
-                    if (!string.IsNullOrEmpty(p)) return p.Replace('/', '\\');
+                    var p = SteamSettingOverride != null ? SteamSettingOverride() : k == null ? null : k.GetValue("SteamPath") as string;
+                    // your own registry (any program you run can change it) names the folder whose caches Elixar empties as
+                    // administrator: only a real Steam folder counts
+                    if (!string.IsNullOrEmpty(p))
+                    {
+                        p = p.Replace('/', '\\');
+                        if (Path.IsPathRooted(p) && !p.StartsWith(@"\\") && !Protect.IsProtected(p) && File.Exists(Path.Combine(p, "steam.exe")) && SafeDelete.NoLinks(p)) return p;
+                    }
                 }
             }
             catch { }
