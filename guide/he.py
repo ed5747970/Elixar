@@ -2048,6 +2048,7 @@ HE.setdefault('not found', 'לא נמצא')
 HE.setdefault('a link', 'קישור')
 HE.setdefault('a system file', 'קובץ מערכת')
 HE.setdefault('a link is in the way', 'קישור חוסם את הדרך')
+HE.setdefault('A backup is already running.', 'גיבוי כבר רץ.')
 import json,sys
 def cs(s): return '"' + s.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n') + '"'
 out=['// Hebrew texts. Generated from guide/he.py; anything missing stays in English.','using System;','using System.Collections.Generic;','using System.Linq;','namespace CDriveCleaner','{','    public static partial class Lang','    {','        static Dictionary<string, string> BuildHebrew()','        {','            var d = new Dictionary<string, string>();']

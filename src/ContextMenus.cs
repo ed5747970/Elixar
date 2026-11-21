@@ -16,7 +16,8 @@ namespace CDriveCleaner
     {
         public string Name = "", Where = "", Kind = "", Hive = "", Key = "", Clsid = "", Program = "", Why = "";
         public bool Missing, Off, WindowsOwn;
-        public bool MachineClsid; public string MachineProgram = "";   // a handler: how the machine-wide registry (only administrators can change it) lists it
+        public bool MachineClsid; public string MachineProgram = "";
+        public List<string> Keys = new List<string>();   // a command shown once but registered in several places (Directory and Folder): all of them   // a handler: how the machine-wide registry (only administrators can change it) lists it
         public CheckLevel Level;
     }
 
@@ -124,7 +125,7 @@ namespace CDriveCleaner
             foreach (var e in l) Judge(e);
             // the same entry under Directory and Folder: one row
             return l.GroupBy(e => e.Kind + "|" + e.Hive + "|" + (e.Kind == "Handler" ? e.Clsid : e.Key.Split('\\').Last()) + "|" + e.Program, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => { var f = g.First(); f.Where = string.Join(", ", g.Select(x => x.Where).Distinct()); return f; })
+                    .Select(g => { var f = g.First(); f.Where = string.Join(", ", g.Select(x => x.Where).Distinct()); f.Keys = g.Select(x => x.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList(); f.Off = g.All(x => x.Off); Judge(f); return f; })
                     .OrderByDescending(e => e.Level).ThenBy(e => e.WindowsOwn).ThenBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         }
 
@@ -194,18 +195,23 @@ namespace CDriveCleaner
                 }
                 else
                 {
-                    if (!e.Key.Contains(@"\shell\") || e.Key.Contains("..")) return "not a command";
+                    var keys = e.Keys.Count > 0 ? e.Keys : new List<string> { e.Key };
+                    if (keys.Any(x => !x.Contains(@"\shell\") || x.Contains(".."))) return "not a command";
                     var classes = Classes();
                     try
                     {
                         var c = classes.FirstOrDefault(x => x.Item1 == e.Hive);
                         if (c == null) return "not found";
                         string root = c.Item1 == "HKLM" ? @"SOFTWARE\Classes\" : @"Software\Classes\";
-                        using (var k = ClassesOverride != null ? c.Item2.OpenSubKey(e.Key, true) : (c.Item1 == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser).OpenSubKey(root + e.Key, true))
-                        {
-                            if (k == null) return "The entry is gone.";
-                            if (off) k.SetValue("LegacyDisable", "", RegistryValueKind.String); else k.DeleteValue("LegacyDisable", false);
-                        }
+                        int done = 0;
+                        foreach (var key in keys)
+                            using (var k = ClassesOverride != null ? c.Item2.OpenSubKey(key, true) : (c.Item1 == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser).OpenSubKey(root + key, true))
+                            {
+                                if (k == null) continue;
+                                if (off) k.SetValue("LegacyDisable", "", RegistryValueKind.String); else k.DeleteValue("LegacyDisable", false);
+                                done++;
+                            }
+                        if (done == 0) return "The entry is gone.";
                     }
                     finally { if (ClassesOverride == null) foreach (var c in classes) c.Item2.Dispose(); }
                 }

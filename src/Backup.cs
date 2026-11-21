@@ -139,8 +139,13 @@ namespace CDriveCleaner
                     if (h.IsInvalid) return true;
                     var b = new StringBuilder(1024);
                     uint n = GetFinalPathNameByHandleW(h, b, 1024, 1 /* VOLUME_NAME_GUID */);
+                    if (n > 0 && n < 1024) return b.ToString().StartsWith(sys.ToString().TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+                    // a mapped network drive (Z: = \\server\share) has no volume name: where it really leads decides
+                    b.Length = 0; n = GetFinalPathNameByHandleW(h, b, 1024, 0 /* VOLUME_NAME_DOS */);
                     if (n == 0 || n >= 1024) return true;
-                    return b.ToString().StartsWith(sys.ToString().TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+                    string dos = b.ToString();
+                    if (dos.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) return LocalHost(@"\\" + dos.Substring(8));
+                    return true;
                 }
             }
             catch { return true; }
@@ -180,6 +185,19 @@ namespace CDriveCleaner
             r.Problem = folders.Count == 0 ? "Choose at least one folder to back up." : DestProblem(dest, folders.Select(f => f[2]));
             if (r.Problem != null) return r;
             string root = Root(dest), stamp = now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+            // one backup at a time (the daily one and "Back up now" would otherwise copy over each other's files)
+            bool mine;
+            using (var one = new Mutex(true, @"Local\ElixarBackup", out mine))
+            {
+                if (!mine) { try { mine = one.WaitOne(0); } catch (AbandonedMutexException) { mine = true; } }   // a run that crashed left it
+                if (!mine) { r.Problem = "A backup is already running."; return r; }
+                try { return RunLocked(root, stamp, folders, now, progress, ct, r, sw); }
+                finally { try { one.ReleaseMutex(); } catch { } }
+            }
+        }
+
+        static BackupResult RunLocked(string root, string stamp, List<string[]> folders, DateTime now, Action<string> progress, CancellationToken ct, BackupResult r, System.Diagnostics.Stopwatch sw)
+        {
             try { SafeFile.MakeDir(root); }
             catch (Exception e) { r.Problem = "Couldn't make the backup folder: " + e.Message; return r; }
             foreach (var f in folders)
@@ -237,8 +255,7 @@ namespace CDriveCleaner
                         var t = new FileInfo(target);
                         if (t.Exists && t.Length == f.Length && Math.Abs((t.LastWriteTimeUtc - f.LastWriteTimeUtc).TotalSeconds) < 2) { r.Kept++; continue; }
                         bool had = t.Exists;
-                        if (had) MoveAside(target, Path.Combine(versions, rel));
-                        CopyOne(f.FullName, target, f.LastWriteTimeUtc);
+                        CopyOne(f.FullName, target, f.LastWriteTimeUtc, Path.Combine(versions, rel));
                         if (had) r.Updated++; else r.Copied++;
                         r.Bytes += f.Length;
                         if (progress != null && (r.Copied + r.Updated) % 200 == 0) progress("Copied " + (r.Copied + r.Updated) + " files (" + Fs.Fmt(r.Bytes) + ")...");
@@ -269,13 +286,16 @@ namespace CDriveCleaner
 
         static bool IsInUse(IOException e) { int h = System.Runtime.InteropServices.Marshal.GetHRForException(e) & 0xFFFF; return h == 32 || h == 33; }
 
-        // the copy goes to a ".elixar-part" file first and gets its real name only when complete
-        static void CopyOne(string src, string target, DateTime mtimeUtc)
+        // the copy goes to a ".elixar-part" file first; only when it is complete does the older copy move to _versions and the
+        // new one get its real name. A file that can't be copied (in use, like an open Outlook file) keeps its last good copy.
+        static void CopyOne(string src, string target, DateTime mtimeUtc, string versionsDir)
         {
             string part = target + ".elixar-part";
-            if (File.Exists(part)) { if (Win.IsWindows) SafeDelete.Delete(part); else File.Delete(part); }
-            SafeFile.Copy(src, part);
-            File.SetLastWriteTimeUtc(part, mtimeUtc);
+            Action drop = () => { try { if (File.Exists(part)) { if (Win.IsWindows) SafeDelete.Delete(part); else File.Delete(part); } } catch { } };
+            drop();
+            try { SafeFile.Copy(src, part); File.SetLastWriteTimeUtc(part, mtimeUtc); }
+            catch { drop(); throw; }
+            if (File.Exists(target)) MoveAside(target, versionsDir);
             SafeFile.MoveInto(part, Path.GetDirectoryName(target), Path.GetFileName(target));
         }
 
@@ -324,8 +344,20 @@ namespace CDriveCleaner
             if (!Policy.Allowed("backup")) return "Your organization's policy doesn't allow this.";
             string ierr = Install.Ensure();
             if (ierr != null) return "Elixar could not put its protected copy in " + Install.Dir + ": " + ierr;
-            return Automation.RunSchtasks(CreateArgs(Install.Exe, Every, "13:17"), out o) == 0 ? null : "Windows didn't make the backup task: " + o;
+            if (Automation.RunSchtasks(CreateArgs(Install.Exe, Every, "13:17"), out o) != 0) return "Windows didn't make the backup task: " + o;
+            // schtasks.exe can't say "run as soon as possible after a missed time" or "also on battery": without them a PC
+            // that's off (or a laptop on battery) at 13:17 would never back up
+            if (Win.IsWindows && !Lx.On)
+            {
+                string r = Sys.RunPowerShell(CatchUpScript, 60000);
+                if (r.StartsWith("ERROR") || r.Contains("Exception")) ChangeLog.Add("Settings", "Backup: couldn't set the task to catch up", Task, "", "", r, true);
+            }
+            return null;
         }
+
+        public const string CatchUpScript = "$t = Get-ScheduledTask -TaskPath '\\Elixar\\' -TaskName 'Backup' -ErrorAction Stop; " +
+            "$t.Settings.StartWhenAvailable = $true; $t.Settings.DisallowStartIfOnBatteries = $false; $t.Settings.StopIfGoingOnBatteries = $false; " +
+            "Set-ScheduledTask -InputObject $t -ErrorAction Stop | Out-Null; 'ok'";
 
         // the scheduled run: quiet; a backup drive that isn't connected is said once every 3 days
         public static int Scheduled(Action<string> log)

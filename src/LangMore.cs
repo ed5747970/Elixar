@@ -378,6 +378,7 @@ namespace CDriveCleaner
             new[] { "a system file", "ملف نظام", "системный файл", "un archivo del sistema" },
             new[] { "a link is in the way", "يوجد رابط في الطريق", "мешает ссылка", "hay un vínculo en medio" },
             new[] { "ready", "جاهز", "готово", "listo" },
+            new[] { "A backup is already running.", "النسخ الاحتياطي قيد التشغيل بالفعل.", "Копирование уже выполняется.", "Ya hay una copia en curso." },
             new[] { "Dashboard", "لوحة التحكم", "Панель", "Panel" },
             new[] { "Apps", "التطبيقات", "Приложения", "Aplicaciones" },
             new[] { "Cleaner", "التنظيف", "Очистка", "Limpieza" },

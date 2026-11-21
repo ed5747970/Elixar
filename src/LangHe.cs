@@ -2348,6 +2348,7 @@ namespace CDriveCleaner
             d["a link"] = "קישור";
             d["a system file"] = "קובץ מערכת";
             d["a link is in the way"] = "קישור חוסם את הדרך";
+            d["A backup is already running."] = "גיבוי כבר רץ.";
             // texts with numbers in them
             Pat(@"(.+), and it can (.+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ", והוא יכול " + T(char.ToUpperInvariant(m.Groups[2].Value[0]) + m.Groups[2].Value.Substring(1)) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
             Pat(@"([^,]+)\. Remove it unless you added it yourself\.", m => T(m.Groups[1].Value) + ". הסירו אותו אלא אם הוספתם אותו בעצמכם.");
