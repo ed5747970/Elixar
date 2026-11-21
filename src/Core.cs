@@ -314,6 +314,16 @@ namespace CDriveCleaner
         }
 
         // a PowerShell string literal: PowerShell also ends a '...' string at the curly quotes, so those are doubled too
+        // on another computer: \\server\share, //server/share, \\?\UNC\..., or a device path that can lead anywhere (\\.\, \\?\GLOBALROOT)
+        public static bool IsNetworkPath(string p)
+        {
+            p = (p ?? "").Trim().Trim('"');
+            if (p.StartsWith("//")) return true;
+            if (!p.StartsWith(@"\\")) return false;
+            if (System.Text.RegularExpressions.Regex.IsMatch(p, @"^\\\\\?\\[A-Za-z]:\\")) return false;   // \\?\C:\... is a long local path
+            return true;
+        }
+
         public static string PsQuote(string v)
         {
             var sb = new StringBuilder("'");

@@ -19,6 +19,8 @@ static class CureServerMain
 
     static int Main(string[] args)
     {
+        // DLLs only from System32, and no folder links made without administrator rights (RedirectionGuard, Windows 11)
+        CDriveCleaner.Install.HardenDllSearch();
         if (args.Contains("--service") || (args.Length == 0 && !Environment.UserInteractive))   // the service is started with --service; msiexec/Intune/SCCM run the install options without a desktop
         { ServiceBase.Run(new CureServer.Service()); return 0; }
         try

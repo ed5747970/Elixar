@@ -126,7 +126,7 @@ namespace CDriveCleaner
             };
             e.File = StartupApps.ExeOf("\"" + expanded + "\"");
             e.Args = args;
-            e.Missing = Win.IsWindows && (e.File.Length == 0 || !File.Exists(e.File));
+            e.Missing = Win.IsWindows && (e.File.Length == 0 || (!Sys.IsNetworkPath(e.File) && !File.Exists(e.File)));   /* a network path is never reached for */
             // Windows' own: in Task Scheduler's \Microsoft\ folder AND running a program from Windows' folder (unwanted
             // software likes to hide in \Microsoft\ too, with a program somewhere else: that one is shown and checked)
             e.WindowsOwn = taskPath.StartsWith("\\Microsoft\\", StringComparison.OrdinalIgnoreCase) && UnderWindows(e.File);
@@ -230,7 +230,7 @@ namespace CDriveCleaner
                                 Command = Environment.ExpandEnvironmentVariables(img), Runs = Lang.Hebrew ? "אוטומטי" : "Automatic"
                             };
                             e.File = StartupApps.ExeOf(e.Command.StartsWith("\\??\\") ? e.Command.Substring(4) : e.Command);
-                            e.Missing = e.File.Length == 0 || !File.Exists(e.File);
+                            e.Missing = e.File.Length == 0 || (!Sys.IsNetworkPath(e.File) && !File.Exists(e.File));   /* a network path is never reached for */
                             e.ElixarOwn = IsElixar(e.File, null);
                             list.Add(e);
                         }

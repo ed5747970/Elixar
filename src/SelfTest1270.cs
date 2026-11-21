@@ -274,6 +274,43 @@ namespace CDriveCleaner
                 finally { Caches.SteamSettingOverride = null; }
             });
 
+            Run(check, "RedirectionGuard: on Windows that has it, Elixar never goes through a folder link made without administrator rights (the trick behind 2026's Defender and Windows Update holes)", () =>
+            {
+                if (!Win.IsWindows) return null;
+                Install.HardenJunctions();
+                bool? on = Install.JunctionGuardOn();
+                if (on == null) return null;   // this Windows doesn't have it yet
+                if (on != true) return "the guard is off (asked: " + Install.JunctionsHardened + ")";
+                return null;
+            });
+
+            Run(check, "Hosts file: lines from 2026's DNS-changer adware that block security sites (Avira, Dr.Web, Emsisoft, Safe Browsing...) are flagged", () =>
+            {
+                string hosts = Path.Combine(R, "hosts-adware");
+                File.WriteAllText(hosts, "127.0.0.1 localhost\r\n0.0.0.0 www.avira.com\r\n0.0.0.0 safebrowsing.googleapis.com\r\n127.0.0.1 download.drweb.com\r\n0.0.0.0 ads.example.net\r\n");
+                NetCheck.HostsOverride = hosts;
+                try
+                {
+                    int n; string p; var flagged = NetCheck.ReadHosts(out n, out p);
+                    var names = flagged.Select(f => f.Name).ToList();
+                    if (!names.Contains("www.avira.com") || !names.Contains("safebrowsing.googleapis.com") || !names.Contains("download.drweb.com")) return "not flagged: " + string.Join(", ", names);
+                    if (names.Contains("ads.example.net")) return "an ad-blocking line was flagged";
+                    return null;
+                }
+                finally { NetCheck.HostsOverride = null; }
+            });
+
+            Run(check, "Signature checks never reach for a file on another computer (that would send your Windows sign-in there)", () =>
+            {
+                if (!Sys.IsNetworkPath(@"\\attacker.invalid\share\x.exe") || !Sys.IsNetworkPath("//attacker.invalid/x.exe") || !Sys.IsNetworkPath(@"\\?\UNC\attacker.invalid\x.exe") || !Sys.IsNetworkPath(@"""\\attacker.invalid\x.exe""")) return "a network path not seen as one";
+                if (Sys.IsNetworkPath(@"C:\Program Files\x.exe") || Sys.IsNetworkPath(@"\\?\C:\Program Files\x.exe") || Sys.IsNetworkPath("notepad.exe")) return "a local path seen as network";
+                if (!Win.IsWindows) return null;
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var r = Trust.CheckMany(new[] { @"\\attacker.invalid\share\x.exe" });
+                if (r.Count != 0) return "it was checked: " + string.Join(",", r.Keys);
+                return null;
+            });
+
             Run(check, "PC health: Windows' pages opened by a link (ms-settings:, windowsdefender:) open with your normal rights, never as administrator (your own registry says what opens a link)", () =>
             {
                 if (!Win.IsWindows) return null;

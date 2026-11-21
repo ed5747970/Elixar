@@ -364,7 +364,9 @@ namespace CDriveCleaner
         // security programs' and Windows' update sites (blocked by unwanted software so protection goes stale)
         static readonly string[] Security = { "kaspersky.com", "kaspersky-labs.com", "eset.com", "avast.com", "avg.com", "bitdefender.com", "bitdefender.net", "malwarebytes.com", "mcafee.com", "norton.com",
             "symantec.com", "symantecliveupdate.com", "sophos.com", "trendmicro.com", "f-secure.com", "secureage.com", "virustotal.com", "windowsupdate.com", "update.microsoft.com",
-            "definitionupdates.microsoft.com", "wdcp.microsoft.com", "wd.microsoft.com", "smartscreen.microsoft.com", "go.microsoft.com", "download.windowsupdate.com" };
+            "definitionupdates.microsoft.com", "wdcp.microsoft.com", "wd.microsoft.com", "smartscreen.microsoft.com", "go.microsoft.com", "download.windowsupdate.com",
+            // also blocked by 2026's DNS-changer adware (it blocks the sites that would find it)
+            "avira.com", "drweb.com", "emsisoft.com", "gdatasoftware.com", "webroot.com", "pandasecurity.com", "comodo.com", "hitmanpro.com", "malwarebytes.org", "safebrowsing.googleapis.com", "eset.sk" };
 
         static bool Under(string name, string domain) { return name.Equals(domain, StringComparison.OrdinalIgnoreCase) || name.EndsWith("." + domain, StringComparison.OrdinalIgnoreCase); }
         static bool Blackhole(string ip) { return ip == "0.0.0.0" || ip == "::" || ip == "::1" || ip.StartsWith("127."); }

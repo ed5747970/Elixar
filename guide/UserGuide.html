@@ -45,7 +45,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.70</p></div>
+  <div><h1>Elixar User Guide</h1><p>The cure for a cluttered PC &middot; made by Elisar &middot; version 1.2.71</p></div>
 </div></header>
 <main class="wrap">
 
@@ -604,6 +604,7 @@
 <h2 id="history">Version history</h2>
 <table>
   <tr><th>Date</th><th>Version</th><th>Changes</th></tr>
+  <tr><td>2026-11-21</td><td>1.2.71</td><td>Checked against the security holes made public in August&ndash;November 2026: Elixar turns on Windows 11&rsquo;s RedirectionGuard (it never goes through a folder link made without administrator rights, the trick behind this year&rsquo;s Defender and Windows Update holes), also in the Cure services; signature checks and the Startup lists never reach for a file on another computer (that would send your Windows sign-in there, like November&rsquo;s Outlook hole); the hosts check also knows the security sites blocked by this year&rsquo;s DNS-changer adware.</td></tr>
   <tr><td>2026-11-21</td><td>1.2.70</td><td>Security review &ldquo;as an attacker&rdquo;: the backup refuses a destination that really leads into Windows (\\?\ paths, a network path back to this PC, a drive letter that is really a folder on C:); Shred never overwrites a file that has a second name (a hard link); the Right-click menu never blocks a Windows part dressed up as a broken app entry; links like ms-settings: from PC health open with your normal rights; network paths are never reached for while checking. Backup: a file in use (an open Outlook file) keeps its last good copy, two backups never run at once, the daily backup runs as soon as possible after a missed time and on battery, a mapped network drive works. Right-click menu: a command registered for folders in two places is turned off in both.</td></tr>
   <tr><td>2026-11-21</td><td>1.2.69</td><td>Four new Tools: Security check (browser extensions, which apps used the camera and microphone, the hosts file, DNS and proxy), Right-click menu (turn off entries apps added, flags broken ones), Games (Steam, Epic, GOG and Xbox, with when each was last played) and Backup (a plain copy of your folders on another drive, with 30 days of older versions). Policy manager: Change the right-click menu, Backup.</td></tr>
   <tr><td>2026-11-21</td><td>1.2.68</td><td>Growing fast: in Elixar for Private you choose what happens to an app&rsquo;s folder that keeps growing (just tell me, cap its size, delete files older than N days, or ignore). The daily check now finishes ProgramData and Windows first and tells you if it can&rsquo;t finish. A notice when C: loses 10 GB or more in a week. SecureAPlus&rsquo;s stuck uploads are recognised. Settings: Elixar&rsquo;s own sounds (Potion).</td></tr>

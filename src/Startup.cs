@@ -149,7 +149,7 @@ namespace CDriveCleaner
                                 e.File = t[0]; e.Command = ("\"" + t[0] + "\" " + t[1]).Trim();
                             }
                             else { e.File = file; e.Command = file; }
-                            e.Missing = e.File.Length == 0 || !System.IO.File.Exists(e.File);
+                            e.Missing = e.File.Length == 0 || (!Sys.IsNetworkPath(e.File) && !System.IO.File.Exists(e.File));   /* a network path is never reached for */
                             list.Add(e);
                         }
                     }
@@ -164,7 +164,7 @@ namespace CDriveCleaner
                                 if (name.Length == 0) continue;
                                 string cmd = (k.GetValue(name) ?? "").ToString();
                                 var e = new StartupEntry { Name = name, Command = cmd, Source = s.Id, Where = s.Label, ItemPath = name, File = ExeOf(cmd), Enabled = IsOn(ReadSwitch(s, name)) };
-                                e.Missing = e.File.Length == 0 || !System.IO.File.Exists(e.File);
+                                e.Missing = e.File.Length == 0 || (!Sys.IsNetworkPath(e.File) && !System.IO.File.Exists(e.File));   /* a network path is never reached for */
                                 list.Add(e);
                             }
                         }

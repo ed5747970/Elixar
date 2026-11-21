@@ -172,7 +172,9 @@ namespace CDriveCleaner
         public static Dictionary<string, string[]> CheckMany(IEnumerable<string> files)
         {
             var res = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-            var list = files.Where(f => !string.IsNullOrEmpty(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            // a file on another computer is never opened to check it: reaching for \\server\... sends your Windows sign-in
+            // there (the trick of November 2026's exploited Outlook hole), and a list in your own registry can name any server
+            var list = files.Where(f => !string.IsNullOrEmpty(f) && !Sys.IsNetworkPath(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (!Win.IsWindows || list.Count == 0) return res;
             // the file list goes in as quoted data, never as part of the script; in batches that fit one command line
             var outs = new StringBuilder();
@@ -977,6 +979,29 @@ namespace CDriveCleaner
             try { SetDllDirectoryW(""); } catch { }
             try { DllSearchHardened = SetDefaultDllDirectories(LoadFromSystem32); } catch { }   // Windows 8+, or 7 with KB2533623
             try { SetSearchPathMode(SafeSearchPermanent); } catch { }
+            HardenJunctions();
+        }
+
+        // RedirectionGuard (Windows 11): this process never goes through a folder link (junction) that someone without
+        // administrator rights made. That is the trick behind 2026's Defender and Windows Update holes (RedSun, ShieldBreak,
+        // CVE-2026-81963): a link swapped in while a program running as administrator works, sending its file work into
+        // Windows. Elixar already checks every path it changes; this makes Windows refuse such links for it too.
+        // Links Windows itself or an administrator made (Move off C:, the old "My Documents" ones) still work.
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetProcessMitigationPolicy(int policy, ref uint flags, IntPtr size);
+        [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetProcessMitigationPolicy(IntPtr process, int policy, ref uint flags, IntPtr size);
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+        const int ProcessRedirectionTrustPolicy = 16;
+        public static bool JunctionsHardened;   // for the self-test
+        public static void HardenJunctions()
+        {
+            if (!Win.IsWindows || JunctionsHardened) return;
+            try { uint enforce = 1; JunctionsHardened = SetProcessMitigationPolicy(ProcessRedirectionTrustPolicy, ref enforce, new IntPtr(4)); } catch { }
+        }
+        // Windows' own answer: is the guard on for this process? (null: this Windows doesn't have it)
+        public static bool? JunctionGuardOn()
+        {
+            if (!Win.IsWindows) return null;
+            try { uint f = 0; if (!GetProcessMitigationPolicy(GetCurrentProcess(), ProcessRedirectionTrustPolicy, ref f, new IntPtr(4))) return null; return (f & 1) != 0; } catch { return null; }
         }
     }
 }
