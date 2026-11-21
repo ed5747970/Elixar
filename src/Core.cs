@@ -79,10 +79,12 @@ namespace CDriveCleaner
         }
 
         // ---- the same count, the fast way (Windows): one call per batch of names, with sizes and attributes, no short names ----
+        // WIN32_FIND_DATAW exactly: its times are two 4-byte halves each (a "long" there would move every field after it
+        // by 4 bytes, and the names with it)
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         struct FindData
         {
-            public uint Attributes; public long Created, Accessed, Written; public uint SizeHigh, SizeLow, Reserved0, Reserved1;
+            public uint Attributes; public uint CreatedLo, CreatedHi, AccessedLo, AccessedHi, WrittenLo, WrittenHi; public uint SizeHigh, SizeLow, Reserved0, Reserved1;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string Name;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 14)] public string ShortName;
         }
@@ -91,6 +93,8 @@ namespace CDriveCleaner
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool FindNextFileW(IntPtr h, out FindData data);
         [DllImport("kernel32.dll")] static extern bool FindClose(IntPtr h);
         public static bool FastSizeOff;   // self-test: compare with the plain way
+        // self-test: the layout Windows writes into (592 bytes, the name at byte 44)
+        public static bool FindDataLayoutOk() { return Marshal.SizeOf(typeof(FindData)) == 592 && Marshal.OffsetOf(typeof(FindData), "Name").ToInt32() == 44; }
         // -1: couldn't (the plain way is used then)
         public static long FastSize(string path)
         {
@@ -113,6 +117,9 @@ namespace CDriveCleaner
                         do
                         {
                             if (d.Name == "." || d.Name == "..") continue;
+                            // a name that can't be one (empty, or with a separator in it) means the listing wasn't read right:
+                            // stop and let the plain way count (never go round the same folder again)
+                            if (string.IsNullOrEmpty(d.Name) || d.Name.IndexOf('\\') >= 0 || d.Name.IndexOf('/') >= 0) return -1;
                             if ((d.Attributes & 0x10) != 0)   // a folder: never through a junction or link (nothing counted twice)
                             {
                                 if ((d.Attributes & 0x400) == 0) stack.Push(dir + "\\" + d.Name);

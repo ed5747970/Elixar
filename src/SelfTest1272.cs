@@ -29,6 +29,9 @@ namespace CDriveCleaner
 
             Run(check, "Fast count: a folder's size comes out the same as the plain way (deep folders, long paths, links not followed)", () =>
             {
+                // Windows writes the listing into this layout: one field off and the names are read wrong (in 1.2.72's first
+                // build an empty name sent the count round the same folder forever)
+                if (!Fs.FindDataLayoutOk()) return "the folder-listing layout doesn't match Windows' (592 bytes, name at 44)";
                 string top = Path.Combine(R, "tree");
                 var rnd = new Random(7); long expect = 0;
                 for (int i = 0; i < 40; i++)
