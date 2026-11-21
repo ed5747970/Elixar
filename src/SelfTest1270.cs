@@ -36,7 +36,7 @@ namespace CDriveCleaner
                 var none = new string[0];
                 foreach (var bad in new[] { @"\\?\C:\Windows", @"\\.\C:\Windows", @"\\?\GLOBALROOT\Device\HarddiskVolume3\Windows", @"\??\C:\Windows", "//?/C:/Windows", @"E:\Backup:hidden" })
                     if (Backup.DestProblem(bad, none) == null) return "allowed: " + bad;
-                foreach (var host in new[] { @"\\localhost\C$\Windows", @"\\127.0.0.1\C$", @"\\127.0.0.2\share", @"\\[::1]\C$", @"\\" + Environment.MachineName + @"\C$", @"\\" + Environment.MachineName.ToLowerInvariant() + @".corp.local\C$", @"\\.\pipe\x" })
+                foreach (var host in new[] { @"\\localhost\C$\Windows", @"\\127.0.0.1\C$", @"\\127.0.0.2\share", @"\\[::1]\C$", @"\\" + Environment.MachineName + @"\C$", @"\\" + Environment.MachineName.ToLowerInvariant() + @".corp.local\C$", @"\\.\pipe\x", @"\\localhost.\C$", @"\\[::ffff:127.0.0.1]\C$", @"\\127.1\C$" })
                     if (!Backup.LocalHost(host)) return "not seen as this PC: " + host;
                 if (Backup.LocalHost(@"\\fileserver\backups") || Backup.LocalHost(@"\\10.20.30.40\backups")) return "a real server seen as this PC";
                 var keepRoot = Backup.SystemRootOverride;

@@ -35,8 +35,8 @@ namespace CDriveCleaner
             btnAutoOff.Click += (o, e) => SwitchAutostarts(false);
             btnAutoOn.Click += (o, e) => SwitchAutostarts(true);
             btnAutoScan.Click += (o, e) => ScanAutostarts();
-            btnAutoTasks.Click += (o, e) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe("taskschd.msc"))) { UseShellExecute = false }); /* started directly, never through a file-type handler your own registry can change */ } catch { } };
-            btnAutoServices.Click += (o, e) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe("services.msc"))) { UseShellExecute = false }); /* started directly, never through a file-type handler your own registry can change */ } catch { } };
+            btnAutoTasks.Click += (o, e) => { OpenConsole("taskschd.msc"); };
+            btnAutoServices.Click += (o, e) => { OpenConsole("services.msc"); };
             chkAutoWindows.CheckedChanged += (o, e) => ShowAutostarts();
             UpdateAutoButtons();
         }
@@ -106,6 +106,19 @@ namespace CDriveCleaner
             Log("Startup: tasks turned " + (on ? "on" : "off") + ": " + (sel.Count - errs.Count) + " of " + sel.Count + (errs.Count > 0 ? " (" + string.Join("; ", errs) + ")" : ""));
             if (errs.Count > 0) Lang.Box(this, string.Join("\n", errs), "Elixar", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ShowAutostarts(); UpdateAutoButtons();
+        }
+
+        // Task Scheduler / Services: mmc.exe started directly when Elixar runs as administrator (never through a file-type handler
+        // your own registry can change); otherwise through File Explorer with your normal rights, where Windows asks for permission
+        void OpenConsole(string msc)
+        {
+            if (testMode) return;
+            try
+            {
+                if (Sys.IsAdmin()) { using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Win.SystemExe("mmc.exe"), Sys.ArgQuote(Win.SystemExe(msc))) { UseShellExecute = false })) { } }
+                else Shell.Open(Win.SystemExe(msc));
+            }
+            catch { try { Shell.Open(Win.SystemExe(msc)); } catch { } }
         }
 
         void ScanAutostarts()

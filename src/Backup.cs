@@ -156,15 +156,27 @@ namespace CDriveCleaner
         {
             try
             {
-                string host = unc.TrimStart('\\', '/').Split('\\', '/')[0].Trim('[', ']').ToLowerInvariant();
+                string host = unc.TrimStart('\\', '/').Split('\\', '/')[0].Trim('[', ']').TrimEnd('.').ToLowerInvariant();
                 if (host.Length == 0 || host == "." || host == "?" || host == "localhost" || host.StartsWith("127.") || host == "::1" || host == "0.0.0.0" || host.EndsWith(".ipv6-literal.net")) return true;
                 string me = Environment.MachineName.ToLowerInvariant();
                 if (host == me || host.StartsWith(me + ".")) return true;
                 IPAddress ip;
-                if (!IPAddress.TryParse(host, out ip)) return false;
-                if (IPAddress.IsLoopback(ip)) return true;
+                var addrs = new List<IPAddress>();
+                if (IPAddress.TryParse(host, out ip)) addrs.Add(ip);
+                else
+                {
+                    // a name: what it leads to (an alias of this PC counts as this PC); a name that can't be looked up quickly isn't
+                    var look = System.Threading.Tasks.Task.Factory.StartNew(() => { try { return Dns.GetHostAddresses(host); } catch { return new IPAddress[0]; } });
+                    if (look.Wait(3000)) addrs.AddRange(look.Result);
+                }
+                var mine = new List<IPAddress>();
                 foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-                    try { foreach (var a in ni.GetIPProperties().UnicastAddresses) if (a.Address.Equals(ip)) return true; } catch { }
+                    try { foreach (var a in ni.GetIPProperties().UnicastAddresses) mine.Add(a.Address); } catch { }
+                foreach (var a0 in addrs)
+                {
+                    var a = a0.IsIPv4MappedToIPv6 ? a0.MapToIPv4() : a0;
+                    if (IPAddress.IsLoopback(a) || a.Equals(IPAddress.Any) || a.Equals(IPAddress.IPv6Any) || mine.Any(m => m.Equals(a))) return true;
+                }
                 return false;
             }
             catch { return true; }
