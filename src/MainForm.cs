@@ -573,6 +573,7 @@ namespace CDriveCleaner
             var watch = Stopwatch.StartNew();
             foreach (var r in rows.Values) { r.SubItems[2].Text = "scanning..."; r.SubItems[3].Text = ""; }
             lblScan.Text = "Scanning...";
+            var rowsNow = new Dictionary<CleanItem, ListViewItem>(rows);   // read by several threads at once: a copy nothing changes
             Task.Factory.StartNew(() =>
             {
                 // several at once: most of the time goes to waiting for the disk, and a slow one (Windows.old, developer caches)
@@ -588,7 +589,7 @@ namespace CDriveCleaner
                     it.SizeUnknown = v < 0;
                     it.Size = Math.Max(0, v);
                     ListViewItem row;
-                    if (!rows.TryGetValue(it, out row)) return;
+                    if (!rowsNow.TryGetValue(it, out row)) return;
                     string text = it.SizeUnknown ? "varies" : Fs.Fmt(it.Size);
                     UI(() => row.SubItems[2].Text = text);
                 });

@@ -149,7 +149,7 @@ namespace CDriveCleaner
                 try { items = Catalog.Build(); } catch (Exception ex) { check(false, "Building the list of items: " + ex.Message); }
                 if (items != null)
                 {
-                    check(items.Count(i => i.Drive == null) == 45 && items.Where(i => i.Privacy).All(i => !i.DefaultOn && i.Tier == Tier.Review), "List has 45 items (plus any for other drives); privacy items are never ticked for you" + (items.Count(i => i.Drive == null) == 45 ? "" : "  (" + items.Count(i => i.Drive == null) + ")"));
+                    check(items.Count(i => i.Drive == null) == 51 && items.Where(i => i.Privacy).All(i => !i.DefaultOn && i.Tier == Tier.Review), "List has 51 items (plus any for other drives); privacy items are never ticked for you" + (items.Count(i => i.Drive == null) == 51 ? "" : "  (" + items.Count(i => i.Drive == null) + ")"));
                     bool allOk = true;
                     foreach (var it in items)
                     {
@@ -498,8 +498,8 @@ namespace CDriveCleaner
                     var oldV = Caches.OldVersionFolders(vers).Select(Path.GetFileName).OrderBy(x => x).ToList();
                     check(oldV.Count == 2 && oldV.Contains("2.0.9") && oldV.Contains("2.1.287"), "Caches: keeps the newest app version, ignores other folders");
                     var cat = Catalog.Build();
-                    check(cat.Where(i => Caches.Items().Any(c => c.Name == i.Name)).All(i => !i.DefaultOn) && Automation.AutoItems().Count(i => !Automation.AutoLeftovers.Contains(i.Name)) == 11,
-                          "Caches: none are ticked by default and the weekly clean is unchanged");
+                    check(cat.Where(i => Caches.Items().Any(c => c.Name == i.Name)).All(i => !i.DefaultOn) && Automation.AutoItems().Count(i => !Automation.AutoLeftovers.Contains(i.Name)) == 12,
+                          "Caches: none are ticked by default and the weekly clean is the Safe ticked set (12, with AMD and Intel shaders since 1.2.72)");
                 } catch (Exception ex) { check(false, "Cache tests stopped: " + ex.GetType().Name + ": " + ex.Message); }
 
                 // 3j. system space helpers and duplicates

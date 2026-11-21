@@ -119,7 +119,7 @@ namespace CDriveCleaner
         public static long MeasureProtected(string path)
         {
             if (!Directory.Exists(path)) return 0;
-            long n = 0; BackupRights.With(() => n = Measure(path), null); return n;
+            long n = 0; BackupRights.ReadWith(() => n = Measure(path)); return n;
         }
 
         public static void Remove(string label, string path, Action<string> log)
@@ -167,15 +167,21 @@ namespace CDriveCleaner
             finally { CloseHandle(tok); }
         }
 
-        public static void With(Action work, Action<string> log)
+        public static void With(Action work, Action<string> log) { With(work, log, true); }
+        // only for reading (counting what's there): the right to write anywhere stays off. The rights are the whole program's,
+        // and other items are counted at the same time (1.2.72), so counting never switches on more than it needs.
+        public static void ReadWith(Action work) { With(work, null, false); }
+        public static bool RestoreOnForTest;   // self-test: what was switched on while the work ran
+        static void With(Action work, Action<string> log, bool write)
         {
-            if (!Win.IsWindows) { work(); return; }
+            if (!Win.IsWindows) { RestoreOnForTest = write; work(); return; }
             lock (gate)
             {
-                bool b = Set("SeBackupPrivilege", true), r = Set("SeRestorePrivilege", true);
+                RestoreOnForTest = write;
+                bool b = Set("SeBackupPrivilege", true), r = !write || Set("SeRestorePrivilege", true);
                 if (!(b && r) && log != null) log("  Windows' backup rights aren't available (Elixar isn't running as administrator?): protected files stay.");
                 try { work(); }
-                finally { Set("SeBackupPrivilege", false); Set("SeRestorePrivilege", false); }
+                finally { Set("SeBackupPrivilege", false); if (write) Set("SeRestorePrivilege", false); }
             }
         }
     }

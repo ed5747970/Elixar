@@ -333,7 +333,7 @@ namespace CDriveCleaner
     // (from HKLM\...\ProfileList, which only administrators can change); otherwise Windows' standard place is used.
     public static class UserDirs
     {
-        static string profile; static bool read;
+        static string profile; static volatile bool read;   // volatile: another thread that sees "read" sees the profile too
         public static string ProfileOverride;   // self-test
 
         public static string Profile
@@ -399,7 +399,7 @@ namespace CDriveCleaner
             return p.TrimEnd('\\', '/').ToLowerInvariant();
         }
 
-        static List<string> exact, subtree;
+        static List<string> exact; static volatile List<string> subtree;   // volatile: set last, so a thread that sees it sees "exact" too
 
         static readonly object initLock = new object();
         static void Init()
@@ -733,7 +733,7 @@ namespace CDriveCleaner
     public static class Paths
     {
         static bool ready;
-        static string chosen;
+        static volatile string chosen;
         public static string DataProblem;   // shown in the log when Elixar's data folder had to move
         static readonly object dataLock = new object();
         public static string Data

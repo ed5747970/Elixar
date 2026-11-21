@@ -68,7 +68,11 @@ namespace CDriveCleaner
                     File.WriteAllText(Path.Combine(app, "Preferences"), "{}");
                 }
                 // not Electron: a folder named Cache without Chromium's files next to it; and Discord (its own item)
+                // (even with a "Preferences" file and a "Cache" folder: only folders that only Chromium makes count)
                 string other = Path.Combine(roaming, "SomeTool"); Directory.CreateDirectory(Path.Combine(other, "Cache")); File.WriteAllText(Path.Combine(other, "Cache", "data.db"), "needed");
+                File.WriteAllText(Path.Combine(other, "Preferences"), "{}");
+                // an Electron app's own "cache" deeper down is the app's, not Chromium's
+                string plug = Path.Combine(slack, "plugins", "cache"); Directory.CreateDirectory(plug); File.WriteAllText(Path.Combine(plug, "x"), "the app's");
                 string discord = Path.Combine(roaming, "discord"); Directory.CreateDirectory(Path.Combine(discord, "Cache")); File.WriteAllText(Path.Combine(discord, "Preferences"), "{}");
                 MoreCaches.ElectronRootsOverride = () => new List<string> { roaming, local };
                 try
@@ -84,6 +88,7 @@ namespace CDriveCleaner
                         if (!File.Exists(Path.Combine(app, "Local Storage", "leveldb", "000003.log")) || !File.Exists(Path.Combine(app, "Preferences"))) return "your data was touched";
                     }
                     if (!File.Exists(Path.Combine(other, "Cache", "data.db"))) return "a non-Electron app's Cache folder was cleared";
+                    if (!File.Exists(Path.Combine(plug, "x"))) return "a cache folder deeper inside an app was cleared";
                     return null;
                 }
                 finally { MoreCaches.ElectronRootsOverride = null; }
@@ -109,6 +114,28 @@ namespace CDriveCleaner
                 finally { MoreCaches.BrowserRootsOverride = null; }
             });
 
+            Run(check, "Developer caches: Deno's downloads go, its scripts' saved data stays; never the pnpm store, Bun's or Yarn 2's cache (hard links / run from)", () =>
+            {
+                var l = MoreCaches.DevCaches();
+                if (l.Any(d => d.IndexOf("pnpm", StringComparison.OrdinalIgnoreCase) >= 0 || d.IndexOf(".bun", StringComparison.OrdinalIgnoreCase) >= 0 || d.IndexOf("Berry", StringComparison.OrdinalIgnoreCase) >= 0))
+                    return "listed: " + string.Join(", ", l);
+                if (l.Any(d => d.EndsWith("deno", StringComparison.OrdinalIgnoreCase) || d.IndexOf("location_data", StringComparison.OrdinalIgnoreCase) >= 0)) return "all of Deno's folder";
+                if (!l.Any(d => d.EndsWith(Path.Combine("deno", "deps"), StringComparison.OrdinalIgnoreCase))) return "Deno's downloads missing";
+                return null;
+            });
+
+            Run(check, "Counting Windows' protected leftovers switches on the right to read only, never the right to write (other items are counted at the same time)", () =>
+            {
+                string d = Path.Combine(R, "prot"); Directory.CreateDirectory(d); File.WriteAllBytes(Path.Combine(d, "a"), new byte[10]);
+                BackupRights.RestoreOnForTest = true;
+                long n = WinLeftovers.MeasureProtected(d);
+                if (n != 10) return "measured " + n;
+                if (BackupRights.RestoreOnForTest) return "the right to write was on while counting";
+                BackupRights.With(() => { }, null);
+                if (!BackupRights.RestoreOnForTest) return "removing lost its rights";
+                return null;
+            });
+
             Run(check, "Old JetBrains versions: the caches of older versions go, the newest of each IDE and Toolbox stay", () =>
             {
                 string jb = Path.Combine(R, "JetBrains");
@@ -123,14 +150,17 @@ namespace CDriveCleaner
                 string dl = Path.Combine(R, "Downloads"); Directory.CreateDirectory(dl);
                 Func<string, int, string> make = (n, days) => { string f = Path.Combine(dl, n); File.WriteAllBytes(f, new byte[100]); File.SetLastWriteTime(f, DateTime.Now.AddDays(-days)); return f; };
                 string chrome = make("ChromeSetup.exe", 90), vlc = make("vlc-3.0.20-win64.exe", 200), fresh = make("Firefox Installer.exe", 5), notInstalled = make("Blender-4.2-windows-x64.msi", 300),
-                       doc = make("report.pdf", 300), bare = make("setup.exe", 300), app = make("App Installer.exe", 300);
+                       doc = make("report.pdf", 300), bare = make("setup.exe", 300), app = make("App Installer.exe", 300),
+                       part = make("art-studio-setup.exe", 300), git = make("Git-2.43.0-64-bit.exe", 300), earth = make("google-earth-pro-setup.exe", 300),
+                       gh = make("GitKraken-amd64.exe", 300), obs = make("OBS-Studio-30.0-Full-Installer-x64.exe", 300);
                 MoreCaches.DownloadsOverride = () => dl;
-                MoreCaches.InstalledOverride = () => new List<string> { "Google Chrome", "VLC media player", "Mozilla Firefox", "App Installer" };
+                MoreCaches.InstalledOverride = () => new List<string> { "Google Chrome", "VLC media player", "Mozilla Firefox", "App Installer", "Samsung Smart Switch", "Git", "OBS Studio" };
                 try
                 {
                     if (MoreCaches.ProductOf("ChromeSetup.exe") != "chrome" || MoreCaches.ProductOf("vlc-3.0.20-win64.exe") != "vlc" || MoreCaches.ProductOf("Firefox Installer (1).exe") != "firefox") return "names: " + MoreCaches.ProductOf("ChromeSetup.exe") + "/" + MoreCaches.ProductOf("vlc-3.0.20-win64.exe");
+                    if (MoreCaches.NameHas(new List<string> { "github", "desktop" }, "git") || !MoreCaches.NameHas(new List<string> { "google", "earth", "pro" }, "googleearth")) return "whole words";
                     var l = MoreCaches.OldInstallers(DateTime.Now).Select(Path.GetFileName).OrderBy(x => x).ToList();
-                    if (string.Join(",", l) != "ChromeSetup.exe,vlc-3.0.20-win64.exe") return "found: " + string.Join(",", l);
+                    if (string.Join(",", l) != "ChromeSetup.exe,Git-2.43.0-64-bit.exe,OBS-Studio-30.0-Full-Installer-x64.exe,vlc-3.0.20-win64.exe") return "found: " + string.Join(",", l);
                     var item = MoreCaches.Items().First(i => i.Name == "Old installers in Downloads");
                     if (item.DefaultOn || item.Tier != Tier.Review) return "it would be ticked by itself";
                     return null;
@@ -142,7 +172,7 @@ namespace CDriveCleaner
             {
                 var names = Catalog.Build().Select(i => i.Name).ToList();
                 var want = new[] { "AMD and Intel shader cache", "Other apps' web caches (Slack, Notion, Signal...)", "Browser website storage (Service Worker caches)",
-                    "More developer caches (pnpm, Bun, Unity, Rust, old JetBrains)", "Game launcher caches (Battle.net, Riot, Ubisoft, Roblox, GOG)", "Old installers in Downloads" };
+                    "More developer caches (Deno, Unity, Rust, old JetBrains)", "Game launcher caches (Battle.net, Riot, Ubisoft, Roblox, GOG)", "Old installers in Downloads" };
                 if (!Lx.On || Catalog.WindowsOnLinux) foreach (var w in want) if (!names.Contains(w)) return "missing: " + w;
                 var crash = Catalog.Build().FirstOrDefault(i => i.Name == "Crash dumps");
                 if (crash != null && !crash.Where.Contains("LiveKernelReports")) return "LiveKernelReports not in crash dumps";

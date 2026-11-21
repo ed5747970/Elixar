@@ -1,7 +1,9 @@
 // 1.2.72: more things to clean.
 // - Other apps' web caches: any Electron app (Slack, Notion, Signal, Obsidian, Figma...) found by its folder layout, not by a list
 // - Browser website storage (Service Worker caches) in Chrome, Edge, Brave and Vivaldi: a review item, never ticked by itself
-// - More developer caches: pnpm, Bun, Yarn 2+, Deno, Unity, Rust sources, caches of old JetBrains IDE versions
+// - More developer caches: Deno, Unity, Rust sources, caches of old JetBrains IDE versions
+//   (not the pnpm store or Bun's cache: projects' files are hard links into them, so deleting frees almost nothing and
+//    the scan would promise space that never comes back; not Yarn 2+'s global cache: Plug'n'Play projects run straight from it)
 // - Game launcher caches and logs: Battle.net, Riot, Ubisoft Connect, Roblox, GOG Galaxy
 // (WSL disks are not shrunk: that means mounting a disk file from your folders as administrator, and a planted disk image
 //  is how March 2025's exploited NTFS holes were set off; WSL's own "sparse" option warns it can corrupt data)
@@ -35,13 +37,15 @@ namespace CDriveCleaner
             "google", "bravesoftware", "vivaldi", "opera software", "mozilla", "chromium", "electronic arts", "steam", "epicgameslauncher", "nvidia", "nvidia corporation",
             "claude", "packages", "temp", "programs", "battle.net", "blizzard entertainment", "riot games", "ubisoft game launcher", "roblox", "jetbrains", "unity" };
 
-        // an Electron app's own folder: Chromium's cache folders next to its "Preferences" or "Local State" file
+        // an Electron app's own folder: Chromium's cache folders next to its "Preferences" or "Local State" file.
+        // A plain "Cache" folder isn't enough (any app can have one, with its own data in it): it takes one only Chromium makes,
+        // GPUCache, Code Cache, or a Cache holding Chromium's Cache_Data.
         public static bool LooksElectron(string dir)
         {
             try
             {
                 bool marker = File.Exists(Path.Combine(dir, "Preferences")) || File.Exists(Path.Combine(dir, "Local State"));
-                bool cache = Directory.Exists(Path.Combine(dir, "Cache")) || Directory.Exists(Path.Combine(dir, "Code Cache")) || Directory.Exists(Path.Combine(dir, "GPUCache"));
+                bool cache = Directory.Exists(Path.Combine(dir, "GPUCache")) || Directory.Exists(Path.Combine(dir, "Code Cache")) || Directory.Exists(Path.Combine(dir, "Cache", "Cache_Data"));
                 return marker && cache;
             }
             catch { return false; }
@@ -66,7 +70,8 @@ namespace CDriveCleaner
             return found.GroupBy(f => f[1], StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
         }
         // only Chromium's own cache folders inside them (never Local Storage, IndexedDB or settings: those are your data)
-        static List<string> ElectronCaches() { return ElectronApps().SelectMany(a => Caches.ChromiumCaches(a[1], 1)).ToList(); }
+        // and only right inside the app's folder: a "cache" deeper down belongs to the app itself, not to Chromium
+        static List<string> ElectronCaches() { return ElectronApps().SelectMany(a => Caches.ChromiumCaches(a[1], 0)).ToList(); }
 
         // ---------- browser website storage (Service Worker) ----------
         public static Func<List<string>> BrowserRootsOverride;   // self-test: browsers' "User Data" folders
@@ -92,9 +97,11 @@ namespace CDriveCleaner
         public static List<string> DevCaches()
         {
             string L = UserDirs.Local, U = UserDirs.Home;
+            string deno = Path.Combine(L, "deno");
             var l = new List<string> {
-                Path.Combine(L, "pnpm", "store"), Path.Combine(L, "pnpm-store"), Path.Combine(U, ".bun", "install", "cache"), Path.Combine(L, "Yarn", "Berry", "cache"),
-                Path.Combine(L, "deno"), Path.Combine(L, "Unity", "cache"), Path.Combine(U, ".cargo", "registry", "src"), Path.Combine(U, ".cargo", "git", "checkouts"),
+                // Deno: only its downloads and compiled code (location_data is scripts' saved data, kept)
+                Path.Combine(deno, "deps"), Path.Combine(deno, "gen"), Path.Combine(deno, "npm"), Path.Combine(deno, "registries"), Path.Combine(deno, "remote"),
+                Path.Combine(L, "Unity", "cache"), Path.Combine(U, ".cargo", "registry", "src"), Path.Combine(U, ".cargo", "git", "checkouts"),
                 Path.Combine(L, "node-gyp", "Cache") };
             l.AddRange(OldJetBrains(Path.Combine(L, "JetBrains")));
             return l;
@@ -132,7 +139,7 @@ namespace CDriveCleaner
         public static Func<string> DownloadsOverride;          // self-test
         public static Func<List<string>> InstalledOverride;    // self-test: installed apps' names
         static readonly string[] SetupWords = { "setup", "installer", "install", "win64", "win32", "x64", "x86", "amd64", "arm64", "windows", "win", "full", "offline", "online", "web", "stub", "latest", "release", "stable", "user", "system",
-            "app", "the", "pro", "free", "tool", "tools", "client", "desktop", "update", "updater", "portable", "beta", "msi", "exe", "new", "my" };
+            "app", "the", "pro", "free", "tool", "tools", "client", "desktop", "update", "updater", "portable", "beta", "msi", "exe", "new", "my", "bit", "64bit", "32bit" };
 
         // "vlc-3.0.20-win64.exe" -> "vlc"; "ChromeSetup.exe" -> "chrome"; "Firefox Installer.exe" -> "firefox"
         public static string ProductOf(string file)
@@ -141,7 +148,23 @@ namespace CDriveCleaner
             n = Regex.Replace(n, @"\(\d+\)$", "");                                     // "setup (1)"
             n = Regex.Replace(n, @"([a-z])(setup|installer|install)\b", "$1 ");        // "chromesetup"
             var words = Regex.Split(n, @"[^a-z0-9]+").Where(w => w.Length > 0 && !SetupWords.Contains(w) && !Regex.IsMatch(w, @"^v?\d+$")).ToList();
-            return words.Count == 0 ? "" : words[0];
+            return string.Concat(words);   // "google-earth-pro-setup" -> "googleearth": all of it, so Google Chrome doesn't count for it
+        }
+
+        // the product is whole words of the app's name, one after another: "googleearth" in "Google Earth Pro", "chrome" in
+        // "Google Chrome"; "git" not in "GitHub Desktop", "art" not in "Samsung Smart Switch"
+        public static bool NameHas(List<string> words, string product)
+        {
+            for (int i = 0; i < words.Count; i++)
+            {
+                string acc = "";
+                for (int j = i; j < words.Count && acc.Length < product.Length; j++)
+                {
+                    acc += words[j];
+                    if (acc == product) return true;
+                }
+            }
+            return false;
         }
 
         public static List<string> OldInstallers(DateTime now)
@@ -152,7 +175,8 @@ namespace CDriveCleaner
             List<string> installed;
             try { installed = InstalledOverride != null ? InstalledOverride() : AppsData.ReadInstalled().Select(a => a.Name ?? "").ToList(); }
             catch { return l; }
-            var names = installed.Select(Leftovers.N).Where(n => n.Length >= 3).ToList();
+            // each installed app's name as words ("Google Chrome" -> google, chrome)
+            var names = installed.Select(a => Regex.Split((a ?? "").ToLowerInvariant(), "[^a-z0-9]+").Where(w => w.Length > 0).ToList()).Where(w => w.Count > 0).ToList();
             FileInfo[] files;
             try { files = new DirectoryInfo(dl).GetFiles(); } catch { return l; }
             foreach (var f in files)
@@ -162,7 +186,7 @@ namespace CDriveCleaner
                 if ((f.Attributes & FileAttributes.ReparsePoint) != 0 || (now - f.LastWriteTime).TotalDays < 60) continue;
                 string p = ProductOf(f.Name);
                 if (p.Length < 3) continue;
-                if (names.Any(n => n.Contains(p))) l.Add(f.FullName);
+                if (names.Any(n => NameHas(n, p))) l.Add(f.FullName);
             }
             return l;
         }
@@ -178,7 +202,7 @@ namespace CDriveCleaner
                     Procs = new[] { "chrome", "msedge", "brave", "vivaldi" },
                     Info = "Copies of websites' files that sites keep for themselves (often several GB). Sites download them again. Web apps you use offline lose their offline copy until you open them online. History, passwords and logins are kept. The browsers must be closed.",
                     Measure = () => MeasureAll(ServiceWorkerCaches()), Clean = log => ClearAll(ServiceWorkerCaches()) },
-                new CleanItem { Name = "More developer caches (pnpm, Bun, Unity, Rust, old JetBrains)", Tier = Tier.Safe, Where = @"pnpm\store, .bun\install\cache, Unity\cache, .cargo\registry\src, JetBrains\<older versions> ...",
+                new CleanItem { Name = "More developer caches (Deno, Unity, Rust, old JetBrains)", Tier = Tier.Safe, Where = @"deno\deps, Unity\cache, .cargo\registry\src, JetBrains\<older versions> ...",
                     Procs = new[] { "idea64", "pycharm64", "rider64", "webstorm64", "clion64", "goland64", "Unity" },
                     Info = "Download caches tools fill again when needed (needs internet), and the caches of JetBrains IDE versions you updated from (the newest of each is kept; settings are kept). Projects are not touched.",
                     Measure = () => DevCaches().Sum(d => Fs.SizeOf(d)), Clean = log => { foreach (var d in DevCaches()) { if (d.IndexOf(@"\JetBrains\", StringComparison.OrdinalIgnoreCase) >= 0) Fs.Delete(d); else Fs.ClearIn(d); } } },
