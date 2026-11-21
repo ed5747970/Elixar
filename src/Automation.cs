@@ -258,8 +258,10 @@ namespace CDriveCleaner
         }
 
         // ---------- what the scheduled runs do ----------
+        public static Action<string, string> NotifyOverride;   // self-test: what would be shown
         public static void Notify(string title, string text, ToolTipIcon kind, bool openOnClick)
         {
+            if (NotifyOverride != null) { NotifyOverride(title, text); return; }
             if (Lx.On) { Lx.Notify(Lang.T(title), Lang.T(text.Replace(" Click to open Elixar.", "")), kind != ToolTipIcon.Info); return; }
             using (var icon = new NotifyIcon())
             {

@@ -187,13 +187,32 @@ namespace CDriveCleaner
             string root = Root(dest), stamp = now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
             // one backup at a time (the daily one and "Back up now" would otherwise copy over each other's files)
             bool mine;
-            using (var one = new Mutex(true, @"Local\ElixarBackup", out mine))
+            Mutex one;
+            try { one = OneAtATime(out mine); }
+            catch (UnauthorizedAccessException) { r.Problem = BusyProblem; return r; }   // held by another Elixar we may not open: busy
+            using (one)
             {
                 if (!mine) { try { mine = one.WaitOne(0); } catch (AbandonedMutexException) { mine = true; } }   // a run that crashed left it
-                if (!mine) { r.Problem = "A backup is already running."; return r; }
+                if (!mine) { r.Problem = BusyProblem; return r; }
                 try { return RunLocked(root, stamp, folders, now, progress, ct, r, sw); }
                 finally { try { one.ReleaseMutex(); } catch { } }
             }
+        }
+
+        // the same lock for "Back up now" (as administrator) and the daily run (with your normal rights): made so that both may open it
+        static Mutex OneAtATime(out bool mine)
+        {
+            if (Win.IsWindows)
+                try
+                {
+                    var sec = new System.Security.AccessControl.MutexSecurity();
+                    var me = System.Security.Principal.WindowsIdentity.GetCurrent().User;
+                    sec.AddAccessRule(new System.Security.AccessControl.MutexAccessRule(me, System.Security.AccessControl.MutexRights.Synchronize | System.Security.AccessControl.MutexRights.Modify, System.Security.AccessControl.AccessControlType.Allow));
+                    return new Mutex(true, @"Local\ElixarBackup", out mine, sec);
+                }
+                catch (UnauthorizedAccessException) { throw; }
+                catch { }
+            return new Mutex(true, @"Local\ElixarBackup", out mine);
         }
 
         static BackupResult RunLocked(string root, string stamp, List<string[]> folders, DateTime now, Action<string> progress, CancellationToken ct, BackupResult r, System.Diagnostics.Stopwatch sw)
@@ -355,6 +374,7 @@ namespace CDriveCleaner
             return null;
         }
 
+        public const string BusyProblem = "A backup is already running.";
         public const string CatchUpScript = "$t = Get-ScheduledTask -TaskPath '\\Elixar\\' -TaskName 'Backup' -ErrorAction Stop; " +
             "$t.Settings.StartWhenAvailable = $true; $t.Settings.DisallowStartIfOnBatteries = $false; $t.Settings.StopIfGoingOnBatteries = $false; " +
             "Set-ScheduledTask -InputObject $t -ErrorAction Stop | Out-Null; 'ok'";
@@ -367,6 +387,7 @@ namespace CDriveCleaner
             if (!Policy.Allowed("backup")) { if (log != null) log("Backup: not allowed by the policy."); return 0; }
             var r = Run(dest, Chosen, DateTime.Now, null, CancellationToken.None);
             if (log != null) log("Backup: " + r.Summary());
+            if (r.Problem == BusyProblem) return 0;   // "Back up now" is running: that one is the backup of today
             if (r.Problem != null)
             {
                 DateTime told; bool recent = DateTime.TryParse(Settings.Get("BackupToldMissing", ""), CultureInfo.InvariantCulture, DateTimeStyles.None, out told) && (DateTime.Now - told).TotalDays < 3;

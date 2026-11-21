@@ -300,6 +300,16 @@ namespace CDriveCleaner
                     {
                         var busy = Backup.Run(dest, new[] { "Documents" }, DateTime.Now.AddSeconds(6), null, System.Threading.CancellationToken.None);
                         if (busy.Problem == null || !busy.Problem.Contains("already running")) return "two backups ran at once: " + busy.Problem;
+                        // the daily run finding "Back up now" busy says nothing (that one is today's backup)
+                        string keepDest = Backup.Dest, keepEvery = Backup.Every, keepTold = Settings.Get("BackupToldMissing", "");
+                        var told = new List<string>();
+                        Automation.NotifyOverride = (a, b) => told.Add(a + ": " + b);
+                        try
+                        {
+                            Backup.Dest = dest; Backup.Every = "day"; Settings.Set("BackupToldMissing", "");
+                            if (Backup.Scheduled(null) != 0 || told.Count > 0) return "the daily run complained: " + string.Join("; ", told);
+                        }
+                        finally { Automation.NotifyOverride = null; Backup.Dest = keepDest; Backup.Every = keepEvery; Settings.Set("BackupToldMissing", keepTold); }
                     }
                     finally { done.Set(); t.Join(10000); }
                     var after = Backup.Run(dest, new[] { "Documents" }, DateTime.Now.AddSeconds(9), null, System.Threading.CancellationToken.None);
