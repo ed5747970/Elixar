@@ -24,7 +24,7 @@ namespace CDriveCleaner
         public static string WriteTemp()
         {
             string path = Path.Combine(UserDirs.Temp, "Elixar-User-Guide-" + Guid.NewGuid().ToString("N").Substring(0, 12) + ".html");
-            using (var fs = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+            using (var fs = SafeFile.CreateNew(path))   // and not through a link put in place of your Temp folder (Elixar is administrator)
             using (var w = new StreamWriter(fs, new UTF8Encoding(true))) w.Write(Html());
             return path;
         }
