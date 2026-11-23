@@ -174,6 +174,18 @@ jobs:
           & .\tools\netwatch.ps1 check
           Check "network watch: Elixar, Cure Agent and Cure Server connected only to this PC (Windows' firewall audit, event 5156)" ($LASTEXITCODE -eq 0)
 
+          # 6b. an attacker without administrator rights repairs the program (Windows runs repairs as SYSTEM) and gives a server
+          # of their own: the agent must not be pointed there, and its service must stay as it was
+          Copy-Item "$PWD\Elixar-Business.msi" 'C:\Users\Public\e2e-repair.msi' -Force
+          $binBefore = (Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName
+          $rp = Start-Process msiexec.exe -Credential $script:viewer -WorkingDirectory 'C:\Users\Public' -ArgumentList '/fa "C:\Users\Public\e2e-repair.msi" /qn CUREAGENT=1 CURESERVER=https://attacker.invalid:9/ CURETOKEN=stolen CURETHUMBPRINT=0000000000000000000000000000000000000000 /l*v "C:\Users\Public\e2e-repair.log"' -Wait -PassThru -ErrorAction SilentlyContinue
+          Write-Host "repair by a plain user: exit $(if ($rp) { $rp.ExitCode } else { 'not started' })"
+          if (Test-Path 'C:\Users\Public\e2e-repair.log') { Write-Host (Select-String -Path 'C:\Users\Public\e2e-repair.log' -Pattern 'InstallCureAgent|CURESERVER' -SimpleMatch | Select-Object -First 8 | Out-String) }
+          $own = Get-ItemProperty 'HKLM:\SOFTWARE\Elixar\Cure' -ErrorAction SilentlyContinue
+          Check "a plain user's repair can't point the agent at another server" (-not ($own -and "$($own.Server)" -match 'attacker')) "$($own.Server)"
+          Check "a plain user's repair leaves the agent service as it was" ((Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName -eq $binBefore)
+          Remove-Item 'C:\Users\Public\e2e-repair.msi', 'C:\Users\Public\e2e-repair.log' -Force -ErrorAction SilentlyContinue
+
           # 7. uninstall: nothing is left behind (the reports stay unless --purge)
           $code = Msi "/x `"$PWD\Elixar-Business.msi`"" 'msi-remove.log'
           Check "MSI uninstall" ($code -eq 0) "exit $code"

@@ -150,7 +150,10 @@ namespace CDriveCleaner
                 Mutex m = null; bool owned = false;
                 try
                 {
-                    try { m = new Mutex(false, @"Global\Elixar-ChangeLog"); owned = m.WaitOne(3000); } catch (AbandonedMutexException) { owned = true; } catch { }
+                    // the lock only keeps two Elixars from writing at once. Something that holds it and never lets go would make every
+                    // change wait: after one wait that came to nothing, the next ones don't wait (the log is still written)
+                    int wait = (DateTime.UtcNow - lastStuck).TotalMinutes < 10 ? 0 : 3000;
+                    try { m = new Mutex(false, @"Global\Elixar-ChangeLog"); owned = m.WaitOne(wait); if (!owned && wait > 0) lastStuck = DateTime.UtcNow; } catch (AbandonedMutexException) { owned = true; } catch { }
                     string f = File_;
                     try { var fi = new FileInfo(f); if (fi.Exists && fi.Length > MaxBytes) { string old = OldFile(f); if (File.Exists(old)) File.Delete(old); File.Move(f, old); } } catch { }
                     Append(f, line + "\n");
@@ -172,6 +175,9 @@ namespace CDriveCleaner
             WinEvents.Write(e);   // and in Windows' Event Log, for the company's security tools
             return e;
         }
+
+        static DateTime lastStuck = DateTime.MinValue;
+        public static void ResetStuckForTest() { lastStuck = DateTime.MinValue; }
 
         static void Append(string f, string text)
         {

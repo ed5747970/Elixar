@@ -62,7 +62,9 @@
       <Custom Action="RemoveSchedules" After="InstallInitialize">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
       <Custom Action="RemoveCureAgent" After="RemoveSchedules">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
       <Custom Action="RemoveCureServer" After="RemoveCureAgent">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
-      <Custom Action="InstallCureAgent" After="InstallFiles">(CUREAGENT="1" OR CURESERVER) AND NOT REMOVE</Custom>
+      <!-- only on a new install or an upgrade (done by an administrator, Intune or SCCM), never on a repair: any user may
+           repair a per-machine program, Windows runs the repair as SYSTEM, and the agent must not be pointed anywhere by it -->
+      <Custom Action="InstallCureAgent" After="InstallFiles">(CUREAGENT="1" OR CURESERVER) AND NOT Installed AND NOT REMOVE</Custom>
     </InstallExecuteSequence>
   </Product>
 </Wix>

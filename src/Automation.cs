@@ -206,10 +206,23 @@ namespace CDriveCleaner
         }
 
         // ---------- Task Scheduler ----------
+        // the last check before Task Scheduler gets a task with administrator rights: it may only start Elixar's launcher in
+        // Program Files (which starts the protected copy). Every schedule already does; this keeps a future mistake from
+        // making a task that runs, as administrator, a copy any program can replace.
+        public static bool ElevatedTaskOk(string args)
+        {
+            if (args == null || !Win.IsWindows || args.IndexOf("/Create", StringComparison.OrdinalIgnoreCase) < 0 ||
+                args.IndexOf("/RL HIGHEST", StringComparison.OrdinalIgnoreCase) < 0) return true;
+            string tr = "/TR " + Quote("\"" + Install.CmdExe + "\" /d /c \"\"" + Install.Launcher + "\" ");
+            tr = tr.Substring(0, tr.Length - 1);   // the value goes on with the argument
+            return args.IndexOf(tr, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public static int RunSchtasks(string args, out string output)
         {
             output = "";
             if (Lx.On) { int lc = LxTimers.Apply(args, out output); ChangeLog.Command("schtasks", args, output, lc); return lc; }
+            if (!ElevatedTaskOk(args)) { output = "refused: a task with administrator rights may only start Elixar's protected copy"; ChangeLog.Command("schtasks.exe", args, output, -1); return -1; }
             try
             {
                 var psi = new ProcessStartInfo(Win.SystemExe("schtasks.exe"), args)

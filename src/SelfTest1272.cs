@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CDriveCleaner
@@ -279,6 +280,40 @@ namespace CDriveCleaner
                 File.WriteAllText(exe + ".config", "<configuration/>");
                 if (EnvGuard.PlantedFiles(exe).Count != 1) return "a planted .config not seen";
                 return null;
+            });
+
+            Run(check, "A scheduled task with administrator rights is only ever made for Elixar's launcher in Program Files, never for another copy", () =>
+            {
+                if (!Win.IsWindows) return null;
+                if (!Automation.ElevatedTaskOk(Automation.CreateCleanArgs(Install.Exe, "Sunday", "20:00")) || !Automation.ElevatedTaskOk(Automation.CreateKeepArgs(Install.Exe)) ||
+                    !Automation.ElevatedTaskOk(Automation.CreateMailArgs(Install.Exe, "09:00")) || !Automation.ElevatedTaskOk(Automation.CreatePolicyCleanArgs(Install.Exe)))
+                    return "Elixar's own schedules refused";
+                string dl = Path.Combine(UserDirs.Home, "Downloads", "Elixar.exe");
+                if (Automation.ElevatedTaskOk(Automation.CreateCleanArgs(dl, "Sunday", "20:00"))) return "an administrator task for a copy in Downloads was allowed";
+                if (Automation.ElevatedTaskOk("/Create /F /TN x /TR \"C:\\Users\\me\\evil.exe\" /SC DAILY /RL HIGHEST")) return "any program allowed";
+                if (!Automation.ElevatedTaskOk(Automation.CreateCheckArgs(dl, 10, "12:00"))) return "a normal (not administrator) task refused";
+                string o; if (Automation.RunSchtasks(Automation.CreateCleanArgs(dl, "Sunday", "20:00"), out o) != -1 || !o.StartsWith("refused")) return "Task Scheduler was asked: " + o;
+                return null;
+            });
+
+            Run(check, "The change log's lock, held by something that never lets go: only the first change waits, every change is still written", () =>
+            {
+                string keep = ChangeLog.OverrideFile; ChangeLog.OverrideFile = Path.Combine(R, "changes-lock.jsonl"); ChangeLog.ResetStuckForTest();
+                var held = new ManualResetEvent(false); var done = new ManualResetEvent(false);
+                var t = new Thread(() => { using (var m = new Mutex(false, @"Global\Elixar-ChangeLog")) { m.WaitOne(); held.Set(); done.WaitOne(20000); m.ReleaseMutex(); } }) { IsBackground = true };
+                t.Start();
+                try
+                {
+                    if (!held.WaitOne(5000)) return null;   // named locks not available here
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    for (int i = 0; i < 5; i++) ChangeLog.Add("Test", "lock " + i, "x", "", "", "", false);
+                    sw.Stop();
+                    if (sw.ElapsedMilliseconds > 6000) return "5 changes took " + sw.ElapsedMilliseconds + " ms";
+                    int n = File.ReadAllLines(ChangeLog.OverrideFile).Count(l => l.Contains("lock "));
+                    if (n != 5) return n + " of 5 changes written";
+                    return null;
+                }
+                finally { done.Set(); t.Join(5000); ChangeLog.OverrideFile = keep; ChangeLog.ResetStuckForTest(); }
             });
 
             Run(check, "Measuring several at once: Windows' folder lists and your profile are made once, safely, from many threads", () =>
