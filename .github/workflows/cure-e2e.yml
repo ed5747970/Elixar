@@ -174,21 +174,18 @@ jobs:
           & .\tools\netwatch.ps1 check
           Check "network watch: Elixar, Cure Agent and Cure Server connected only to this PC (Windows' firewall audit, event 5156)" ($LASTEXITCODE -eq 0)
 
-          # 6b. an attacker without administrator rights repairs the program (Windows runs repairs as SYSTEM) and gives a server
-          # of their own: the agent must not be pointed there, and its service must stay as it was
-          Write-Host "6b. a plain user's repair, with a server of their own"
-          Copy-Item "$PWD\Elixar-Business.msi" 'C:\Users\Public\e2e-repair.msi' -Force
+          # 6b. a repair (any user may start one; Windows runs it as SYSTEM) with a server given to it: the agent must not be
+          # set up again from it. Run here as administrator, so Windows passes every setting on: the strongest case
+          Write-Host "6b. a repair with a server of its own"
           $binBefore = (Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName
-          $rp = Start-Process msiexec.exe -Credential $script:viewer -WorkingDirectory 'C:\Users\Public' -ArgumentList '/fa "C:\Users\Public\e2e-repair.msi" /qn CUREAGENT=1 CURESERVER=https://attacker.invalid:9/ CURETOKEN=stolen CURETHUMBPRINT=0000000000000000000000000000000000000000 /l*v "C:\Users\Public\e2e-repair.log"' -PassThru -ErrorAction SilentlyContinue
-          # at most 5 minutes (Windows may wait for an administrator that never comes)
-          $done = $rp -and $rp.WaitForExit(300000)
-          if ($rp -and -not $done) { try { $rp.Kill() } catch { }; Get-Process msiexec -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -ne 0 } | Stop-Process -Force -ErrorAction SilentlyContinue }
-          Write-Host "repair by a plain user: $(if (-not $rp) { 'not started' } elseif ($done) { "exit $($rp.ExitCode)" } else { 'still waiting after 5 minutes (stopped)' })"
-          if (Test-Path 'C:\Users\Public\e2e-repair.log') { Write-Host (Select-String -Path 'C:\Users\Public\e2e-repair.log' -Pattern 'InstallCureAgent|CURESERVER' -SimpleMatch | Select-Object -First 8 | Out-String) }
-          $own = Get-ItemProperty 'HKLM:\SOFTWARE\Elixar\Cure' -ErrorAction SilentlyContinue
-          Check "a plain user's repair can't point the agent at another server" (-not ($own -and "$($own.Server)" -match 'attacker')) "$($own.Server)"
-          Check "a plain user's repair leaves the agent service as it was" ((Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName -eq $binBefore)
-          Remove-Item 'C:\Users\Public\e2e-repair.msi', 'C:\Users\Public\e2e-repair.log' -Force -ErrorAction SilentlyContinue
+          $rpJob = Start-Job -ScriptBlock { param($m, $l) (Start-Process msiexec.exe -ArgumentList "/fa `"$m`" /qn CUREAGENT=1 CURESERVER=https://attacker.invalid:9/ CURETOKEN=stolen CURETHUMBPRINT=0000000000000000000000000000000000000000 /l*v `"$l`"" -Wait -PassThru).ExitCode } -ArgumentList "$PWD\Elixar-Business.msi", "$PWD\msi-repair.log"
+          $rpDone = Wait-Job $rpJob -Timeout 600
+          $rpCode = if ($rpDone) { Receive-Job $rpJob } else { 'still running after 10 minutes' }
+          Write-Host "repair: $rpCode"
+          if (Test-Path msi-repair.log) { Write-Host (Select-String -Path msi-repair.log -Pattern 'InstallCureAgent' -SimpleMatch | Select-Object -First 4 | Out-String) }
+          $ownKey = Get-ItemProperty 'HKLM:\SOFTWARE\Elixar\Cure' -ErrorAction SilentlyContinue
+          Check "a repair can't point the agent at another server" (-not ($ownKey -and "$($ownKey.Server)" -match 'attacker')) "$($ownKey.Server)"
+          Check "a repair leaves the agent service as it was" ((Get-CimInstance Win32_Service -Filter "Name='CureAgent'").PathName -eq $binBefore)
 
           # 7. uninstall: nothing is left behind (the reports stay unless --purge)
           $code = Msi "/x `"$PWD\Elixar-Business.msi`"" 'msi-remove.log'
